@@ -15,7 +15,15 @@ webpush.setVapidDetails("mailto:contoh@localhost", vapid.publicKey, vapid.privat
 const tokens = new Set<string>();
 const subscriptions = new Map<string, PushSubscription>();
 const buffer: { type: string; seq: number; ts: string; data: unknown }[] = [];
-const clients = new Map<WebSocket, { candles: Set<string> }>();
+const clients = new Map<WebSocket, { candles: Set<string>; topics: Set<string> }>();
+const ALWAYS = new Set(["gw.error"]);
+const failing = new Map<string, number>();
+let upstreamDownUntil = 0;
+const upstreamDown = () => Date.now() < upstreamDownUntil;
+
+function wants(ws: WebSocket, type: string): boolean {
+  return ALWAYS.has(type) || (clients.get(ws)?.topics.has(type) ?? false);
+}
 let seq = 0;
 let scenario: Scenario = (process.env.MOCK_SCENARIO as Scenario) ?? "aman";
 let droppedUntil = 0;
@@ -188,7 +196,7 @@ function emit(type: string, data: unknown) {
   const event = { type, seq: ++seq, ts: isoMs(Date.now()), data };
   buffer.push(event);
   if (buffer.length > 200) buffer.shift();
-  for (const [ws] of clients) send(ws, event);
+  for (const [ws] of clients) if (wants(ws, type)) send(ws, event);
   return event;
 }
 
@@ -269,10 +277,26 @@ const server = createServer(async (req, res) => {
         return json(res, 200, { dropped_until: iso(droppedUntil) });
       }
       if (path === "/gw/v1/dev/push") return json(res, 200, await push(String(b.kind)));
+      if (path === "/gw/v1/dev/upstream") {
+        upstreamDownUntil = Date.now() + Number(b.seconds ?? 30) * 1000;
+        emit("gw.error", { code: "upstream_unavailable", message: "Freqtrade websocket closed", retry_ms: 5000 });
+        return json(res, 200, { down_until: iso(upstreamDownUntil) });
+      }
+      if (path === "/gw/v1/dev/fail") {
+        const status = Number(b.status ?? 0);
+        if (status > 0) failing.set(String(b.path), status);
+        else failing.delete(String(b.path));
+        return json(res, 200, { failing: Object.fromEntries(failing) });
+      }
       return fail(res, 404, "not_found", "unknown dev route");
     }
     const auth = req.headers.authorization?.replace(/^Bearer /, "");
     if (!auth || !tokens.has(auth)) return fail(res, 401, "unauthorized", "Token tidak sah");
+    const forced = failing.get(path);
+    if (forced) return fail(res, forced, forced === 404 ? "not_found" : "upstream_error", "Gagal dipaksa oleh rute dev");
+    if (upstreamDown() && ["/gw/v1/health", "/gw/v1/overview", "/gw/v1/risk"].includes(path)) {
+      return fail(res, 503, "upstream_unavailable", "Freqtrade API did not answer within 5s");
+    }
     if (req.method === "GET") {
       switch (path) {
         case "/gw/v1/health":
@@ -358,7 +382,7 @@ server.on("upgrade", (req, socket, head) => {
       ws.close(4401, "unauthorized");
       return;
     }
-    clients.set(ws, { candles: new Set() });
+    clients.set(ws, { candles: new Set(), topics: new Set() });
     hello(ws);
     ws.on("message", (raw) => {
       let msg: Record<string, unknown>;
@@ -372,19 +396,26 @@ server.on("upgrade", (req, socket, head) => {
         const last = Number(msg.last_seq);
         const first = buffer[0]?.seq ?? seq + 1;
         if (last + 1 >= first) {
-          for (const e of buffer) if (e.seq > last) send(ws, e);
+          for (const e of buffer) if (e.seq > last && wants(ws, e.type)) send(ws, e);
         } else {
           hello(ws);
           send(ws, { type: "gw.resync", seq, ts: isoMs(Date.now()), data: { whitelist: PAIRS.map((p) => p.pair), open_trades: trades.filter((t) => !t.close_ms).map(tradeJson), balance: overview().balance } });
         }
         return;
       }
-      if (msg.type === "subscribe" && Array.isArray(msg.candles)) {
-        for (const c of msg.candles as { pair: string; limit?: number }[]) {
+      if (msg.type === "subscribe") {
+        const state = clients.get(ws);
+        if (!state) return;
+        const previous = state.candles;
+        state.topics = new Set(Array.isArray(msg.topics) ? (msg.topics as string[]) : []);
+        state.candles = new Set();
+        for (const c of (Array.isArray(msg.candles) ? msg.candles : []) as { pair: string; limit?: number }[]) {
           const rows = candles.get(c.pair);
           if (!rows) continue;
-          clients.get(ws)?.candles.add(c.pair);
-          send(ws, { type: "gw.candles", seq, ts: isoMs(Date.now()), data: { pair: c.pair, timeframe: "1h", snapshot: true, candles: rows.slice(-(c.limit ?? 300)) } });
+          state.candles.add(c.pair);
+          if (!previous.has(c.pair) && state.topics.has("gw.candles")) {
+            send(ws, { type: "gw.candles", seq, ts: isoMs(Date.now()), data: { pair: c.pair, timeframe: "1h", snapshot: true, candles: rows.slice(-(c.limit ?? 300)) } });
+          }
         }
       }
     });
@@ -398,6 +429,10 @@ const heartbeat = setInterval(() => {
 
 function tick() {
   if (Date.now() < droppedUntil) return;
+  if (upstreamDown()) {
+    emit("gw.error", { code: "upstream_unavailable", message: "Freqtrade websocket closed", retry_ms: 5000 });
+    return;
+  }
   for (const p of PAIRS) prices.set(p.pair, prices.get(p.pair)! * (1 + (random() - 0.5) * p.vol * 0.15));
   const h = hourNow() - HOUR;
   if (h > lastHour) {
@@ -408,7 +443,7 @@ function tick() {
       const close = prices.get(p.pair)!;
       const row: Row = [iso(h), prev[4], Math.max(prev[4], close) * 1.001, Math.min(prev[4], close) * 0.999, Math.round(close), 0.2, prev[6], prev[7], prev[8], null, null];
       rows.push(row);
-      for (const [ws, c] of clients) if (c.candles.has(p.pair)) send(ws, { type: "gw.candles", seq: ++seq, ts: isoMs(Date.now()), data: { pair: p.pair, timeframe: "1h", candles: [row] } });
+      for (const [ws, c] of clients) if (c.candles.has(p.pair) && c.topics.has("gw.candles")) send(ws, { type: "gw.candles", seq: ++seq, ts: isoMs(Date.now()), data: { pair: p.pair, timeframe: "1h", candles: [row] } });
     }
   }
   emit("gw.risk", (({ equity, daily_loss_pct, drawdown_pct, entries_allowed, breaches }) => ({ equity, daily_loss_pct, drawdown_pct, entries_allowed, breaches }))(riskSnapshot()));
@@ -416,7 +451,7 @@ function tick() {
 
 let step = 0;
 function script() {
-  if (Date.now() < droppedUntil) return;
+  if (Date.now() < droppedUntil || upstreamDown()) return;
   const pair = PAIRS[step % 3].pair;
   const phase = step % 4;
   step++;

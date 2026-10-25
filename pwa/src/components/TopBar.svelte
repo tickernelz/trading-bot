@@ -20,7 +20,7 @@
 
 <header class="bar">
   {#if g.mode === null}
-    <span class="mode unknown">Mode belum diketahui</span>
+    <span class="mode unknown" aria-label="Mode belum diketahui" title="Mode belum diketahui">Mode ?</span>
   {:else}
     <span class="mode" class:live={g.mode === "live"}>{g.mode === "live" ? "Live, dana nyata" : "Dry-run"}</span>
   {/if}
@@ -48,6 +48,10 @@
     background: var(--bg);
     border-bottom: 1px solid var(--rule);
     font-size: var(--step--1);
+  }
+  .mode,
+  .sample {
+    white-space: nowrap;
   }
   .mode {
     padding: 3px 8px;

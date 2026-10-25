@@ -20,6 +20,8 @@
     <h2 class="sec">Jejak hari ini <span class="meta">sejak 00.00 WIB</span></h2>
     {#if day && g.risk}
       <div class="pad"><Trace points={day.points} start={g.equityDay!.start_equity} limitPct={g.risk.limits.max_daily_loss_pct} from={g.risk.day_start} stale={g.stale} /></div>
+    {:else if g.panelFaults.equityDay}
+      <p class="note warn-text">Jejak hari ini gagal dimuat ({g.panelFaults.equityDay.code}).</p>
     {:else}
       <div class="pad"><span class="skeleton" style="height:150px"></span></div>
     {/if}

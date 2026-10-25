@@ -17,6 +17,17 @@
   });
   const cpu = $derived(g.sysinfo ? g.sysinfo.cpu_pct.reduce((a, b) => a + b, 0) / Math.max(1, g.sysinfo.cpu_pct.length) : null);
   const version = __APP_VERSION__;
+  const PANEL_LABEL: Record<string, string> = {
+    open: "posisi terbuka",
+    closed: "trade ditutup",
+    equityDay: "jejak hari ini",
+    equityWeek: "ekuitas Bot A dan B",
+    decisions: "keputusan swarm",
+    sysinfo: "beban PC",
+    logs: "log bot",
+    candles: "kandel",
+  };
+  const panelFaults = $derived(Object.entries(g.panelFaults));
 </script>
 
 <h2 class="sec first">Kesehatan <span class="meta">{g.health ? "dari gateway " + clock(g.lastDataAt ?? g.now, true) : ""}</span></h2>
@@ -34,6 +45,16 @@
   </dl>
 {:else}
   <p class="note">Menunggu data kesehatan dari gateway.</p>
+{/if}
+
+{#if panelFaults.length}
+  <h2 class="sec">Data yang gagal dimuat</h2>
+  <dl class="rows">
+    {#each panelFaults as [name, f] (name)}
+      <div><dt>{PANEL_LABEL[name] ?? name}</dt><dd class="warn-text">{f!.code} · {clock(f!.at)}</dd></div>
+    {/each}
+  </dl>
+  <p class="note">Bagian lain tetap diperbarui; bagian ini memakai data terakhir yang berhasil dimuat.</p>
 {/if}
 
 <h2 class="sec">Provider voter <span class="meta">dari keputusan swarm terakhir</span></h2>

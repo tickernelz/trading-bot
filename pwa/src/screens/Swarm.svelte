@@ -70,6 +70,8 @@
       </li>
     {/each}
   </ul>
+{:else if g.panelFaults.decisions}
+  <p class="note empty warn-text">Keputusan swarm gagal dimuat dari gateway ({g.panelFaults.decisions.code}). Dicoba lagi setiap 30 detik.</p>
 {:else}
   <p class="note empty">Belum ada keputusan swarm. Swarm menilai kandidat entry saat kandel 1 jam tertutup dan strategi memberi sinyal masuk; hasilnya muncul di sini bersama jawaban tiap voter.</p>
 {/if}

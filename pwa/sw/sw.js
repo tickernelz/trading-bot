@@ -1,5 +1,6 @@
-const CACHE = "tb-shell-v1";
-const SHELL = ["/", "/manifest.webmanifest", "/icons/icon.svg", "/icons/icon-192.png"];
+const CACHE = "tb-shell-__SW_VERSION__";
+const SHELL = ["/", "/manifest.webmanifest", "/icons/icon.svg", "/icons/icon-192.png", ...__SW_ASSETS__];
+const HOME = "/#ringkas";
 const URGENT = new Set(["risk_breach", "kill_switch", "heartbeat_lost"]);
 
 self.addEventListener("install", (event) => {
@@ -28,8 +29,10 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const copy = response.clone();
-          void caches.open(CACHE).then((cache) => cache.put("/", copy));
+          if (response.ok) {
+            const copy = response.clone();
+            void caches.open(CACHE).then((cache) => cache.put("/", copy));
+          }
           return response;
         })
         .catch(() => caches.match("/").then((cached) => cached ?? Response.error())),
@@ -53,6 +56,15 @@ self.addEventListener("fetch", (event) => {
   }
 });
 
+function sameOrigin(raw) {
+  try {
+    const url = new URL(raw, self.location.origin);
+    return url.origin === self.location.origin ? url.href : new URL(HOME, self.location.origin).href;
+  } catch {
+    return new URL(HOME, self.location.origin).href;
+  }
+}
+
 function parse(event) {
   try {
     return event.data ? event.data.json() : null;
@@ -71,7 +83,7 @@ self.addEventListener("push", (event) => {
     timestamp: data.ts ? Date.parse(data.ts) : Date.now(),
     icon: "/icons/icon-192.png",
     badge: "/icons/badge-96.png",
-    data: { url: data.url ?? "/#ringkas", kind },
+    data: { url: sameOrigin(data.url ?? HOME), kind },
     requireInteraction: URGENT.has(kind),
     renotify: false,
   };
@@ -80,7 +92,7 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const target = new URL(event.notification.data?.url ?? "/#ringkas", self.location.origin).href;
+  const target = sameOrigin(event.notification.data?.url ?? HOME);
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
       for (const client of list) {

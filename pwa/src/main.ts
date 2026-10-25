@@ -4,7 +4,7 @@ import { mount } from "svelte";
 import App from "./App.svelte";
 import { gateway } from "./lib/gateway.svelte";
 
-if ("serviceWorker" in navigator) {
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
   void navigator.serviceWorker.register("/sw.js", { scope: "/" });
 }
 

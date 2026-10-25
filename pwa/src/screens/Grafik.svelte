@@ -62,6 +62,8 @@
     {#if finals.length === 2}
       <p class="note">Selisih B terhadap A: <Outcome value={finals[1].end - finals[0].end} unit="idr" word={false} />. Swarm di Bot B hanya mencatat (mode bayangan); selisih ini belum bukti swarm berguna. Syarat adopsi ada di plan bagian 8.</p>
     {/if}
+  {:else if g.panelFaults.equityWeek}
+    <p class="note warn-text">Ekuitas Bot A dan B gagal dimuat ({g.panelFaults.equityWeek.code}).</p>
   {:else}
     <div class="pad"><span class="skeleton" style="height:260px"></span></div>
   {/if}
@@ -89,6 +91,8 @@
     <p class="note age">
       Kandel tertutup terakhir {lastRow ? dayClock(String(lastRow[0])) : "-"}{frame.last_analyzed ? " · dianalisis " + clock(frame.last_analyzed) : ""}. Kandel baru tiba saat jam berikutnya tertutup.
     </p>
+  {:else if g.panelFaults.candles}
+    <p class="note warn-text">Kandel gagal dimuat ({g.panelFaults.candles.code}).</p>
   {:else}
     <div class="pad"><span class="skeleton" style="height:340px"></span></div>
   {/if}

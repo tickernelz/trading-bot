@@ -4,7 +4,10 @@
 
   const g = gateway;
   const retryIn = $derived(g.link.retryAt === null ? null : Math.max(0, Math.ceil((g.link.retryAt - g.now) / 1000)));
-  const show = $derived(g.link.state === "waiting" || g.link.state === "offline" || (g.stale && g.link.state !== "connecting"));
+  const fault = $derived(g.upstreamFault ?? g.coreFault);
+  const show = $derived(
+    g.link.state === "waiting" || g.link.state === "offline" || fault !== null || (g.stale && g.link.state !== "connecting"),
+  );
 </script>
 
 {#if show}
@@ -14,6 +17,10 @@
         Perangkat sedang offline.
       {:else if g.link.state === "waiting"}
         Sambungan ke gateway putus{g.link.closedAt ? " sejak " + clock(g.link.closedAt) : ""}.
+      {:else if g.upstreamFault}
+        Gateway tersambung, tetapi bot tidak menjawab sejak {clock(g.upstreamFault.at)}: {g.upstreamFault.message} ({g.upstreamFault.code}).
+      {:else if g.coreFault}
+        Keadaan bot gagal dimuat pada {clock(g.coreFault.at)}: {g.coreFault.message} ({g.coreFault.code}).
       {:else}
         Tidak ada data baru selama {age(g.dataAge).replace(" lalu", "")}.
       {/if}

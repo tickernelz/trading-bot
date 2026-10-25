@@ -2,14 +2,13 @@ import { createApi, type Api } from "./api";
 import { FeedClient, type LinkInfo } from "./feed";
 import { describe, type FeedItem } from "./feedText";
 import { parseTs } from "./format";
+import { carriesData, FEED_TOPICS, faultOf, isStale, loadSnapshot, safetyOf, type Fault, type PanelName, type SafetyState } from "./state";
 import type { CandleFrame, Decision, Equity, FeedEvent, Health, LogLine, Overview, Risk, Sysinfo, Trade } from "./types";
 
-export const STALE_AFTER_MS = 90000;
 const FEED_LIMIT = 200;
+const RECOVERY_REFRESH_MS = 10000;
 const TOKEN_KEY = "tb.session";
 const BASE = (import.meta.env.VITE_GATEWAY_BASE as string | undefined) ?? "";
-
-export type SafetyState = "aman" | "ditahan" | "berhenti";
 
 export interface PendingOrder {
   trade_id: number;
@@ -46,7 +45,9 @@ class Gateway {
   feed = $state<FeedItem[]>([]);
   sysinfo = $state<Sysinfo | null>(null);
   logs = $state<LogLine[]>([]);
-  error = $state<string | null>(null);
+  coreFault = $state<Fault | null>(null);
+  upstreamFault = $state<Fault | null>(null);
+  panelFaults = $state<Partial<Record<PanelName | "candles", Fault>>>({});
   pending = $state<PendingOrder[]>([]);
 
   readonly api: Api;
@@ -54,6 +55,8 @@ class Gateway {
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
   private tradeRefresh: ReturnType<typeof setTimeout> | null = null;
   private watchedPairs = new Set<string>();
+  private refreshing = false;
+  private lastRefreshAt = 0;
 
   constructor() {
     this.api = createApi(BASE, () => this.token, () => this.logout());
@@ -84,7 +87,7 @@ class Gateway {
   }
 
   get dryRun(): boolean {
-    return this.mode !== "live";
+    return this.mode === "dry_run";
   }
 
   get dataAge(): number {
@@ -92,14 +95,11 @@ class Gateway {
   }
 
   get stale(): boolean {
-    return this.lastDataAt !== null && (this.link.state !== "open" || this.dataAge > STALE_AFTER_MS);
+    return isStale({ linkOpen: this.link.state === "open", lastDataAt: this.lastDataAt, now: this.now, upstream: this.upstreamFault, core: this.coreFault });
   }
 
   get safety(): SafetyState | null {
-    if (!this.health || !this.risk) return null;
-    if (this.health.freqtrade.state !== "running") return "berhenti";
-    if (!this.risk.entries_allowed) return "ditahan";
-    return "aman";
+    return safetyOf(this.health, this.risk);
   }
 
   async login(password: string): Promise<void> {
@@ -133,7 +133,7 @@ class Gateway {
   watchCandles(pair: string): void {
     if (this.watchedPairs.has(pair)) return;
     this.watchedPairs.add(pair);
-    this.client.send({ type: "subscribe", topics: [], candles: [{ pair, timeframe: "1h", limit: 300 }] });
+    this.client.send(this.subscription());
     if (!this.candles[pair]) void this.loadCandles(pair);
   }
 
@@ -141,64 +141,84 @@ class Gateway {
     try {
       const frame = await this.api.get<CandleFrame>("/gw/v1/candles?pair=" + encodeURIComponent(pair) + "&timeframe=1h&limit=300");
       this.candles = { ...this.candles, [pair]: frame };
+      this.clearPanelFault("candles");
     } catch (error) {
-      this.fail(error);
+      this.panelFaults = { ...this.panelFaults, candles: faultOf(error, Date.now()) };
     }
   }
 
   private greeting(): object[] {
     const messages: object[] = [];
     if (this.lastSeq !== null) messages.push({ type: "resume", last_seq: this.lastSeq });
-    messages.push({
-      type: "subscribe",
-      topics: ["entry", "entry_fill", "exit", "exit_fill", "status", "warning", "whitelist", "gw.risk", "gw.risk_denied", "gw.decision", "gw.candles"],
-      candles: [...this.watchedPairs].map((pair) => ({ pair, timeframe: "1h", limit: 300 })),
-    });
+    messages.push(this.subscription());
     return messages;
   }
 
+  private subscription(): object {
+    return {
+      type: "subscribe",
+      topics: [...FEED_TOPICS],
+      candles: [...this.watchedPairs].map((pair) => ({ pair, timeframe: "1h", limit: 300 })),
+    };
+  }
+
+  private clearPanelFault(name: PanelName | "candles"): void {
+    if (!this.panelFaults[name]) return;
+    const rest = { ...this.panelFaults };
+    delete rest[name];
+    this.panelFaults = rest;
+  }
+
   async refresh(): Promise<void> {
-    const get = this.api.get;
+    if (this.refreshing) return;
+    this.refreshing = true;
+    this.lastRefreshAt = Date.now();
     try {
-      const [health, overview, risk, open, closed, day, week, decisions, sysinfo, logs] = await Promise.all([
-        get<Health>("/gw/v1/health"),
-        get<Overview>("/gw/v1/overview"),
-        get<Risk>("/gw/v1/risk"),
-        get<Trade[]>("/gw/v1/trades/open"),
-        get<Trade[]>("/gw/v1/trades?limit=50"),
-        get<Equity>("/gw/v1/equity?window=day"),
-        get<Equity>("/gw/v1/equity?window=7d&bots=A,B"),
-        get<Decision[]>("/gw/v1/decisions?limit=20"),
-        get<Sysinfo>("/gw/v1/sysinfo"),
-        get<{ logs: (string | number)[][] }>("/gw/v1/logs?limit=30"),
-      ]);
-      this.health = health;
-      this.overview = overview;
-      this.risk = risk;
-      this.openTrades = open;
-      this.closedTrades = closed.filter((t) => !t.is_open);
-      this.equityDay = day;
-      this.equityWeek = week;
-      this.decisions = decisions;
-      this.sysinfo = sysinfo;
-      this.logs = logs.logs.map((l) => ({ ts: String(l[0]), logger: String(l[2]), level: String(l[3]), message: String(l[4]) }));
-      this.sampleData = Boolean(health.gateway.sample_data);
-      this.lastDataAt = Math.max(this.lastDataAt ?? 0, parseTs(overview.as_of));
-      this.error = null;
-    } catch (error) {
-      this.fail(error);
+      await this.load();
+    } finally {
+      this.refreshing = false;
     }
   }
 
-  private fail(error: unknown): void {
-    this.error = error instanceof Error ? error.message : String(error);
+  private async load(): Promise<void> {
+    const snap = await loadSnapshot(this.api.get, Date.now);
+    if (snap.core) {
+      this.health = snap.core.health;
+      this.overview = snap.core.overview;
+      this.risk = snap.core.risk;
+      this.sampleData = Boolean(snap.core.health.gateway.sample_data);
+      this.lastDataAt = Math.max(this.lastDataAt ?? 0, parseTs(snap.core.overview.as_of));
+      this.coreFault = null;
+      this.upstreamFault = null;
+    } else {
+      this.coreFault = snap.coreFault;
+    }
+    const p = snap.panels;
+    if (p.open) this.openTrades = p.open;
+    if (p.closed) this.closedTrades = p.closed;
+    if (p.equityDay) this.equityDay = p.equityDay;
+    if (p.equityWeek) this.equityWeek = p.equityWeek;
+    if (p.decisions) this.decisions = p.decisions;
+    if (p.sysinfo) this.sysinfo = p.sysinfo;
+    if (p.logs) this.logs = p.logs;
+    const candles = this.panelFaults.candles;
+    this.panelFaults = candles ? { ...snap.panelFaults, candles } : snap.panelFaults;
   }
 
   private apply(event: FeedEvent): void {
     if (typeof event.seq === "number") this.lastSeq = event.seq;
-    this.lastDataAt = this.now = Date.now();
+    this.now = Date.now();
+    if (carriesData(event.type)) {
+      this.lastDataAt = this.now;
+      const recovering = this.upstreamFault !== null || this.coreFault !== null;
+      this.upstreamFault = null;
+      if (recovering && this.now - this.lastRefreshAt >= RECOVERY_REFRESH_MS) void this.refresh();
+    }
     const data = event.data as Record<string, unknown>;
     switch (event.type) {
+      case "gw.error":
+        this.upstreamFault = { code: String(data.code ?? "upstream_error"), message: String(data.message ?? ""), at: this.now };
+        break;
       case "gw.hello":
         this.sampleData = Boolean(data.sample_data);
         void this.refresh();
@@ -286,8 +306,9 @@ class Gateway {
         ]);
         this.openTrades = open;
         this.closedTrades = closed.filter((t) => !t.is_open);
+        this.clearPanelFault("open");
       } catch (error) {
-        this.fail(error);
+        this.panelFaults = { ...this.panelFaults, open: faultOf(error, Date.now()) };
       }
     }, 400);
   }

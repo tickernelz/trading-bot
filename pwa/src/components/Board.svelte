@@ -3,7 +3,9 @@
   import { age, clock, MINUS, percent } from "../lib/format";
 
   const g = gateway;
-  const word = $derived(g.safety === "aman" ? "Aman" : g.safety === "ditahan" ? "Ditahan" : g.safety === "berhenti" ? "Berhenti" : "");
+  const word = $derived(
+    g.safety === "aman" ? "Aman" : g.safety === "ditahan" ? "Ditahan" : g.safety === "berhenti" ? "Berhenti" : g.coreFault ? "Tidak diketahui" : "",
+  );
   const sentence = $derived.by(() => {
     const risk = g.risk;
     if (!risk || !g.safety) return "";
@@ -21,7 +23,7 @@
   });
 </script>
 
-<section class="board {g.safety ?? 'loading'}" class:stale={g.stale} aria-label="Keadaan bot">
+<section class="board {g.safety ?? (g.coreFault ? 'unknown' : 'loading')}" class:stale={g.stale && g.safety !== null} aria-label="Keadaan bot">
   <p class="sr-only" aria-live="assertive">{word ? "Keadaan bot: " + word : ""}</p>
   {#if g.safety}
     <div class="w" aria-hidden="true">{word}</div>
@@ -29,6 +31,9 @@
     {#if g.stale}
       <p class="basi">Keadaan terakhir yang diketahui, dari {g.lastDataAt ? clock(g.lastDataAt) : "-"} ({age(g.dataAge)}). Bisa sudah berubah.</p>
     {/if}
+  {:else if g.coreFault}
+    <div class="w">Tidak diketahui</div>
+    <p class="s">Keadaan bot belum bisa dimuat dari gateway. Jangan anggap aman sampai papan ini menampilkan keadaan.</p>
   {:else}
     <span class="skeleton" style="width:40%;height:2.5rem"></span>
     <span class="skeleton" style="width:85%;margin-top:12px"></span>
@@ -46,6 +51,11 @@
   .board.berhenti {
     background: var(--sig);
     color: var(--onsig);
+  }
+  .board.unknown {
+    background: var(--panel);
+    color: var(--ink);
+    box-shadow: inset 0 0 0 2px var(--sig);
   }
   .board.loading {
     background: var(--panel);

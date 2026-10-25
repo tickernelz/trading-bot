@@ -40,7 +40,12 @@ export function createApi(base: string, token: () => string | null, onUnauthoriz
       throw new ApiError(401, "unauthorized", "Sesi berakhir");
     }
     const text = await response.text();
-    const parsed = text ? (JSON.parse(text) as unknown) : null;
+    let parsed: unknown = null;
+    try {
+      parsed = text ? JSON.parse(text) : null;
+    } catch {
+      if (response.ok) throw new ApiError(response.status, "invalid_response", "Gateway mengirim respons yang bukan JSON");
+    }
     if (!response.ok) {
       const envelope = parsed as ErrorEnvelope | null;
       throw new ApiError(
