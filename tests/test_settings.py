@@ -45,6 +45,9 @@ def _mutations():
     def duplicate_pair(raw):
         raw["exchange"]["pairs"] = ["BTC/IDR", "BTC/IDR"]
 
+    def api_listens_beyond_loopback(raw):
+        raw["api"]["listen"] = "0.0.0.0"
+
     def missing_fee(raw):
         del raw["exchange"]["fee_pct"]
 
@@ -80,6 +83,7 @@ def _mutations():
         non_idr_pair,
         duplicate_pair,
         missing_fee,
+        api_listens_beyond_loopback,
         unknown_timezone,
         voter_unknown_provider,
         voter_unlisted_model,

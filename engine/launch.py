@@ -12,6 +12,7 @@ from engine.settings import ConfigError, Settings, load_settings
 
 STRATEGY = "SwingEmaRsi"
 STRATEGY_COMMANDS = {"trade", "backtesting", "webserver"}
+API_COMMANDS = {"trade", "webserver"}
 ENGINE_ROOT = Path(__file__).resolve().parent
 
 
@@ -19,9 +20,9 @@ class MissingSecret(Exception):
     """Raised when a required environment variable is unset or empty."""
 
 
-def freqtrade_config(settings: Settings) -> dict[str, Any]:
+def freqtrade_config(settings: Settings, serve_api: bool = True) -> dict[str, Any]:
     """Translate validated settings into a Freqtrade configuration without secrets."""
-    return {
+    config: dict[str, Any] = {
         "bot_name": "trading-bot",
         "trading_mode": "spot",
         "margin_mode": "",
@@ -55,20 +56,24 @@ def freqtrade_config(settings: Settings) -> dict[str, Any]:
             "pair_blacklist": [],
         },
         "pairlists": [{"method": "StaticPairList"}],
-        "api_server": {
+        "internals": {"process_throttle_secs": 5},
+        "trading_bot": {
+            "initial_capital": settings.capital.initial_idr,
+            "compounding": settings.capital.compounding,
+            "risk": settings.risk.model_dump(),
+        },
+    }
+    if serve_api:
+        config["api_server"] = {
             "enabled": True,
             "listen_ip_address": settings.api.listen,
             "listen_port": settings.api.port,
             "verbosity": "error",
             "enable_openapi": False,
             "CORS_origins": [],
-        },
-        "internals": {"process_throttle_secs": 5},
-        "trading_bot": {
-            "initial_capital": settings.capital.initial_idr,
-            "risk": settings.risk.model_dump(),
-        },
-    }
+        }
+        config["apiserver"] = {"allow_custom_messages": True}
+    return config
 
 
 def secret_env(settings: Settings, environ: dict[str, str]) -> dict[str, str]:
@@ -100,13 +105,14 @@ def main(argv: list[str]) -> int:
     userdir = os.environ.get("TRADING_BOT_USERDIR", "user_data")
     try:
         settings = load_settings(config_file)
-        overrides = secret_env(settings, dict(os.environ))
+        serve_api = argv[0] in API_COMMANDS
+        overrides = secret_env(settings, dict(os.environ)) if serve_api else {}
     except (ConfigError, MissingSecret) as exc:
         print(f"trading-bot: refusing to start: {exc}", file=sys.stderr)
         return 2
     rendered = Path(userdir) / "trading-bot.freqtrade.json"
     rendered.parent.mkdir(parents=True, exist_ok=True)
-    rendered.write_text(json.dumps(freqtrade_config(settings), indent=2), encoding="utf-8")
+    rendered.write_text(json.dumps(freqtrade_config(settings, serve_api), indent=2), encoding="utf-8")
     command = build_argv(argv[0], argv[1:], rendered, userdir)
     os.execvpe(command[0], command, {**os.environ, **overrides})
 

@@ -122,7 +122,7 @@ class Notify(Strict):
 
 
 class Api(Strict):
-    listen: str = "127.0.0.1"
+    listen: Literal["127.0.0.1", "::1"] = "127.0.0.1"
     port: Annotated[int, Field(ge=1024, le=65535)] = 8080
     username_env: EnvName = "FT_API_USERNAME"
     password_env: EnvName = "FT_API_PASSWORD"

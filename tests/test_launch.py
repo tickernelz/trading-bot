@@ -43,6 +43,23 @@ def test_rendered_config_passes_freqtrade_validation(tmp_path):
     assert rendered["dry_run"] is True
     assert rendered["dry_run_wallet"] == 2_000_000
     assert rendered["fee"] == 0.002
+    assert rendered["apiserver"] == {"allow_custom_messages": True}
+    assert rendered["trading_bot"]["compounding"] is True
+
+
+@pytest.mark.parametrize("command", ["download-data", "backtesting", "show-config"])
+def test_offline_commands_run_without_api_server_or_secrets(monkeypatch, tmp_path, exec_calls, command):
+    for name in SECRETS:
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("TRADING_BOT_CONFIG", str(EXAMPLE))
+    monkeypatch.setenv("TRADING_BOT_USERDIR", str(tmp_path / "user_data"))
+    launch.main([command])
+    [(_, argv, env)] = exec_calls
+    assert argv[1] == command
+    assert not any(key.startswith("FREQTRADE__API_SERVER__") for key in env)
+    rendered = json.loads((tmp_path / "user_data" / "trading-bot.freqtrade.json").read_text(encoding="utf-8"))
+    assert "api_server" not in rendered
+    assert "apiserver" not in rendered
 
 
 def test_rendered_config_has_no_secrets():
@@ -61,7 +78,7 @@ def test_invalid_config_refuses_to_start(monkeypatch, tmp_path, example_raw, wri
     assert "refusing to start" in capsys.readouterr().err
 
 
-@pytest.mark.parametrize("command", ["trade", "download-data", "backtesting"])
+@pytest.mark.parametrize("command", ["trade", "webserver"])
 def test_missing_api_secret_refuses_to_start(monkeypatch, tmp_path, exec_calls, command):
     for name in SECRETS:
         monkeypatch.delenv(name, raising=False)
@@ -71,8 +88,8 @@ def test_missing_api_secret_refuses_to_start(monkeypatch, tmp_path, exec_calls, 
     assert exec_calls == []
 
 
-@pytest.mark.parametrize("command", ["trade", "download-data", "backtesting", "show-config"])
-def test_every_command_passes_api_secrets_through_env(monkeypatch, tmp_path, exec_calls, command):
+@pytest.mark.parametrize("command", ["trade", "webserver"])
+def test_serving_commands_pass_api_secrets_through_env(monkeypatch, tmp_path, exec_calls, command):
     for name, value in SECRETS.items():
         monkeypatch.setenv(name, value)
     monkeypatch.setenv("TRADING_BOT_CONFIG", str(EXAMPLE))
