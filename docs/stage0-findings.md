@@ -16,7 +16,7 @@ Kode ada di `swarm/` (paket Python `tb_swarm`, `pyproject.toml` sendiri supaya t
 | 6. Kronos mini di CPU | Terbukti (waktu, memori, median antar jalur) | `swarm/bench/bench_kronos.py`, 10 konfigurasi |
 | 7. Temuan dan angka di dokumen ini | Dokumen ini | - |
 
-Suite: `142 passed` (`cd swarm && .venv/bin/python -m pytest`), tanpa jaringan, tanpa key; 26,9 detik, RSS puncak 203 MB (`/usr/bin/time -v`).
+Suite: `161 passed` (`cd swarm && .venv/bin/python -m pytest`), tanpa jaringan, tanpa key; 28,5 detik, RSS puncak 203 MB (`/usr/bin/time -v`).
 
 ## Butir 1: antarmuka keputusan
 
