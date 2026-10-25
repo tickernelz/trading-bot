@@ -149,7 +149,7 @@ async def main():
     backends = [b.strip() for b in arguments.backends.split(",") if b.strip()]
     report = {"status": "ran", "base_url": arguments.base_url, "model": MODEL, "cases": len(CASES), "results": []}
     for backend in backends:
-        for mode in modes:
+        for mode in modes if backend == "direct" else ["prompt"]:
             report["results"].append(await run_cell(arguments, key, mode, backend))
     if arguments.out:
         arguments.out.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
