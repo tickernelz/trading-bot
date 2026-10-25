@@ -1,7 +1,10 @@
 #!/bin/sh
-hits=$(git diff --cached -U0 --diff-filter=ACM -- '*.ts' '*.tsx' '*.js' '*.py' '*.yaml' '*.yml' | grep -E '^\+\s*(//|#|/\*|\*)' | grep -v -E '^\+#!' | grep -v -E '^\+\s*(//|#|/\*)\s*(@ts-|eslint|noqa|type:|pragma|yaml-language-server|ruff|pyright|biome)' || true)
-if [ -n "$hits" ]; then
+whitelist='^\+\s*(//|#|/\*)\s*(@ts-|eslint|noqa|type:|pragma|yaml-language-server|ruff|pyright|biome)'
+py_hits=$(git diff --cached -U0 --diff-filter=ACM -- '*.py' | grep -E '^\+\s*#' | grep -v -E '^\+#!' | grep -v -E "$whitelist" || true)
+web_hits=$(git diff --cached -U0 --diff-filter=ACM -- '*.ts' '*.tsx' '*.js' '*.vue' '*.scss' '*.css' '*.yaml' '*.yml' | grep -E '^\+\s*(//|#|/\*|\*)' | grep -v -E '^\+#!' | grep -v -E "$whitelist" || true)
+if [ -n "$py_hits$web_hits" ]; then
   echo "pre-commit: comment gate failed:"
-  echo "$hits"
+  [ -n "$py_hits" ] && echo "$py_hits"
+  [ -n "$web_hits" ] && echo "$web_hits"
   exit 1
 fi
