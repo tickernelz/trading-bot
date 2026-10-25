@@ -1,5 +1,5 @@
 #!/bin/sh
-hits=$(git diff --cached -U0 --diff-filter=ACM -- '*.ts' '*.tsx' '*.js' '*.py' '*.yaml' '*.yml' | grep -E '^\+\s*(//|#|/\*|\*)' | grep -v -E '^\+#!' | grep -v -E '^\+\s*(//|#|/\*)\s*(@ts-|eslint|noqa|type:|pragma|yaml-language-server|ruff|pyright|biome)' || true)
+hits=$(git diff --cached -U0 --diff-filter=ACM -- '*.ts' '*.tsx' '*.js' '*.py' '*.yaml' '*.yml' | grep -E '^\+\s*(//|#|/\*|\*)' | grep -v -E '^\+#!' | grep -v -E '^\+\s*(//|#|/\*)\s*(@ts-|eslint|noqa|type:|pragma|yaml-language-server|ruff|pyright|biome)' | grep -v -E '^\+\s*\*{1,2}[A-Za-z_]*[,)]?\s*$' || true)
 if [ -n "$hits" ]; then
   echo "pre-commit: comment gate failed:"
   echo "$hits"
