@@ -30,7 +30,7 @@ class ProviderSpec(BaseModel):
     base_url: str | None = None
     base_url_env: str | None = None
     api_key_env: str | None = None
-    api_key: str | None = None
+    api_key: str | None = Field(default=None, repr=False)
     models: list[str] = Field(default_factory=list)
 
     def resolve_base_url(self, env: Mapping[str, str]) -> str | None:

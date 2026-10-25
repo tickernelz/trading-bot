@@ -45,6 +45,12 @@ def test_base_url_env_overrides_placeholder():
     assert spec.resolve_base_url({"P_URL": "http://h/v1"}) == "http://h/v1"
 
 
+def test_api_key_never_appears_in_repr():
+    spec = ProviderSpec(id="p", type="systemone", api_key="literal-secret-value")
+    assert "literal-secret-value" not in repr(spec)
+    assert spec.resolve_api_key({}) == "literal-secret-value"
+
+
 def test_api_key_prefers_env_then_literal():
     spec = ProviderSpec(id="p", type="systemone", api_key_env="K", api_key="literal")
     assert spec.resolve_api_key({"K": "from-env"}) == "from-env"

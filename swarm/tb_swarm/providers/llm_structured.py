@@ -1,4 +1,3 @@
-import asyncio
 import json
 import re
 import time
@@ -12,7 +11,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from tb_swarm.errors import ConfigError, ProviderError
 from tb_swarm.llm_prompt import SYSTEM_PROMPT
-from tb_swarm.models import ChoiceQuestion, DecisionRequest, DecisionResponse, NoulQuestion, ScoreQuestion, Usage
+from tb_swarm.models import ChoiceQuestion, DecisionRequest, DecisionResponse, NoulQuestion, Usage
 from tb_swarm.providers.base import DecisionProvider
 from tb_swarm.providers.http_wire import classify_status
 from tb_swarm.validate import parse_answers
