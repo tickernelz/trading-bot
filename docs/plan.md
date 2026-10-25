@@ -1,4 +1,4 @@
-# Plan final bot trading otonom 24 jam (revisi 8)
+# Plan final bot trading otonom 24 jam (revisi 9)
 
 Disusun 2026-10-25 setelah riset mendalam (dokumen research-swarm-pwa pada issue ini). Arahan Zhafron yang dipenuhi: modal Rp 2 juta; profit masuk lagi jadi modal; analisis memakai berita dan social; demo dulu; decision model (System One) sebagai bantuan cepat untuk LLM dan harus mendukung banyak model, bukan hanya Jev; analisis dengan swarm dan median; jalan di semua OS, mobile lewat PWA. Belum ada kode, akun, atau uang yang disentuh.
 
@@ -11,6 +11,8 @@ Perubahan revisi 6 (Zhafron 2026-10-25): provider AI yang dipakai adalah yang ak
 Perubahan revisi 7 (Zhafron 2026-10-25): (a) bot berjalan di PC Zhafron sendiri; (b) model uji: deepseek-v4.1-flash-1017 di provider nutaraline untuk semua peran LLM selama testing; (c) ada UI setup provider dan key, dan Wira yang mengatur penyimpanan key supaya aman (bagian 4.5); (d) UI/UX harus unik, bukan AI slop, dengan skill impeccable (bagian 12); (e) proyek disimpan di ~/Projects dengan git (bagian 11).
 
 Perubahan revisi 8 (Zhafron 2026-10-25): aplikasi dibuat full features, termasuk grafik live, aksi live, dan pratinjau live; daftar fitur must-have dan nice-to-have mengikuti saran Wira (bagian 13).
+
+Perubahan revisi 9 (Zhafron 2026-10-25): (a) secret tidak perlu terlalu dalam: API key boleh lewat variabel lingkungan atau langsung di config; keyring dibuang (bagian 4.5); (b) Freqtrade dijadikan vendor lewat git submodule supaya modifikasi mudah dan fleksibel (bagian 11); (c) yang memakai aplikasi adalah Zhafron di PC-nya sendiri, tema visual mengikuti keputusan Wira; (d) mode full otonom: setelah plan selesai, pekerjaan berjalan sampai selesai tanpa menunggu persetujuan per langkah, Zhafron mengoreksi sambil jalan (jendela otonom 24 jam, tanpa tindakan destruktif).
 
 ## 1. Pernyataan jujur tentang hasil
 
@@ -71,7 +73,7 @@ Catatan keamanan dari review sebelumnya (ZHA-3610, deepagents 0.7.13, belum diuj
 
 ### 4.2 Semua configurable
 
-Satu berkas konfigurasi YAML. Rahasia (API key) tidak di berkas dan tidak di repo, hanya lewat variabel lingkungan atau secret store. Berkas divalidasi skema saat start; konfigurasi salah berarti bot tidak start, bukan jalan dengan nilai tebakan. Nilai di bawah adalah default usulan Wira, semuanya bisa diubah Zhafron.
+Satu berkas konfigurasi YAML. API key boleh lewat variabel lingkungan (api_key_env) atau langsung di config/config.yaml (api_key); config.yaml dan .env ada di .gitignore dan tidak masuk repo. Berkas divalidasi skema saat start; konfigurasi salah berarti bot tidak start, bukan jalan dengan nilai tebakan. Nilai di bawah adalah default usulan Wira, semuanya bisa diubah Zhafron.
 
 ```yaml
 mode: dry_run                     # live butuh konfirmasi dua langkah
@@ -93,7 +95,8 @@ providers:
   - id: nutaraline
     type: openai-completions       # openai-completions, openai-responses, anthropic-messages
     base_url: from_import          # diambil dari omp models.yml, berakhiran /v1
-    key: secret:nutaraline         # nilai di penyimpanan kredensial OS, bukan di berkas ini
+    api_key_env: NUTARALINE_API_KEY   # nama variabel lingkungan; atau isi api_key di bawah
+    api_key: null                  # boleh diisi langsung di config.yaml lokal (tidak di-commit)
     models: [deepseek-v4.1-flash-1017]
 swarm:
   enabled: true
@@ -135,7 +138,7 @@ Aturan perubahan konfigurasi:
 
 ### 4.3 Provider AI yang sudah dimiliki Zhafron (dari omp models.yml)
 
-Dibaca 2026-10-25 dari ~/.omp/agent/models.yml. Yang diambil hanya nama provider, tipe API, host, dan id model. API key tidak disalin ke dokumen ini; key tetap lewat variabel lingkungan atau secret store saat bot dibuat.
+Dibaca 2026-10-25 dari ~/.omp/agent/models.yml. Yang diambil hanya nama provider, tipe API, host, dan id model. API key tidak disalin ke dokumen ini; key diberikan lewat variabel lingkungan atau config lokal (bagian 4.5).
 
 | Provider | Tipe API | Host | Jumlah id model |
 |---|---|---|---|
@@ -160,7 +163,7 @@ Temuan:
 4. Tiga tipe API muncul: openai-completions, openai-responses, anthropic-messages. Adapter llm_structured harus mendukung ketiganya. Dukungan base URL kustom untuk ketiganya lewat LangChain dan deepagents belum kuverifikasi dari dokumen yang kubaca; diuji di tahap 0 ([INFERENCE]: kelas chat OpenAI dan Anthropic menerima base URL kustom).
 5. 7 dari 13 provider beralamat localhost (sub2api-*, omniroute): hanya terjangkau dari PC Zhafron. Bot berjalan di PC Zhafron (diputuskan 2026-10-25), jadi provider localhost terjangkau. Bila bot suatu hari dipindah ke VPS, voter pada provider localhost tidak terjangkau kecuali ada tunnel. 6 provider lain beralamat publik (xai-hm, modelrouter, tiprouter, nutaraline, lucif, experientiallabs).
 6. Beberapa gateway tampak pihak ketiga; ketersediaan dan kebijakan tiap gateway tidak kuketahui. Desain kuorum dan voter gagal dibuang (bagian 3) memang untuk itu. Voter disebar ke lebih dari satu gateway supaya satu gateway mati tidak menjatuhkan kuorum.
-7. Registri voter menyimpan nama variabel lingkungan untuk key, bukan nilainya.
+7. Registri voter menyimpan nama variabel lingkungan untuk key (api_key_env), atau nilainya di config.yaml lokal yang tidak di-commit.
 
 ### 4.4 Model uji (diputuskan Zhafron 2026-10-25)
 
@@ -171,32 +174,27 @@ Selama testing semua peran LLM (agen analis dan semua voter) memakai deepseek-v4
 - Satu model untuk semua voter berarti kesalahan voter berkorelasi. Swarm di fase testing hanya menguji mesin dan adapter, bukan nilai swarm. Voter beragam diaktifkan setelah mesin lolos.
 - Format provider:model di konfigurasi memakai id provider milik bot (nutaraline). Backend menerjemahkannya ke integrasi LangChain: openai-completions menjadi kelas chat OpenAI dengan base_url kustom ([INFERENCE], diuji di tahap 0).
 
-### 4.5 Setup provider dan key (UI) dan penyimpanan aman
+### 4.5 Setup provider dan key (UI) dan penyimpanan
 
-Zhafron: sediakan UI untuk setup provider dan key; cara menyimpannya diatur Wira yang paling aman.
+Zhafron (revisi 9): secret tidak perlu terlalu dalam, boleh lewat env atau langsung di config. Keputusan sebelumnya (keyring dan Credential Locker) dibatalkan; dengan begitu pilihan native Windows atau Docker tidak lagi bergantung pada penyimpanan key.
 
 UI (layar Provider):
 - Daftar provider: nama, tipe API, host, status uji terakhir, model aktif.
 - Tambah atau ubah provider: tipe API, base URL, daftar model.
-- Kolom key sekali tulis: setelah disimpan hanya tampil 4 karakter terakhir dan tanggal simpan. Tidak ada tombol lihat key.
-- Tombol Uji koneksi: satu panggilan kecil, menampilkan latensi dan hasil, tidak menampilkan isi key.
-- Pilih provider dan model per peran (agen analis, tiap voter). Hapus dan ganti key.
-- Impor dari omp models.yml: dibaca lokal oleh aplikasi di PC (nama, tipe API, base URL, model). Key hanya diimpor bila Zhafron mencentang per provider, dan key tidak pernah melewati agen atau PWA.
+- Kolom key: ditulis ke config/config.yaml (api_key) atau, bila diisi nama variabel, dibaca dari lingkungan (api_key_env). Setelah disimpan tampilan hanya memperlihatkan 4 karakter terakhir.
+- Tombol Uji koneksi: satu panggilan kecil, menampilkan latensi dan hasil.
+- Pilih provider dan model per peran (agen analis, tiap voter).
+- Impor dari omp models.yml: dibaca lokal oleh aplikasi di PC (nama, tipe API, base URL, model; key hanya bila dicentang per provider).
 
-Penyimpanan (keputusan Wira):
-1. Key disimpan di penyimpanan kredensial OS lewat pustaka keyring (versi 25.7.0 di PyPI): Windows Credential Locker, macOS Keychain, Linux SecretService atau KWallet (README keyring). Konfigurasi hanya berisi referensi secret:NAMA, bukan nilainya.
-2. Tidak ada endpoint yang mengembalikan key. Gateway hanya punya operasi tulis, hapus, dan uji.
-3. Key hanya bisa dimasukkan atau diganti dari PC (localhost). Dari PWA jarak jauh hanya bisa melihat status, mengaktifkan atau menonaktifkan, dan menguji koneksi, supaya key tidak pernah lewat tunnel.
-4. Key tidak ditulis ke berkas konfigurasi, basis data, log, atau cadangan. Log disaring dari pola Authorization dan token. Ekspor konfigurasi tidak memuat secret.
-5. Agen LLM (deepagents) tidak diberi tool yang bisa membaca penyimpanan key. Key hanya hidup di memori proses backend saat memanggil provider.
-6. Perubahan key dicatat (siapa, kapan, nama secret; tanpa nilai).
-7. Bila tidak ada backend keyring, aplikasi menolak menyimpan key dan menampilkan petunjuk, bukan menulis plaintext.
-8. Key exchange nanti (tahap live): tanpa izin penarikan, idealnya dengan whitelist IP. Dry-run tidak butuh key exchange.
+Aturan sederhana yang tetap dipegang:
+1. config/config.yaml dan .env ada di .gitignore; pemindaian rahasia pada staged diff dijalankan sebelum commit.
+2. Tidak ada endpoint yang mengembalikan key utuh; key tidak ditulis ke log (log menyaring pola Authorization dan token).
+3. Agen LLM (deepagents) tidak diberi tool yang membaca config atau .env.
+4. Memasukkan atau mengganti key hanya dari PC (localhost), tidak dari PWA jarak jauh; PWA jarak jauh hanya menampilkan status, aktif atau nonaktif, dan uji koneksi.
 
-Cara menjalankan di PC dan dampaknya ke penyimpanan key (dibutuhkan keputusan Zhafron, rekomendasi Wira di bawah):
-- Native Windows lewat setup.ps1 (dokumen Freqtrade: Python 3.12 atau lebih baru, 64 bit): memakai Credential Locker langsung. Dijalankan sebagai tugas terjadwal saat logon pengguna, bukan service sistem, supaya penyimpanan kredensial terbuka tanpa input ([INFERENCE], diuji di tahap 0).
-- Docker atau WSL2: cara yang direkomendasikan dokumen Freqtrade untuk Windows ("lebih mudah dan lebih aman"). Proses di dalam Linux kemungkinan tidak punya akses langsung ke Credential Locker Windows ([INFERENCE]), jadi key memakai berkas terenkripsi dengan kunci utama dari variabel lingkungan atau secret mount. Ini lebih lemah daripada Credential Locker.
-- Rekomendasi Wira: native Windows demi penyimpanan key. Trade-off: jalur resmi Freqtrade untuk Windows adalah Docker, jadi native bisa lebih sering bermasalah; tahap 0 membuktikan keduanya sebelum dipilih. Angka perbandingan belum ada.
+Konsekuensi yang diterima Zhafron: key di config.yaml tersimpan sebagai teks biasa di disk PC. Cukup untuk bot pribadi di PC sendiri; bila repo atau berkas itu pernah tersalin keluar, key harus dianggap bocor dan diganti. Rekomendasi Wira: pakai env bila nyaman, config bila praktis.
+
+Cara menjalankan di PC: dokumen Freqtrade merekomendasikan Docker untuk Windows (lebih mudah dan lebih aman), lalu WSL2; native lewat setup.ps1 (Python 3.12 atau lebih baru, 64 bit) bila memang diperlukan. Rekomendasi Wira sekarang: Docker, karena alasan memilih native (keyring) sudah gugur. Satu hal yang diuji di tahap 0: provider localhost (sub2api, omniroute) dari dalam kontainer harus lewat host.docker.internal atau jaringan host ([INFERENCE], belum diuji). Bila itu merepotkan, native Windows atau WSL2 jadi pilihan.
 
 ## 5. Sumber data
 
@@ -211,7 +209,7 @@ Cara menjalankan di PC dan dampaknya ke penyimpanan key (dibutuhkan keputusan Zh
 - API Freqtrade tetap di localhost dan tidak dibuka ke internet (peringatan dokumen). Antara PWA dan engine ada gateway kecil buatan sendiri: autentikasi, endpoint baca, kill switch, pengirim Web Push. Gateway diakses lewat HTTPS tunnel (usulan Cloudflare Tunnel dengan Access, atau jaringan privat), bukan port terbuka. Zhafron sudah punya Cloudflare named tunnel untuk subdomain domain pribadinya (catatan skill internal), jadi gateway bisa memakainya setelah disetujui; tidak dikerjakan sekarang.
 - PWA: dasbor (profit, posisi terbuka, meter rugi harian, suara tiap voter, median, sebaran) dan notifikasi. FreqUI bukan PWA (tanpa manifest dan service worker), jadi PWA dibuat sendiri. Android dan desktop: dipasang dari browser Chrome atau Edge (pemasangan desktop belum kuverifikasi). iOS: iOS 16.4 atau lebih baru, harus ditambahkan ke Home Screen, izin push diminta lewat ketukan tombol, notifikasi harus terlihat.
 - Tindakan berbahaya dari ponsel (mode live, menaikkan batas) butuh konfirmasi dua langkah. Versi pertama panel hanya baca ditambah notifikasi; kontrol menyusul setelah gateway diuji.
-- Windows: tiga cara menjalankan Freqtrade: Docker (direkomendasikan dokumen), WSL2, atau native lewat setup.ps1. Pilihan memengaruhi penyimpanan key (bagian 4.5).
+- Windows: tiga cara menjalankan Freqtrade: Docker (direkomendasikan dokumen), WSL2, atau native lewat setup.ps1. Rekomendasi sekarang Docker (bagian 4.5).
 
 ## 7. Biaya compute (bukan batasan)
 
@@ -227,7 +225,7 @@ Arahan Zhafron: biaya LLM tidak perlu terlalu dipikirkan karena provider AI-nya 
 
 | Tahap | Isi | Syarat lolos (usulan) |
 |---|---|---|
-| 0. Setup (1-2 hari) | Freqtrade dry-run (Docker atau VPS), uji Indodax via CCXT, spike adapter DecisionProvider (gateway milik Zhafron: jev dan clef di modelrouter dan experientiallabs, satu model chat biasa lewat llm_structured; Ollama lokal dan OpenRouter opsional), uji model uji deepseek-v4.1-flash-1017 di nutaraline (structured output, latensi, token reasoning), uji penyimpanan key di native Windows dan di Docker, ambil katalog decision model, uji Kronos mini di CPU, pasang batas rugi default lewat konfigurasi, ukur latensi dan token voter lewat deepagents dibanding pemanggilan langsung | Dry-run jalan dengan data Indodax tanpa error; minimal 3 adapter menjawab pertanyaan yang sama |
+| 0. Setup (1-2 hari) | Freqtrade dry-run (Docker atau VPS), uji Indodax via CCXT, spike adapter DecisionProvider (gateway milik Zhafron: jev dan clef di modelrouter dan experientiallabs, satu model chat biasa lewat llm_structured; Ollama lokal dan OpenRouter opsional), uji model uji deepseek-v4.1-flash-1017 di nutaraline (structured output, latensi, token reasoning), uji menjalankan submodule Freqtrade di Docker dan native Windows (termasuk jangkauan provider localhost dari kontainer), ambil katalog decision model, uji Kronos mini di CPU, pasang batas rugi default lewat konfigurasi, ukur latensi dan token voter lewat deepagents dibanding pemanggilan langsung | Dry-run jalan dengan data Indodax tanpa error; minimal 3 adapter menjawab pertanyaan yang sama |
 | 1. Demo minggu 1 | Dry-run 7 hari non-stop. Bot A aturan saja; bot B aturan ditambah swarm dalam mode bayangan (hanya mencatat). Kerangka PWA baca-saja dan notifikasi dibangun paralel | Mesin stabil 24 jam, tidak ada order gagal, biaya dan token tercatat. Ini uji mesin, bukan bukti profit |
 | 2. Minggu 2-4 | Backtest strategi aturan 2-3 tahun (tanpa sinyal berita), dry-run berlanjut, evaluasi swarm di forward test | Ekspektasi positif setelah fee dan pajak di data out-of-sample; kriteria adopsi swarm di bawah |
 | 3. Live kecil, minimal 4 minggu | Porsi awal usulan Rp 500 ribu (25%), karena fee dan minimum order membuat porsi 5-10% terlalu kecil untuk diukur | Tidak melanggar batas rugi; selisih dengan dry-run wajar |
@@ -249,24 +247,26 @@ Seminggu demo hanya menguji mesin; strategi 1-4 jam menghasilkan sedikit trade p
 
 Sudah diputuskan Zhafron: bot berjalan di PC sendiri; model uji deepseek-v4.1-flash-1017 di nutaraline; UI setup provider dan key dengan penyimpanan aman yang diatur Wira; UI/UX harus unik (bukan AI slop) dengan impeccable; proyek di ~/Projects dengan git; biaya compute LLM bukan batasan (batas biaya default mati); modal Rp 2 juta; profit masuk lagi jadi modal; demo dulu; semua configurable; backend LLM deepagents; batas rugi default sesuai usulan (1% per hari, 10% total, tetap configurable); PDF plan beserta mockup dibuat dulu oleh tim.
 
-Masih dibutuhkan dari Zhafron (belum diputuskan):
-1. Persetujuan membuat task tahap 0 dan 1 (belum dibuat; sekarang baru PDF plan di ZHA-3761).
-2. Jawaban wawancara desain impeccable (3 pertanyaan di bagian 12); PRODUCT.md belum ditulis sebelum itu.
-3. Cara menjalankan di PC: native Windows (rekomendasi Wira, key di Credential Locker) atau Docker/WSL2 (jalur resmi Freqtrade, penyimpanan key lebih lemah). Tahap 0 menguji keduanya.
-4. Repo tetap lokal atau dibuatkan repo privat di GitHub, dan lisensi (bagian 11). Tidak ada remote dan tidak ada push tanpa persetujuan.
-5. Exchange untuk tahap live: Indodax (domestik, pajak 0,21%, dukungan Freqtrade belum terbukti) atau luar negeri (pajak 1%, ada stoploss di exchange). Tidak dibutuhkan untuk demo.
+Masih dibutuhkan dari Zhafron: tidak ada yang menghalangi pekerjaan. Mode full otonom (revisi 9): Wira memutuskan sendiri dan Zhafron mengoreksi sambil jalan. Keputusan yang Wira ambil dan bisa dikoreksi:
+1. Task tahap 0 dan 1 dibuat setelah plan ini (sebelumnya menunggu persetujuan; sekarang tercakup full otonom).
+2. Tema dan arah visual diputuskan Wira (bagian 12), bukan hasil wawancara.
+3. Cara menjalankan di PC: Docker dulu (bagian 4.5), diuji di tahap 0.
+4. Repo tetap lokal tanpa remote dan tanpa LICENSE sampai Zhafron memutuskan (push dan lisensi tidak termasuk jendela otonom).
+5. Exchange untuk tahap live: tidak dibutuhkan untuk demo; live tidak dimulai tanpa persetujuan eksplisit Zhafron (uang sungguhan di luar jendela otonom).
 
 ## 11. Proyek dan git
 
-- Lokasi: ~/Projects/trading-bot (nama kerja, mudah diganti). Dibuat 2026-10-25 dengan git init -b main. Identitas commit mengikuti ~/.gitconfig (Zhafron), tanpa Co-Authored-By.
-- Sudah ada di repo (bukan kode produk): README, .gitignore, hook git, contoh konfigurasi tanpa komentar, contoh .env berisi nama variabel saja, salinan plan dan riset di docs/. Tautan skill impeccable di .agents/skills tidak di-commit.
-- Dibuat di tahap 0, belum ada: engine Freqtrade dan strategi, gateway, adapter DecisionProvider dan voter, agen analis deepagents, PWA, penyimpanan key, docker-compose.
-- Commit: Conventional Commits berbahasa Inggris (type(scope): subject, imperatif, di bawah 72 karakter). Hook commit-msg menolak format salah dan trailer Co-Authored-By. Hook pre-commit menjalankan gerbang komentar: tidak ada komentar di kode (aturan Zhafron), shebang dan pragma diizinkan.
-- Cabang: main dan cabang fitur (feat/..., fix/...). Worktree lewat ~/Projects/.worktrees bila perlu.
+- Lokasi: ~/Projects/trading-bot (nama kerja, mudah diganti). Branch main. Identitas commit mengikuti ~/.gitconfig (Zhafron), tanpa Co-Authored-By.
+- Freqtrade sebagai git submodule di vendor/freqtrade (arahan Zhafron revisi 9): url https://github.com/freqtrade/freqtrade.git, branch stable, shallow, terkunci di commit 1f394eae yang adalah tag 2026.9 (commit 568b46b). Strategi, konfigurasi, dan data pengguna ada di luar vendor lewat --strategy-path dan --userdir (dokumen Freqtrade), jadi isi vendor tidak diubah. Bila suatu saat engine perlu dimodifikasi: fork Freqtrade lalu ubah url di .gitmodules ke fork itu. Memperbarui versi: fetch tag baru di submodule, checkout, commit gitlink-nya (langkah ada di README).
+- Ukuran: submodule shallow sekitar 58 MB berkas kerja dan 41 MB data git (diukur saat dipasang).
+- Sudah ada di repo: README, .gitignore, .gitattributes, .editorconfig, .env.example, hook git, contoh konfigurasi tanpa komentar, salinan plan dan riset di docs/. Tautan skill impeccable di .agents/skills tidak di-commit.
+- Dibuat di tahap 0, belum ada: strategi Freqtrade, gateway, adapter DecisionProvider dan voter, agen analis deepagents, PWA, docker-compose.
+- Commit: Conventional Commits berbahasa Inggris, subject di bawah 72 karakter. Hook commit-msg menolak format salah dan trailer Co-Authored-By. Hook pre-commit menjalankan gerbang komentar pada kode kita (aturan Zhafron: tanpa komentar); isi vendor/freqtrade adalah kode pihak ketiga dan tidak diperiksa.
+- Cabang: main dan cabang fitur (feat/..., fix/...). Worktree lewat ~/Projects/.worktrees.
 - Tes: repo tanpa CI, jadi suite penuh lokal maksimal sekali per SHA final sebelum push; saat mengembangkan hanya tes terkait (aturan Zhafron).
-- Alat: Python 3.12 atau lebih baru (syarat Freqtrade) dengan uv; deepagents; framework PWA dipilih saat tahap desain impeccable.
-- Rahasia: .env, user_data, basis data, dan log tidak masuk repo (.gitignore). Tidak ada API key di repo atau docs.
-- Remote dan lisensi: belum ada remote dan belum ada berkas LICENSE. Freqtrade berlisensi GPL-3.0 (daftar repo org freqtrade di GitHub); strategi yang mengimpor Freqtrade kemungkinan ikut terikat ([INFERENCE], perlu penilaian hukum bila repo akan dibuka). MiroFish dan MiroShark (AGPL-3.0) tidak dipakai. Rekomendasi: repo privat, tanpa LICENSE, sampai Zhafron memutuskan.
+- Alat: Python 3.12 atau lebih baru dengan uv; deepagents; kerangka PWA dipilih di tahap desain.
+- Rahasia: config/config.yaml, .env, user_data, basis data, dan log tidak masuk repo (.gitignore).
+- Remote dan lisensi: belum ada remote dan belum ada LICENSE. Freqtrade berlisensi GPL-3.0; strategi yang mengimpor Freqtrade kemungkinan ikut terikat ([INFERENCE], perlu penilaian hukum bila repo akan dibuka). Rekomendasi: repo privat, tanpa LICENSE, sampai Zhafron memutuskan.
 
 ## 12. UI/UX unik dengan impeccable
 
