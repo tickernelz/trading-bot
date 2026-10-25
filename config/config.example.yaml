@@ -9,10 +9,12 @@ risk:
   max_open_trades: 3
   leverage: none
   on_breach: stop_new_entries
+  daily_reset_timezone: Asia/Jakarta
 exchange:
   name: indodax
   pairs: [BTC/IDR, ETH/IDR, SOL/IDR]
   timeframe: 1h
+  fee_pct: 0.2
 providers:
   - id: nutaraline
     type: openai-completions
@@ -96,3 +98,11 @@ data:
   social: off
 notify:
   web_push: true
+api:
+  listen: 127.0.0.1
+  port: 8080
+  username_env: FT_API_USERNAME
+  password_env: FT_API_PASSWORD
+  jwt_secret_env: FT_API_JWT_SECRET
+  ws_token_env: FT_API_WS_TOKEN
+  force_entry: false

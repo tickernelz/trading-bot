@@ -1,0 +1,37 @@
+name: trading-bot
+
+x-engine-build: &engine-build
+  context: .
+  dockerfile: docker/Dockerfile
+  additional_contexts:
+    freqtrade-base: service:freqtrade-base
+
+services:
+  freqtrade-base:
+    image: trading-bot/freqtrade:2026.9
+    build:
+      context: vendor/freqtrade
+    profiles: [build]
+
+  bot:
+    image: trading-bot/engine:dev
+    build:
+      <<: *engine-build
+      target: engine
+    network_mode: host
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - ./config:/opt/trading-bot/config:ro
+      - ./user_data:/freqtrade/user_data
+    command: ["trade"]
+
+  tests:
+    image: trading-bot/engine:test
+    build:
+      <<: *engine-build
+      target: test
+    network_mode: none
+    profiles: [test]
