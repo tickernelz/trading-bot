@@ -1,6 +1,11 @@
 # Kontrak API gateway dan feed event
 
-Kontrak untuk tugas PWA (tahap 1) dan gateway tahap 2. Diturunkan dari bagian 13 plan revisi 10 dan dari REST/WebSocket Freqtrade 2026.9 yang benar-benar ada di `vendor/freqtrade`. Semua contoh JSON di bawah diambil dari bot dry-run yang berjalan di PC ini pada 2026-10-25 17:06 UTC dengan exchange Indodax (bukan karangan). Path `/gw/...` adalah kontrak kita, bukan path Freqtrade; path Freqtrade ada di bagian 8.
+Kontrak untuk tugas PWA (tahap 1) dan gateway tahap 2. Diturunkan dari bagian 13 plan revisi 10 dan dari REST/WebSocket Freqtrade 2026.9 yang benar-benar ada di `vendor/freqtrade`. Path `/gw/...` adalah kontrak kita, bukan path Freqtrade; path Freqtrade ada di bagian 8.
+
+Setiap contoh JSON diberi satu dari dua label:
+
+- `tangkapan Freqtrade 2026.9`: diambil dari bot dry-run Indodax yang berjalan di PC ini pada 2026-10-25 (REST, WebSocket `/api/v1/message/ws`, dan `strategy_msg` penolakan risiko). Nilai boleh dipangkas, nama field dan bentuknya tidak diubah.
+- `rancangan`: bentuk milik gateway yang belum dibangun (sesi, konfirmasi, envelope galat, ringkasan, event `gw.*`). Belum terbukti; tahap gateway wajib menangkap ulang dan memperbarui contoh ini.
 
 ## 1. Topologi dan batas kepercayaan
 
@@ -28,6 +33,8 @@ Aksi yang menambah risiko (force enter, force exit ke pasar, hapus lock, hapus b
 
 1. `POST /gw/v1/control/...` dengan header `Idempotency-Key: <uuid>` dan tanpa `confirm` menghasilkan `409`:
 
+Contoh: rancangan, gateway belum ada; nilai mengikuti tangkapan Freqtrade bila ada.
+
 ```json
 {
   "error": {
@@ -51,6 +58,8 @@ Aksi yang menambah risiko (force enter, force exit ke pasar, hapus lock, hapus b
 
 Sukses mengembalikan data langsung (objek atau array) seperti contoh di bagian 5. Semua respons galat memakai bentuk yang sama:
 
+Contoh: rancangan, gateway belum ada; nilai mengikuti tangkapan Freqtrade bila ada.
+
 ```json
 {
   "error": {
@@ -71,6 +80,8 @@ Semua butuh `read`. Cache di gateway: `overview` 2 detik, `candles` mengikuti ca
 
 Gabungan `/ping`, `/version`, dan `/health` Freqtrade, ditambah status gateway.
 
+Contoh: rancangan, gateway belum ada; nilai mengikuti tangkapan Freqtrade bila ada.
+
 ```json
 {
   "gateway": {"status": "ok", "version": "0.1.0", "uptime_s": 128},
@@ -83,6 +94,8 @@ Gabungan `/ping`, `/version`, dan `/health` Freqtrade, ditambah status gateway.
 ### 5.2 `GET /gw/v1/overview`
 
 Ringkasan satu layar: modal, saldo, profit, trade terbuka, batas risiko.
+
+Contoh: rancangan, gateway belum ada; nilai mengikuti tangkapan Freqtrade bila ada.
 
 ```json
 {
@@ -101,6 +114,8 @@ Ringkasan satu layar: modal, saldo, profit, trade terbuka, batas risiko.
 
 Diteruskan dari `/status`. Elemen memakai objek trade Freqtrade apa adanya (bagian 9), ditambah dua field turunan: `profit_pct_now` (persen terhadap `open_trade_value`) dan `age_s`.
 
+Contoh: tangkapan Freqtrade 2026.9 untuk field Freqtrade (trade 1, `force_entry`); `profit_pct_now` dan `age_s` rancangan gateway. `stake_amount` 333322.90 di tangkapan 17:06 UTC berasal dari ukuran tanpa biaya; sejak biaya ikut dihitung, tangkapan 17:40 UTC memberi `stake_amount` 294627.59 untuk modal yang sama (rugi di stoploss 3% plus dua kali biaya 0,2% = Rp 10.000).
+
 ```json
 [
   {
@@ -112,7 +127,7 @@ Diteruskan dari `/status`. Elemen memakai objek trade Freqtrade apa adanya (bagi
     "amount": 0.00022769,
     "stake_amount": 333322.90477,
     "strategy": "SwingEmaRsi",
-    "enter_tag": "ema_cross_up",
+    "enter_tag": "force_entry",
     "fee_open": 0.002,
     "open_date": "2026-10-25 17:06:26",
     "open_timestamp": 1792947986077,
@@ -130,6 +145,8 @@ Diteruskan dari `/status`. Elemen memakai objek trade Freqtrade apa adanya (bagi
 
 Diteruskan dari `/trades` (trade terbuka dan tertutup). Bentuk sama dengan 5.3; trade tertutup membawa `close_date`, `close_rate`, `close_profit_abs`, `exit_reason`, `exit_order_status`.
 
+Contoh: tangkapan Freqtrade 2026.9 (dry-run Indodax di PC ini, 2026-10-25).
+
 ```json
 [
   {"trade_id": 1, "pair": "BTC/IDR", "is_open": false, "enter_tag": "force_entry", "exit_reason": "force_exit", "open_rate": 1463933000.0, "close_rate": 1463912000.0, "close_profit_abs": -1333.5188537, "close_profit_pct": -0.4, "profit_abs": -1333.5188537, "close_date": "2026-10-25 17:07:12"}
@@ -143,6 +160,8 @@ Satu trade dari `/trade/{id}`, bentuk 5.3. `404` bila tidak ada.
 ### 5.6 `GET /gw/v1/balance`
 
 Diteruskan dari `/balance` dengan penyesuaian: hanya mata uang yang dikelola bot.
+
+Contoh: tangkapan Freqtrade 2026.9 (dry-run Indodax di PC ini, 2026-10-25).
 
 ```json
 {
@@ -163,6 +182,8 @@ Diteruskan dari `/balance` dengan penyesuaian: hanya mata uang yang dikelola bot
 ### 5.7 `GET /gw/v1/profit?window=total|daily|weekly|monthly&timescale=7`
 
 `window=total` memakai `/profit`; lainnya memakai `/daily`, `/weekly`, `/monthly`.
+
+Contoh: tangkapan Freqtrade 2026.9 untuk field Freqtrade; `window` rancangan gateway.
 
 ```json
 {
@@ -192,6 +213,8 @@ Diteruskan dari `/balance` dengan penyesuaian: hanya mata uang yang dikelola bot
 
 ### 5.8 `GET /gw/v1/stats`
 
+Contoh: tangkapan Freqtrade 2026.9 (dry-run Indodax di PC ini, 2026-10-25).
+
 ```json
 {
   "durations": {"wins": null, "draws": null, "losses": 46.409757},
@@ -202,6 +225,8 @@ Diteruskan dari `/balance` dengan penyesuaian: hanya mata uang yang dikelola bot
 ### 5.9 `GET /gw/v1/performance?pair=BTC/IDR`
 
 Gabungan `/performance`, `/entries`, `/exits`, `/mix_tags`.
+
+Contoh: tangkapan Freqtrade 2026.9 per bagian; pembungkus `per_pair`/`by_enter_tag`/`by_exit_reason` rancangan gateway.
 
 ```json
 {
@@ -214,6 +239,8 @@ Gabungan `/performance`, `/entries`, `/exits`, `/mix_tags`.
 ### 5.10 `GET /gw/v1/candles?pair=BTC/IDR&timeframe=1h&limit=300`
 
 Diteruskan dari `/pair_candles` (GET). `timeframe` hanya `1h` pada tahap ini; gateway menolak timeframe lain dengan `invalid_request`. `limit` maksimal 1500, default 300. Indikator ikut dalam `columns`.
+
+Contoh: tangkapan Freqtrade 2026.9 dari `/pair_candles` (kolom dan baris), dipangkas ke kolom yang dipakai PWA.
 
 ```json
 {
@@ -233,6 +260,8 @@ Baris adalah array sesuai urutan `columns` (bentuk asli Freqtrade), bukan objek 
 
 ### 5.11 `GET /gw/v1/pairs`
 
+Contoh: tangkapan Freqtrade 2026.9 dari `/whitelist`, `/blacklist`, `/locks`; pembungkus rancangan gateway.
+
 ```json
 {
   "whitelist": {"pairs": ["BTC/IDR", "ETH/IDR", "SOL/IDR"], "length": 3, "method": ["StaticPairList"]},
@@ -246,6 +275,8 @@ Lock `"Auto lock"` selalu muncul setelah exit: Freqtrade mengunci pasangan selam
 ### 5.12 `GET /gw/v1/risk`
 
 Dihitung gateway dengan modul yang sama seperti mesin (`engine/risk.py`), dari trade tertutup dan profit terbuka. Bukan sekadar diteruskan dari Freqtrade.
+
+Contoh: rancangan, gateway belum ada; nilai mengikuti tangkapan Freqtrade bila ada.
 
 ```json
 {
@@ -265,12 +296,16 @@ Dihitung gateway dengan modul yang sama seperti mesin (`engine/risk.py`), dari t
 
 `breaches` berisi `"daily_loss"` dan/atau `"total_drawdown"`. `entries_allowed` false berarti mesin menolak entry baru sampai hari berganti (untuk `daily_loss`) atau selamanya (untuk `total_drawdown`). PWA menampilkan keduanya sebagai status, bukan sebagai tombol yang bisa dimatikan.
 
-### 5.13 `GET /gw/v1/logs?limit=50&level=warning`
+### 5.13 `GET /gw/v1/logs?limit=50`
+
+Contoh: tangkapan Freqtrade 2026.9 (dry-run Indodax di PC ini, 2026-10-25).
 
 ```json
 {
-  "logs": [["2026-10-25 17:07:12,401 - freqtrade.wallets - INFO - Wallets synced."]],
-  "level": ["INFO"]
+  "log_count": 2,
+  "logs": [
+    ["2026-10-25 17:36:56", 1792949816022.821, "freqtrade.worker", "INFO", "Bot heartbeat. PID=1, version='2026.9', state='RUNNING'"]
+  ]
 }
 ```
 
@@ -296,11 +331,14 @@ Semua butuh `control`, dan semua menulis satu baris audit `{actor, ip, action, t
 | `POST /gw/v1/trades` | `POST /forceenter` | ya | Entry paksa; ditolak `risk_limit_breached` bila `entries_allowed` false |
 | `POST /gw/v1/trades/{id}/exit` | `POST /forceexit` | ya | Exit paksa satu trade |
 | `POST /gw/v1/locks` | `POST /locks` | tidak | Kunci pasangan sementara |
-| `DELETE /gw/v1/locks?pair=BTC/IDR` | `DELETE /locks` | ya | Buka kunci |
+| `DELETE /gw/v1/locks/{lock_id}` | `DELETE /locks/{lockid}` | ya | Buka satu kunci |
+| `POST /gw/v1/locks/delete` | `POST /locks/delete` body `{"pair": "BTC/IDR"}` atau `{"lockid": 1}` | ya | Buka kunci per pasangan |
 | `POST /gw/v1/blacklist` | `POST /blacklist` | tidak | Tambah pasangan ke blacklist |
 | `DELETE /gw/v1/blacklist?pairs=BTC/IDR` | `DELETE /blacklist` | ya | Hapus dari blacklist |
 
 Contoh `POST /gw/v1/trades`:
+
+Contoh: rancangan, gateway belum ada; nilai mengikuti tangkapan Freqtrade bila ada.
 
 ```json
 {"pair": "BTC/IDR", "side": "long", "stake_amount": null, "confirm": "cf_01J9Z6H0YV"}
@@ -317,6 +355,8 @@ Contoh `POST /gw/v1/trades`:
 ### 7.2 Pesan server
 
 Semua pesan satu objek JSON dengan `type`. Event Freqtrade yang diteruskan punya `seq` naik monoton per koneksi gateway serta `ts` ISO-8601. Event turunan gateway memakai `type` berawalan `gw.`.
+
+Label: isi `data` untuk `entry`, `entry_fill`, `exit`, `exit_fill`, `status`, `warning`, `whitelist`, `analyzed_df` adalah tangkapan Freqtrade 2026.9 (di Freqtrade field event berada di tingkat atas pesan, bukan di `data`; gateway memindahkannya ke `data`). Pembungkus `seq`/`ts` dan semua event `gw.*` adalah rancangan.
 
 ```json
 {"type": "gw.hello", "seq": 0, "ts": "2026-10-25T17:05:30.000Z", "data": {"gateway_version": "0.1.0", "freqtrade_version": "2026.9", "dry_run": true, "whitelist": ["BTC/IDR", "ETH/IDR", "SOL/IDR"], "sequence_resume_window": 200}}
@@ -347,26 +387,34 @@ Semua pesan satu objek JSON dengan `type`. Event Freqtrade yang diteruskan punya
 ```
 
 ```json
-{"type": "whitelist", "seq": 7, "ts": "2026-10-25T17:10:00.000Z", "data": {"BTC/IDR": null, "ETH/IDR": null, "SOL/IDR": null}}
+{"type": "whitelist", "seq": 7, "ts": "2026-10-25T17:10:00.000Z", "data": ["BTC/IDR", "ETH/IDR", "SOL/IDR"]}
 ```
 
 ```json
-{"type": "analyzed_df", "seq": 8, "ts": "2026-10-25T17:10:00.000Z", "data": {"key": ["BTC/IDR", "1h", "spot"], "la": "2026-10-25 17:00:00+00:00", "df": {"date": ["2026-10-25T16:00:00Z"], "close": [1463932000.0], "ema_fast": [1460601161.45], "ema_slow": [1464373799.03], "rsi": [54.657]}}}
+{"type": "analyzed_df", "seq": 8, "ts": "2026-10-25T17:36:51.853Z", "data": {"key": ["BTC/IDR", "1h", "spot"], "la": "2026-10-25T17:36:51.853684+00:00", "df": {"__type__": "dataframe", "__value__": "{\"columns\":[\"date\",\"open\",\"high\",\"low\",\"close\",\"volume\",\"ema_fast\",\"ema_slow\",\"rsi\",\"enter_tag\",\"enter_long\",\"exit_tag\",\"exit_long\"],\"index\":[647],\"data\":[[1792944000000,1463059000.0,1463933000.0,1460899000.0,1463932000.0,0.25369079,1460601161.45,1464373799.03,54.657,\"\",null,\"\",null]]}"}}}
 ```
 
-`df` adalah objek kolom ke array (bentuk asli Freqtrade), sehingga klien mengubahnya menjadi baris sekali.
+`df` dibungkus `{"__type__": "dataframe", "__value__": "<string>"}`; `__value__` adalah JSON pandas orientasi `split` (`columns`, `index`, `data`) dengan `date` dalam milidetik epoch. Gateway mengurai string itu sekali dan meneruskan baris ke PWA lewat `gw.candles`; PWA tidak pernah menerima bentuk mentah ini.
 
-Event turunan gateway:
+Event turunan gateway (rancangan):
 
 ```json
 {"type": "gw.risk", "seq": 9, "ts": "2026-10-25T17:10:05.000Z", "data": {"equity": 1998666.48, "daily_loss_pct": 0.067, "drawdown_pct": 0.067, "entries_allowed": true, "breaches": []}}
 ```
 
 ```json
-{"type": "gw.risk_denied", "seq": 10, "ts": "2026-10-25T17:11:00.000Z", "data": {"pair": "ETH/IDR", "breaches": ["daily_loss"], "daily_loss_pct": 1.004, "drawdown_pct": 1.12, "equity": 1979900.0}}
+{"type": "gw.risk_denied", "seq": 10, "ts": "2026-10-25T17:35:01.730Z", "data": {"pair": "ETH/IDR", "breaches": ["daily_loss"], "daily_loss_pct": 1.25, "drawdown_pct": 1.25, "equity": 1975000.0}}
 ```
 
-`gw.risk_denied` berasal dari mesin: saat sinyal muncul tetapi lapisan risiko menolak, strategi memanggil `dp.send_msg` dengan `{"event": "risk_guard_denied", ...}`, dan gateway memetakannya ke tipe ini.
+`gw.risk_denied` berasal dari mesin. Saat lapisan risiko menolak entry, strategi memanggil `dp.send_msg`; Freqtrade mengirimnya ke WebSocket sebagai `strategy_msg` hanya bila config memuat `"apiserver": {"allow_custom_messages": true}` (`rpc/rpc_manager.py` `process_msg_queue`, nama modul `apiserver`), yang dirender `engine/launch.py` untuk `trade` dan `webserver`. Gateway berlangganan `strategy_msg`, mengurai `msg`, dan memetakan `event: risk_guard_denied` ke tipe ini.
+
+Tangkapan Freqtrade 2026.9 (`/api/v1/message/ws`, 2026-10-25 17:35 UTC, satu trade rugi Rp 25.000 disemai lalu `forceenter ETH/IDR`):
+
+```json
+{"type": "strategy_msg", "msg": "{\"event\": \"risk_guard_denied\", \"pair\": \"ETH/IDR\", \"breaches\": [\"daily_loss\"], \"daily_loss_pct\": 1.25, \"drawdown_pct\": 1.25, \"equity\": 1975000.0}"}
+```
+
+Kontrol negatif pada bot yang sama tanpa kunci `apiserver`: penolakan tetap terjadi (`User denied entry for ETH/IDR.` di log) tetapi WebSocket hanya menerima `new_candle`, nol `strategy_msg`.
 
 ```json
 {"type": "gw.candles", "seq": 11, "ts": "2026-10-25T18:00:01.000Z", "data": {"pair": "BTC/IDR", "timeframe": "1h", "candles": [["2026-10-25T17:00:00Z", 1463932000.0, 1464200000.0, 1463800000.0, 1464100000.0, 0.31, 1460700000.0, 1464400000.0, 56.1, null, null]]}}
@@ -417,7 +465,11 @@ Terverifikasi jalan pada bot dry-run Indodax di PC ini. Semua di bawah `/api/v1`
 | `/stats`, `/count` | GET | 5.8 |
 | `/performance`, `/entries`, `/exits`, `/mix_tags` | GET | 5.9 |
 | `/pair_candles` | GET | 5.10 |
-| `/whitelist`, `/blacklist`, `/locks` | GET, POST, DELETE | 5.11, 6 |
+| `/whitelist` | GET | 5.11 |
+| `/blacklist` | GET, POST, DELETE `?pairs_to_delete=` | 5.11, 6 |
+| `/locks` | GET, POST (array `{pair, until, side, reason}`) | 5.11, 6 |
+| `/locks/{lockid}` | DELETE | 6 |
+| `/locks/delete` | POST `{pair?, lockid?}` | 6 |
 | `/forceenter`, `/forceexit` | POST | 6, butuh `force_entry_enable: true` |
 | `/pause`, `/start`, `/stop`, `/stopentry`, `/reload_config` | POST | 6 |
 | `/token/login`, `/token/refresh` | POST | sesi internal gateway |
@@ -427,7 +479,7 @@ Request `/forceenter`: `{"pair": "BTC/IDR", "side": "long", "stakeamount": null,
 
 Request `/forceexit`: `{"tradeid": "1", "ordertype": null, "amount": null}`. Respons `{"result": "Created exit order for trade 1."}`.
 
-Klien WebSocket Freqtrade mengirim `{"type": "subscribe", "data": ["entry", "exit", "entry_fill", "exit_fill", "status", "warning", "whitelist", "analyzed_df", "new_candle"]}`, `{"type": "whitelist"}`, dan `{"type": "analyzed_df", "data": {"limit": 2, "pair": "BTC/IDR"}}`.
+Klien WebSocket Freqtrade (gateway) mengirim `{"type": "subscribe", "data": ["entry", "exit", "entry_fill", "exit_fill", "entry_cancel", "exit_cancel", "status", "warning", "exception", "strategy_msg", "protection_trigger", "protection_trigger_global", "whitelist", "new_candle"]}`, `{"type": "whitelist"}`, dan `{"type": "analyzed_df", "data": {"limit": 2, "pair": "BTC/IDR"}}`.
 
 ## 9. Arti field trade yang dipakai PWA
 

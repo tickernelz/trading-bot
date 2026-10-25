@@ -36,7 +36,7 @@ Butuh Docker di mesin yang sama; diuji di WSL2 dengan Docker Engine 29.9.2.
     mkdir -p user_data
     cp config/config.example.yaml config/config.yaml
 
-Isi FT_API_USERNAME, FT_API_PASSWORD, FT_API_JWT_SECRET, FT_API_WS_TOKEN di .env (jangan di-commit). Lalu:
+Isi FT_API_USERNAME, FT_API_PASSWORD, FT_API_JWT_SECRET (minimal 32 karakter), FT_API_WS_TOKEN di .env (jangan di-commit). Hanya trade dan webserver yang membuka API dan membutuhkan keempatnya; download-data, backtesting, dan show-config berjalan tanpa API server. Lalu:
 
     docker compose build bot
     docker compose up -d bot
@@ -50,14 +50,14 @@ Perintah Freqtrade lain memakai launcher yang sama, sehingga validasi tetap berl
     docker run --rm --network host --env-file .env -v ./config:/opt/trading-bot/config:ro -v ./user_data:/freqtrade/user_data trading-bot/engine:dev backtesting --timerange 20250601-
     docker run --rm --network host --env-file .env -v ./config:/opt/trading-bot/config:ro -v ./user_data:/freqtrade/user_data trading-bot/engine:dev show-config
 
-Jaringan: network_mode host dipakai supaya bot bisa menjangkau provider LLM yang hanya listen di 127.0.0.1 host (dibuktikan di WSL2: 127.0.0.1:62173 dan 127.0.0.1:20128 menjawab 401 dari dalam kontainer, sedangkan host.docker.internal dengan host-gateway hanya menghasilkan 000). Jalur Docker Desktop di Windows belum diuji; di sana host.docker.internal biasanya menunjuk loopback Windows sehingga api.listen perlu 0.0.0.0.
+Jaringan: network_mode host dipakai supaya bot bisa menjangkau provider LLM yang hanya listen di 127.0.0.1 host (dibuktikan di WSL2: 127.0.0.1:62173 dan 127.0.0.1:20128 menjawab 401 dari dalam kontainer, sedangkan host.docker.internal dengan host-gateway hanya menghasilkan 000). Jalur Docker Desktop di Windows belum diuji. api.listen dibatasi skema ke 127.0.0.1 atau ::1, jadi REST tidak pernah terbuka ke LAN; untuk Docker Desktop rencananya jaringan bridge dengan publish 127.0.0.1:8080:8080, tetap belum diuji.
 
 ## Tes
 
     docker compose --profile test build tests
     docker compose --profile test run --rm tests
 
-Tes berjalan di dalam image turunan Freqtrade, jadi versi Freqtrade, ccxt, dan pandas sama dengan produksi. Kontrol negatif: matikan pemeriksaan batas di engine/risk.py (ganti kedua if batas menjadi if False:) lalu jalankan tes; 8 tes wajib gagal.
+Tes berjalan di dalam image turunan Freqtrade, jadi versi Freqtrade, ccxt, dan pandas sama dengan produksi. Kontrol negatif: matikan pemeriksaan batas di engine/risk.py (ganti kedua if batas menjadi if False:) lalu jalankan tes; tes batas wajib gagal.
 
 ## Batasan Indodax yang terukur
 
