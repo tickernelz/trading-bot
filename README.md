@@ -18,6 +18,7 @@ Status: tahap 1 (dua bot dry-run, swarm bayangan, gateway). Belum ada akun atau 
 - gateway/: gateway antara PWA dan bot (docs/gateway-api.md bagian 12)
 - scripts/stage1.sh: menjalankan bot A, bot B, layanan bayangan, dan gateway sebagai unit systemd user
 - scripts/measure_gateway.py: ukur jeda fill dan beban klien gateway
+- scripts/stage1_report.py: ringkasan lari tahap 1
 - docker/Dockerfile, docker-compose.yml: image turunan dari vendor/freqtrade, jaringan host
 - docs/plan.md: plan final
 - docs/gateway-api.md: kontrak API gateway dan feed event untuk PWA
@@ -88,6 +89,10 @@ Direktori jalan (di luar repo), contoh `~/Projects/trading-bot-runs/stage1`:
     RUN_DIR=~/Projects/trading-bot-runs/stage1 IMAGE=trading-bot/engine:<sha> scripts/stage1.sh start
     RUN_DIR=... IMAGE=... scripts/stage1.sh status
     RUN_DIR=... scripts/stage1.sh stop bot-b
+
+Ringkasan lari (uptime dari baris `Bot heartbeat` di journald dengan celah di atas 180 detik dihitung mati, restart, order per status, baris ERROR, keputusan swarm, jam bot B sejak jawaban voter nyata pertama, token, hasil trade yang dibayangi, jeda fill):
+
+    PYTHONPATH=. python3 scripts/stage1_report.py --run-dir ~/Projects/trading-bot-runs/stage1 --unit-prefix trading-bot-stage1
 
 Unit systemd user transien (`Restart=always`) bertahan saat sesi terminal atau server lain di-restart; restart dihitung dari `starts.jsonl`. Log: `journalctl --user -u trading-bot-stage1-bot-a`.
 
