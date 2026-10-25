@@ -54,7 +54,7 @@ Kunci API diambil dari variabel lingkungan (`api_key_env`) atau `api_key` di kon
 ```sh
 .venv/bin/python -m pytest
 .venv/bin/python bench/bench_voter_overhead.py --samples 30
-.venv/bin/python bench/live_nutaraline.py --out /tmp/nutaraline-live.json
+.venv/bin/python bench/live_nutaraline.py --base-url <base URL berakhiran /v1> --out /tmp/nutaraline-live.json
 ```
 
-`bench/live_nutaraline.py` butuh `NUTARALINE_API_KEY`; tanpa itu skrip berhenti dengan status `not_run` dan tidak menghubungi jaringan.
+`bench/live_nutaraline.py` butuh `NUTARALINE_API_KEY` dan `--base-url`; tanpa itu skrip berhenti dengan status `not_run` dan tidak menghubungi jaringan.

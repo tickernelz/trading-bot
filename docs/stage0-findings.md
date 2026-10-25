@@ -16,7 +16,7 @@ Kode ada di `swarm/` (paket Python `tb_swarm`, `pyproject.toml` sendiri supaya t
 | 6. Kronos mini di CPU | Terbukti (waktu, memori, median antar jalur) | `swarm/bench/bench_kronos.py`, 10 konfigurasi |
 | 7. Temuan dan angka di dokumen ini | Dokumen ini | - |
 
-Suite: `119 passed` (`swarm/.venv/bin/python -m pytest`), tanpa jaringan, tanpa key.
+Suite: `142 passed` (`cd swarm && .venv/bin/python -m pytest`), tanpa jaringan, tanpa key; 26,9 detik, RSS puncak 203 MB (`/usr/bin/time -v`).
 
 ## Butir 1: antarmuka keputusan
 
@@ -85,13 +85,13 @@ Aturan keputusan (`swarm/tb_swarm/runner.py`):
 - Semua voter aktif dijalankan serentak, masing-masing dengan batas waktunya sendiri (`asyncio.wait_for`). Voter yang lewat batas, error HTTP, kunci salah, jawaban tidak valid, atau exception tak terduga dibuang dari keputusan itu dan dicatat alasannya (`timeout`, `failed`, `invalid`).
 - Kuorum: kurang dari `min_voters_answered` (5) jawaban sah berarti hasil `skip` dengan alasan `quorum_not_met`. Fail-closed: tidak ada agregat, sehingga konsumen tidak bisa mengambil keputusan.
 - Urutan opsi diacak per voter per keputusan dengan RNG ber-seed (`seed:decision_id:voter_id`), termasuk membalik rubrik `score`; jawaban dipulihkan ke urutan asli sebelum digabung. Voter tetap menjawab berdasarkan nama kunci, jadi pengacakan hanya menghapus bias posisi.
-- Penggabungan: median berbobot (bobot voter) untuk `noul` dan `score`, plus sebaran kuartil (q25, q75, IQR, min, maks); untuk `choice` dipakai median probabilitas per opsi (distribusi ternormalisasi; satu-panas bila model tidak memberi probabilitas), pemenang, tanda seri, jumlah suara, dan tingkat kesepakatan berbobot.
+- Penggabungan: median berbobot (bobot voter) untuk `noul` dan `score`, plus sebaran kuartil (q25, q75, IQR, min, maks); untuk `choice` dipakai median probabilitas per opsi (distribusi ternormalisasi; satu-panas bila model tidak memberi probabilitas), pemenang, jumlah suara, dan tingkat kesepakatan berbobot. Seri (dua opsi atau lebih dengan median tertinggi sama, mis. tanpa mayoritas pada surat suara satu-panas) berarti voter tidak sepakat: hasil `skip` dengan alasan `choice_tie:<pertanyaan>`, dicek sebelum gerbang sebaran.
 - `max_spread` opsional: bila IQR melebihi ambang, hasil `skip` dengan alasan `spread_exceeded:<pertanyaan>`. Ambang ini berlaku untuk `noul` dan untuk probabilitas pemenang `choice`; `score` tidak ikut diperiksa karena satuannya level rubrik, bukan probabilitas, sehingga satu angka ambang tidak bisa adil untuk keduanya.
 - Setiap keputusan dapat dicatat ke JSONL (`swarm.log_path`): request, status, agregat, dan satu baris per voter (status, latency, model, usage, jawaban, urutan opsi yang disajikan, rubrik yang dibalik).
 
 ## Butir 3: uji ke stub lokal
 
-`swarm/tb_swarm/stub_server.py` adalah server HTTP lokal (port acak) yang meniru empat wire: `/v1/systemone`, `/api/alpha/decisions`, `/v1/chat/completions`, `/v1/responses`, `/v1/messages`. Perilaku per model bisa diatur: kebijakan jawaban, delay, status gagal, keluaran rusak, jumlah token reasoning. Server menolak kunci salah dengan 401, sehingga tes bisa membuktikan jalur auth. Tidak ada jaringan keluar dan tidak ada key di tes: kunci yang dipakai hanya `stub-key-not-a-secret`.
+`swarm/tb_swarm/stub_server.py` adalah server HTTP lokal (port acak) yang meniru lima wire: `/v1/systemone`, `/api/alpha/decisions`, `/v1/chat/completions`, `/v1/responses`, `/v1/messages`. Perilaku per model bisa diatur: kebijakan jawaban, delay, status gagal, keluaran rusak, jumlah token reasoning. Server menolak kunci salah dengan 401, sehingga tes bisa membuktikan jalur auth. Tidak ada jaringan keluar dan tidak ada key di tes: kunci yang dipakai hanya `stub-key-not-a-secret`.
 
 Hasil stub bukan bukti kualitas model, hanya bukti bentuk wire, parsing, klasifikasi error, dan logika keputusan.
 
@@ -99,7 +99,7 @@ Hasil stub bukan bukti kualitas model, hanya bukti bentuk wire, parsing, klasifi
 
 Belum dijalankan: `NUTARALINE_API_KEY` tidak ada di lingkungan maupun `.env` worktree saat pekerjaan ini dikerjakan. Nilai `apiKey` di `~/.omp/agent/models.yml` tidak dibaca dan tidak disalin.
 
-Skrip siap: `swarm/bench/live_nutaraline.py`, 20 contoh keputusan trading (RSI, breakdown, funding crowded, depeg, outage API, dan seterusnya) x tiga mode structured output (`prompt`, `json_object`, `json_schema`). Yang diukur: tingkat jawaban valid, latensi median/p90, token reasoning median/total, token output, dan model yang benar-benar melayani.
+Skrip siap: `swarm/bench/live_nutaraline.py`, 20 contoh keputusan trading (RSI, breakdown, funding crowded, depeg, outage API, dan seterusnya) x tiga mode structured output (`prompt`, `json_object`, `json_schema`) x dua backend (`direct`, `deepagents`). Satu provider per sel (mode, backend) dan satu panggilan pemanasan yang tidak dihitung, jadi median latensi adalah keadaan tunak. Yang diukur per sel: tingkat jawaban valid, latensi median/p90, token input/output/reasoning, dan model yang benar-benar melayani. Perbandingan latensi dan token deepagents vs langsung pada provider nyata (butir 5) keluar dari skrip yang sama.
 
 Cara jalan setelah key terpasang:
 
@@ -109,7 +109,7 @@ NUTARALINE_API_KEY=... .venv/bin/python bench/live_nutaraline.py \
   --base-url <base URL berakhiran /v1> --out /tmp/nutaraline-live.json
 ```
 
-Bila base URL tidak diberikan, skrip hanya membaca field `baseUrl` milik provider `nutaraline` dari `~/.omp/agent/models.yml` (tanpa menyentuh field kunci). Mekanisme jalur sukses dan jalur gagal sudah diuji ke stub: 20/20 valid pada dua mode, dan 20/20 tercatat `network` saat base URL diarahkan ke port kosong.
+Base URL wajib diberikan lewat `--base-url` atau `NUTARALINE_BASE_URL` (berakhiran `/v1`); skrip tidak membuka `~/.omp/agent/models.yml`. Mekanisme jalur sukses dan jalur gagal sudah diuji ke stub.
 
 Dukungan structured output, latensi nyata, dan token reasoning pada model ini tetap **belum terbukti** sampai skrip di atas dijalankan dengan key.
 
