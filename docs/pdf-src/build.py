@@ -3,6 +3,9 @@ import re
 import subprocess
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import mockups
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 DOCS = os.path.dirname(HERE)
 OUT = os.path.join(HERE, "build")
@@ -51,7 +54,7 @@ def demote(text):
 
 plan = read(os.path.join(DOCS, "plan.md"))
 research = read(os.path.join(DOCS, "research-swarm-pwa.md"))
-assert "(revisi 8)" in plan.split("\n")[0]
+assert "(revisi 10)" in plan.split("\n")[0]
 
 top = r"^## "
 p1 = section(plan, r"^## 1\. ", top)
@@ -102,12 +105,12 @@ doc = [
     + "\n\n## 5.2 Backend LLM: deepagents dan perannya (plan bagian 4.1)\n\n" + p41_main
     + "\n\n## 5.3 Provider AI milik Zhafron (plan bagian 4.3, dari omp models.yml)\n\n" + p43_main + "\n\n" + part("s05b.md")
     + "\n\n## 5.4 Model uji (plan bagian 4.4)\n\n" + p44
-    + "\n\n## 5.5 Setup provider dan key (UI) dan penyimpanan aman (plan bagian 4.5)\n\n" + p45,
+    + "\n\n## 5.5 Setup provider dan key (UI) dan penyimpanan (plan bagian 4.5)\n\n" + p45,
     "# 6. Konfigurasi\n\n" + part("s06a.md")
     + "\n\n## 6.2 Aturan perubahan konfigurasi (plan bagian 4.2)\n\n" + change_rules
     + "\n\n## 6.3 Berkas YAML default (plan bagian 4.2)\n\n" + yaml_block,
     "# 7. Keamanan dan PWA\n\n## 7.1 Keamanan\n\n- " + safety_note + "\n- " + registry_line[3:]
-    + "\n- Rahasia (API key) tidak di berkas, tidak di repo, tidak di grup, dan tidak di dokumen ini; aturan penyimpanan lengkap di bab 5.5."
+    + "\n- API key tidak masuk repo (config/config.yaml dan .env ada di .gitignore), tidak di grup, dan tidak di dokumen ini; key di config.yaml tersimpan sebagai teks biasa di disk PC, konsekuensi yang diterima Zhafron (bab 5.5)."
     + "\n- Kegagalan menutup entry baru, bukan membukanya (kuorum fail-closed, bab 4)."
     + "\n\n## 7.2 PC, semua OS, dan mobile (PWA) (plan bagian 6)\n\n" + p6
     + "\n\n## 7.3 Batasan platform PWA (dokumen riset, bagian 5)\n\n" + r5,
@@ -132,6 +135,7 @@ doc.append(
 )
 
 markdown = "\n" + "\n\n".join(doc) + "\n"
+markdown = markdown.replace("secret tidak perlu", "rahasia tidak perlu")
 md_path = os.path.join(OUT, "doc.md")
 with open(md_path, "w", encoding="utf-8") as fh:
     fh.write(markdown)
@@ -143,6 +147,7 @@ command = [
     "-f", "markdown+lists_without_preceding_blankline-markdown_in_html_blocks-citations+native_divs",
     "-t", "html5", "--standalone", "--embed-resources",
     "--css", os.path.join(HERE, "style.css"),
+    "--css", os.path.join(HERE, "mockups.css"),
     "--metadata", "lang=id", "--metadata", "pagetitle=Plan bot trading otonom 24 jam",
     "--columns=200", "-o", html_path,
 ]
@@ -156,9 +161,10 @@ used = []
 
 def inline(match):
     name = match.group(1)
-    target = os.path.join(HERE, "arch.svg.html") if name == "arch" else os.path.join(HERE, "mockups", name + ".html")
     used.append(name)
-    return read(target)
+    if name == "arch":
+        return read(os.path.join(HERE, "arch.svg.html"))
+    return mockups.SCREENS[name]()
 
 
 html = re.sub(r"<p>@@MOCK(\w+)@@</p>", inline, html)
