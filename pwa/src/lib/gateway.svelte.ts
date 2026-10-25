@@ -2,7 +2,7 @@ import { createApi, type Api } from "./api";
 import { FeedClient, type LinkInfo } from "./feed";
 import { describe, type FeedItem } from "./feedText";
 import { parseTs } from "./format";
-import { carriesData, FEED_TOPICS, faultOf, isStale, loadSnapshot, safetyOf, type Fault, type PanelName, type SafetyState } from "./state";
+import { carriesData, faultOf, greetingMessages, isStale, loadSnapshot, safetyOf, type Fault, type PanelName, type SafetyState } from "./state";
 import type { CandleFrame, Decision, Equity, FeedEvent, Health, LogLine, Overview, Risk, Sysinfo, Trade } from "./types";
 
 const FEED_LIMIT = 200;
@@ -148,18 +148,11 @@ class Gateway {
   }
 
   private greeting(): object[] {
-    const messages: object[] = [];
-    if (this.lastSeq !== null) messages.push({ type: "resume", last_seq: this.lastSeq });
-    messages.push(this.subscription());
-    return messages;
+    return greetingMessages(this.lastSeq, this.watchedPairs);
   }
 
   private subscription(): object {
-    return {
-      type: "subscribe",
-      topics: [...FEED_TOPICS],
-      candles: [...this.watchedPairs].map((pair) => ({ pair, timeframe: "1h", limit: 300 })),
-    };
+    return greetingMessages(null, this.watchedPairs)[0];
   }
 
   private clearPanelFault(name: PanelName | "candles"): void {

@@ -19,10 +19,19 @@ export const FEED_TOPICS = [
   "gw.candles",
 ] as const;
 
-const DATA_EVENTS = new Set<string>(FEED_TOPICS);
+const FRESHNESS_EVENTS = new Set<string>(FEED_TOPICS.filter((type) => type !== "gw.decision"));
 
 export function carriesData(type: string): boolean {
-  return DATA_EVENTS.has(type);
+  return FRESHNESS_EVENTS.has(type);
+}
+
+export function greetingMessages(lastSeq: number | null, pairs: Iterable<string>): object[] {
+  const subscribe = {
+    type: "subscribe",
+    topics: [...FEED_TOPICS],
+    candles: [...pairs].map((pair) => ({ pair, timeframe: "1h", limit: 300 })),
+  };
+  return lastSeq === null ? [subscribe] : [subscribe, { type: "resume", last_seq: lastSeq }];
 }
 
 export interface Fault {
