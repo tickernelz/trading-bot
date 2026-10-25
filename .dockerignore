@@ -1,6 +1,12 @@
 *
 !engine
+!gateway
+!swarm
 !tests
 !pyproject.toml
 !config/config.example.yaml
+!config/gateway.example.yaml
 **/__pycache__
+**/.venv
+**/.ruff_cache
+swarm/bench

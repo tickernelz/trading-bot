@@ -14,6 +14,8 @@ STRATEGY = "SwingEmaRsi"
 STRATEGY_COMMANDS = {"trade", "backtesting", "webserver"}
 API_COMMANDS = {"trade", "webserver"}
 ENGINE_ROOT = Path(__file__).resolve().parent
+DRY_RUN_DB = "tradesv3.dryrun.sqlite"
+TRADABLE_BALANCE_RATIO = 0.99
 
 
 class MissingSecret(Exception):
@@ -31,7 +33,7 @@ def freqtrade_config(settings: Settings, serve_api: bool = True) -> dict[str, An
         "fee": settings.exchange.fee_pct / 100,
         "stake_currency": settings.exchange.stake_currency,
         "stake_amount": "unlimited",
-        "tradable_balance_ratio": 0.99,
+        "tradable_balance_ratio": TRADABLE_BALANCE_RATIO,
         "max_open_trades": settings.risk.max_open_trades,
         "timeframe": settings.exchange.timeframe,
         "cancel_open_orders_on_exit": False,
@@ -58,6 +60,8 @@ def freqtrade_config(settings: Settings, serve_api: bool = True) -> dict[str, An
         "pairlists": [{"method": "StaticPairList"}],
         "internals": {"process_throttle_secs": 5},
         "trading_bot": {
+            "bot_id": settings.bot_id,
+            "shadow_url": settings.shadow.url if settings.swarm.enabled and settings.shadow else None,
             "initial_capital": settings.capital.initial_idr,
             "compounding": settings.capital.compounding,
             "risk": settings.risk.model_dump(),
@@ -112,7 +116,10 @@ def main(argv: list[str]) -> int:
         return 2
     rendered = Path(userdir) / "trading-bot.freqtrade.json"
     rendered.parent.mkdir(parents=True, exist_ok=True)
-    rendered.write_text(json.dumps(freqtrade_config(settings, serve_api), indent=2), encoding="utf-8")
+    config = freqtrade_config(settings, serve_api)
+    if serve_api:
+        config["db_url"] = f"sqlite:///{(Path(userdir) / DRY_RUN_DB).resolve()}"
+    rendered.write_text(json.dumps(config, indent=2), encoding="utf-8")
     command = build_argv(argv[0], argv[1:], rendered, userdir)
     os.execvpe(command[0], command, {**os.environ, **overrides})
 

@@ -131,8 +131,20 @@ class Api(Strict):
     force_entry: bool = False
 
 
+class Shadow(Strict):
+    listen: Literal["127.0.0.1", "::1"] = "127.0.0.1"
+    port: Annotated[int, Field(ge=1024, le=65535)] = 8091
+    database: Annotated[str, Field(pattern=r"^[A-Za-z0-9_.-]+\.sqlite$")] = "swarm_decisions.sqlite"
+
+    @property
+    def url(self) -> str:
+        host = "[::1]" if self.listen == "::1" else self.listen
+        return f"http://{host}:{self.port}"
+
+
 class Settings(Strict):
     mode: Literal["dry_run"]
+    bot_id: Annotated[str, Field(pattern=r"^[A-Z]$")] = "A"
     capital: Capital
     risk: RiskSettings
     exchange: Exchange
@@ -143,6 +155,15 @@ class Settings(Strict):
     data: Data
     notify: Notify
     api: Api = Api()
+    shadow: Shadow | None = None
+
+    @model_validator(mode="after")
+    def _swarm_mode_supported(self) -> Settings:
+        if self.swarm.enabled and self.swarm.mode == "veto":
+            raise ValueError("swarm.mode veto is not implemented yet; use shadow or disable the swarm")
+        if self.swarm.enabled and self.shadow is None:
+            raise ValueError("swarm.mode shadow needs a shadow section")
+        return self
 
     @model_validator(mode="after")
     def _references_resolve(self) -> Settings:

@@ -115,3 +115,6 @@ def test_valid_config_execs_freqtrade_with_strategy(monkeypatch, tmp_path, exec_
     assert env["FREQTRADE__API_SERVER__PASSWORD"] == "pw-example"
     rendered = json.loads((tmp_path / "user_data" / "trading-bot.freqtrade.json").read_text(encoding="utf-8"))
     assert "pw-example" not in json.dumps(rendered)
+    assert rendered["db_url"] == f"sqlite:///{tmp_path / 'user_data' / 'tradesv3.dryrun.sqlite'}"
+    assert rendered["trading_bot"]["shadow_url"] == "http://127.0.0.1:8091"
+    assert rendered["trading_bot"]["bot_id"] == "A"

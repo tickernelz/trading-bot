@@ -106,3 +106,7 @@ api:
   jwt_secret_env: FT_API_JWT_SECRET
   ws_token_env: FT_API_WS_TOKEN
   force_entry: false
+shadow:
+  listen: 127.0.0.1
+  port: 8091
+  database: swarm_decisions.sqlite
