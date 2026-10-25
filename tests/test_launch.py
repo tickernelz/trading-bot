@@ -81,7 +81,7 @@ def test_every_command_passes_api_secrets_through_env(monkeypatch, tmp_path, exe
     [(_, argv, env)] = exec_calls
     assert argv[1] == command
     assert env["FREQTRADE__API_SERVER__WS_TOKEN"] == "ws-example"
-    assert ("--strategy" in argv) is (command != "download-data")
+    assert ("--strategy" in argv) is (command in launch.STRATEGY_COMMANDS)
 
 
 def test_valid_config_execs_freqtrade_with_strategy(monkeypatch, tmp_path, exec_calls):

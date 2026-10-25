@@ -11,7 +11,7 @@ from typing import Any
 from engine.settings import ConfigError, Settings, load_settings
 
 STRATEGY = "SwingEmaRsi"
-STRATEGY_COMMANDS = {"trade", "backtesting", "show-config"}
+STRATEGY_COMMANDS = {"trade", "backtesting", "webserver"}
 ENGINE_ROOT = Path(__file__).resolve().parent
 
 
