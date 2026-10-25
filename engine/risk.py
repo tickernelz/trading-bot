@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
@@ -51,6 +52,8 @@ def assess(
     now: datetime,
 ) -> RiskState:
     """Evaluate the daily-loss and peak-drawdown limits at now."""
+    if not math.isfinite(open_pnl):
+        raise ValueError("open_pnl must be finite")
     start = day_start(now, settings.daily_reset_timezone)
     realized = initial_capital
     peak = initial_capital
@@ -61,6 +64,8 @@ def assess(
             raise ValueError("close_time must be timezone-aware")
         if trade.close_time > now:
             continue
+        if not math.isfinite(trade.profit_abs):
+            raise ValueError("profit_abs must be finite")
         realized += trade.profit_abs
         peak = max(peak, realized)
         if trade.close_time < start:
@@ -88,19 +93,28 @@ def assess(
     )
 
 
+def loss_ratio_at_stop(stoploss: float, fee: float) -> float:
+    """Return the fraction of a long stake lost when the stoploss fills, entry and exit fees included."""
+    if not -1 < stoploss < 0:
+        raise ValueError("stoploss must be a negative ratio above -1")
+    if not 0 <= fee < 1:
+        raise ValueError("fee must be a ratio in [0, 1)")
+    return (1 + fee) - (1 + stoploss) * (1 - fee)
+
+
 def stake_for_risk(
     settings: RiskSettings,
     equity: float,
     stoploss: float,
+    fee: float,
     min_stake: float | None,
     max_stake: float,
 ) -> float:
-    """Size a stake so that hitting the stoploss loses risk_per_trade_pct of equity; 0 means skip."""
-    if not -1 < stoploss < 0:
-        raise ValueError("stoploss must be a negative ratio above -1")
-    if equity <= 0:
+    """Size a stake so that a stoploss fill, fees included, loses risk_per_trade_pct of equity; 0 means skip."""
+    per_stake = loss_ratio_at_stop(stoploss, fee)
+    if not math.isfinite(equity) or equity <= 0:
         return 0.0
-    stake = min(equity * settings.risk_per_trade_pct / 100 / abs(stoploss), max_stake)
+    stake = min(equity * settings.risk_per_trade_pct / 100 / per_stake, max_stake)
     if min_stake is not None and stake < min_stake:
         return 0.0
     return max(stake, 0.0)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 from datetime import datetime
 
 import talib.abstract as ta
@@ -44,6 +45,8 @@ class SwingEmaRsi(IStrategy):
         section = self.config["trading_bot"]
         self.risk_settings = RiskSettings.model_validate(section["risk"])
         self.initial_capital = float(section["initial_capital"])
+        self.compounding = bool(section["compounding"])
+        self.fee = float(self.config["fee"])
 
     def populate_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         dataframe["ema_fast"] = ta.EMA(dataframe, timeperiod=20)
@@ -79,11 +82,17 @@ class SwingEmaRsi(IStrategy):
         )
         return assess(self.risk_settings, self.initial_capital, closed, open_pnl, current_time)
 
+    def sizing_equity(self, state: RiskState) -> float:
+        return state.equity if self.compounding else min(state.equity, self.initial_capital)
+
     def _last_close(self, pair: str) -> float:
         dataframe, _ = self.dp.get_analyzed_dataframe(pair, self.timeframe)
         if dataframe.empty:
             raise RiskDataUnavailable(f"no candles for open trade {pair}")
-        return float(dataframe["close"].iloc[-1])
+        close = float(dataframe["close"].iloc[-1])
+        if not math.isfinite(close) or close <= 0:
+            raise RiskDataUnavailable(f"no usable close for open trade {pair}")
+        return close
 
     def custom_stake_amount(
         self,
@@ -100,7 +109,9 @@ class SwingEmaRsi(IStrategy):
     ) -> float:
         try:
             state = self.risk_state(current_time, pair, current_rate)
-            return stake_for_risk(self.risk_settings, state.equity, self.stoploss, min_stake, max_stake)
+            return stake_for_risk(
+                self.risk_settings, self.sizing_equity(state), self.stoploss, self.fee, min_stake, max_stake
+            )
         except Exception:
             logger.exception("risk guard could not size %s; skipping entry", pair)
             return 0.0

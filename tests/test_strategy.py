@@ -30,6 +30,22 @@ class CandleStub:
         return DataFrame({"close": [self.closes[pair]]}), None
 
 
+def _make_strategy(compounding: bool = True) -> SwingEmaRsi:
+    config = freqtrade_config(load_settings(EXAMPLE))
+    config["trading_bot"]["compounding"] = compounding
+    instance = SwingEmaRsi(config)
+    instance.dp = CandleStub({})
+    instance.bot_start()
+    return instance
+
+
+@pytest.fixture
+def fixed_strategy():
+    init_db("sqlite://")
+    yield _make_strategy(compounding=False)
+    Trade.session.remove()
+
+
 @pytest.fixture
 def strategy():
     init_db("sqlite://")
@@ -127,13 +143,37 @@ def test_entry_denied_when_open_trade_cannot_be_priced(strategy):
     assert _stake(strategy) == 0.0
 
 
-def test_stake_follows_risk_per_trade(strategy):
-    assert _stake(strategy) == pytest.approx(2_000_000.0 * 0.005 / 0.03)
+def test_stoploss_fill_loses_risk_per_trade_of_equity_after_fees(strategy):
+    stake = _stake(strategy)
+    open_rate = 60_000_000.0
+    trade = _trade("ETH/IDR", open_rate, stake, is_open=True)
+    loss = trade.calculate_profit(open_rate * (1 + strategy.stoploss)).profit_abs
+    assert loss == pytest.approx(-2_000_000.0 * 0.005, rel=1e-6)
 
 
 def test_stake_compounds_with_realized_profit(strategy):
+    base = _stake(strategy)
     _closed(NOW - timedelta(days=3), 1_000_000.0)
-    assert _stake(strategy) == pytest.approx(3_000_000.0 * 0.005 / 0.03)
+    assert _stake(strategy) == pytest.approx(base * 1.5)
+
+
+def test_stake_without_compounding_ignores_profit(fixed_strategy):
+    base = _stake(fixed_strategy)
+    _closed(NOW - timedelta(days=3), 1_000_000.0)
+    assert _stake(fixed_strategy) == pytest.approx(base)
+
+
+def test_stake_without_compounding_still_shrinks_after_loss(fixed_strategy):
+    base = _stake(fixed_strategy)
+    _closed(NOW - timedelta(days=3), -100_000.0)
+    assert _stake(fixed_strategy) == pytest.approx(base * 0.95)
+
+
+def test_entry_denied_when_open_trade_price_is_nan(strategy):
+    strategy.dp = CandleStub({"SOL/IDR": float("nan")})
+    _trade("SOL/IDR", 3_000_000.0, 400_000.0, is_open=True)
+    assert not _confirm(strategy)
+    assert _stake(strategy) == 0.0
 
 
 def test_stake_skips_when_below_exchange_minimum(strategy):
