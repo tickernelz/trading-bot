@@ -1,5 +1,11 @@
 #!/bin/sh
-hits=$(git diff --cached -U0 --diff-filter=ACM -- '*.ts' '*.tsx' '*.js' '*.py' '*.yaml' '*.yml' | grep -E '^\+\s*(//|#|/\*|\*)' | grep -v -E '^\+#!' | grep -v -E '^\+\s*(//|#|/\*)\s*(@ts-|eslint|noqa|type:|pragma|yaml-language-server|ruff|pyright|biome)' | grep -v -E '^\+\s*\*{1,2}[A-Za-z_]*[,)]?\s*$' || true)
+base='^\+\s*(//|#|/\*|\*)'
+shebang='^\+#!'
+pragma='^\+\s*(//|#|/\*)\s*(@ts-|eslint|noqa|type:|pragma|yaml-language-server|ruff|pyright|biome)'
+separator='^\+\s*(\*,|\*{1,2}[A-Za-z_][A-Za-z0-9_]*,?\)?)\s*$'
+hits=$(git diff --cached -U0 --diff-filter=ACM -- '*.ts' '*.tsx' '*.js' '*.yaml' '*.yml' | grep -E "$base" | grep -v -E "$shebang" | grep -v -E "$pragma" || true)
+pyhits=$(git diff --cached -U0 --diff-filter=ACM -- '*.py' | grep -E "$base" | grep -v -E "$shebang" | grep -v -E "$pragma" | grep -v -E "$separator" || true)
+hits=$(printf '%s\n%s' "$hits" "$pyhits" | sed '/^$/d')
 if [ -n "$hits" ]; then
   echo "pre-commit: comment gate failed:"
   echo "$hits"
