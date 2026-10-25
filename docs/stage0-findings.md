@@ -11,8 +11,8 @@ Kode ada di `swarm/` (paket Python `tb_swarm`, `pyproject.toml` sendiri supaya t
 | 1. Antarmuka `DecisionProvider` tiga primitif + tiga adapter | Terbukti | `swarm/tb_swarm/providers/`, 18 tes wire |
 | 2. Registri voter, kuorum 5/7, pengacakan opsi, median | Terbukti | `swarm/tb_swarm/{config,runner,shuffle,aggregate}.py`, 45 tes |
 | 3. Semua adapter diuji ke server stub lokal | Terbukti | `swarm/tb_swarm/stub_server.py`, tanpa key dan tanpa jaringan |
-| 4. Uji hidup `nutaraline/deepseek-v4.1-flash-1017` | **Belum terbukti, menunggu `NUTARALINE_API_KEY`** | Skrip siap: `swarm/bench/live_nutaraline.py` |
-| 5. Agen analis deepagents 0.7.32 + uji ulang ZHA-3610 | Terbukti; angka token hidup menunggu key | `swarm/tb_swarm/agents.py`, 21 tes, `bench/bench_voter_overhead.py` |
+| 4. Uji hidup `nutaraline/deepseek-v4.1-flash-1017` | Terbukti: 20/20 valid di setiap sel, dua kali (effort bawaan dan `high`) | `swarm/bench/live_nutaraline.py`, bagian Butir 4 |
+| 5. Agen analis deepagents 0.7.32 + uji ulang ZHA-3610 | Terbukti, termasuk latensi dan token hidup | `swarm/tb_swarm/agents.py`, 21 tes, `bench/bench_voter_overhead.py` |
 | 6. Kronos mini di CPU | Terbukti (waktu, memori, median antar jalur) | `swarm/bench/bench_kronos.py`, 10 konfigurasi |
 | 7. Temuan dan angka di dokumen ini | Dokumen ini | - |
 
@@ -95,23 +95,58 @@ Aturan keputusan (`swarm/tb_swarm/runner.py`):
 
 Hasil stub bukan bukti kualitas model, hanya bukti bentuk wire, parsing, klasifikasi error, dan logika keputusan.
 
-## Butir 4: uji hidup nutaraline (menunggu key)
+## Butir 4: uji hidup nutaraline
 
-Belum dijalankan: `NUTARALINE_API_KEY` tidak ada di lingkungan maupun `.env` worktree saat pekerjaan ini dikerjakan. Nilai `apiKey` di `~/.omp/agent/models.yml` tidak dibaca dan tidak disalin.
+Dijalankan 2026-10-26 ke `https://nutaraline.co.uk/v1`, model `deepseek-v4.1-flash-1017`, tipe API `openai-completions`. Kunci diambil dari `NUTARALINE_API_KEY` di `.env` worktree yang di-gitignore (izin Zhafron lewat komentar Wira di ZHA-3763); nilai `apiKey` di `~/.omp/agent/models.yml` tidak dibaca. Pemeriksaan: nilai kunci tidak ada di berkas yang dilacak git, tidak ada di riwayat git, dan tidak ada di berkas keluaran.
 
-Skrip siap: `swarm/bench/live_nutaraline.py`, 20 contoh keputusan trading (RSI, breakdown, funding crowded, depeg, outage API, dan seterusnya) x tiga mode structured output (`prompt`, `json_object`, `json_schema`) untuk backend `direct`, dan mode `prompt` saja untuk backend `deepagents` (backend itu tidak meneruskan `response_format`, jadi kombinasi lain ditolak saat konfigurasi dimuat). Perbandingan deepagents vs langsung dilakukan pada sel yang sama, `prompt`. Satu provider per sel (mode, backend) dan satu panggilan pemanasan yang tidak dihitung, jadi median latensi adalah keadaan tunak. Yang diukur per sel: tingkat jawaban valid, latensi median/p90, token input/output/reasoning, dan model yang benar-benar melayani. Perbandingan latensi dan token deepagents vs langsung pada provider nyata (butir 5) keluar dari skrip yang sama: sel `direct x prompt` melawan `deepagents x prompt`.
+`swarm/bench/live_nutaraline.py` mengirim 20 contoh keputusan trading (satu pertanyaan `choice`, satu `noul`, satu `score` per contoh), satu provider per sel dengan satu panggilan pemanasan yang tidak dihitung. Sel: backend `direct` x tiga mode (`prompt`, `json_object`, `json_schema`) dan backend `deepagents` x `prompt`.
 
-Cara jalan setelah key terpasang:
+### Dukungan structured output
+
+Ketiga mode diterima server dan menghasilkan jawaban valid 20/20. `json_object` dan `json_schema` (strict) tidak ditolak oleh gateway. Catatan: ini membuktikan permintaan diterima dan jawabannya lolos validasi kita; belum membuktikan bahwa server benar-benar menegakkan skema (mode `prompt` juga 20/20, jadi pada 20 contoh ini tidak ada selisih yang bisa dikaitkan dengan penegakan).
+
+### Reasoning
+
+Tanpa parameter tambahan model menjawab tanpa reasoning (`reasoning_tokens` = 0 pada semua 80 panggilan). Reasoning baru aktif dengan `reasoning_effort: "high"` lewat `extra_body`: respons membawa `reasoning_content` dan `completion_tokens_details.reasoning_tokens`. Untuk tugas ini "reasoning aktif" di deskripsi butir 4 berarti harus dipilih lewat konfigurasi voter (`extra_body`), bukan bawaan model.
+
+### Hasil 20 contoh per sel
+
+Effort bawaan (`--interval 3`, tanpa 429 pada putaran ini):
+
+| Backend | Mode | Valid | Latensi median | p90 | Token masuk (median) | Token keluar (median) | Token reasoning |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| direct | prompt | 20/20 | 1,22 s | 1,50 s | 333 | 36 | 0 |
+| direct | json_object | 20/20 | 1,31 s | 2,24 s | 333 | 36 | 0 |
+| direct | json_schema | 20/20 | 1,23 s | 2,07 s | 654 | 36 | 0 |
+| deepagents | prompt | 20/20 | 1,23 s | 1,57 s | 333 | 36 | 0 |
+
+`reasoning_effort: high`:
+
+| Backend | Mode | Valid | Latensi median | p90 | Token masuk (median) | Token keluar (median) | Token reasoning (median / total) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| direct | prompt | 20/20 | 5,23 s | 8,75 s | 358 | 431 | 398 / 8.145 |
+| direct | json_object | 20/20 | 5,04 s | 7,76 s | 358 | 433 | 403 / 8.574 |
+| direct | json_schema | 20/20 | 4,30 s | 9,24 s | 679 | 342 | 312 / 8.742 |
+| deepagents | prompt | 20/20 | 4,89 s | 9,84 s | 358 | 356 | 326 / 10.182 |
+
+Biaya moneter tidak diukur: respons tidak membawa `usage.cost`.
+
+### Temuan operasional
+
+- Mode `json_schema` hampir menggandakan token masuk (654 lawan 333) karena skema ikut dikirim; tanpa selisih kualitas yang terukur pada 20 contoh.
+- Reasoning `high` menaikkan latensi median sekitar 4x (1,2 s menjadi 4,3 sampai 5,2 s) dan token keluar sekitar 12x. Latensi terburuk satu panggilan 27,6 s (deepagents) dan 22,2 s (json_schema), jadi `timeout_s: 30` di `config.example.yaml` tipis untuk effort `high`; di effort bawaan p90 di bawah 2,3 s.
+- Gateway membatasi laju per kunci. Putaran pertama tanpa jeda mengirim empat sel berurutan dan tiga sel terakhir terkena HTTP 429 (`Laju request per key melebihi batas`): 19 dari 20 kasus gagal di tiap sel itu. Tujuh voter paralel pada satu kunci akan menabrak batas ini pada setiap keputusan, jadi kuorum 5 dari 7 akan sering gagal bila ketujuh voter berbagi satu kunci dan satu model. Ini hasil yang bisa diukur, bukan prediksi: batas pastinya belum diukur.
+- Setelah skrip diberi jeda `--interval` dan percobaan ulang 429 (`--rate-limit-retries`, `--rate-limit-wait`), putaran ulang 80/80 valid tanpa satu pun percobaan ulang pada `--interval 3`.
+
+Cara menjalankan ulang:
 
 ```sh
 cd swarm
-NUTARALINE_API_KEY=... .venv/bin/python bench/live_nutaraline.py \
-  --base-url <base URL berakhiran /v1> --out /tmp/nutaraline-live.json
+set -a && . ../.env && set +a
+.venv/bin/python bench/live_nutaraline.py --base-url https://nutaraline.co.uk/v1 --interval 3 --out <berkas keluaran>
+.venv/bin/python bench/live_nutaraline.py --base-url https://nutaraline.co.uk/v1 --interval 3 \
+  --extra-body '{"reasoning_effort":"high"}' --out <berkas keluaran>
 ```
-
-Base URL wajib diberikan lewat `--base-url` atau `NUTARALINE_BASE_URL` (berakhiran `/v1`); skrip tidak membuka `~/.omp/agent/models.yml`. Mekanisme jalur sukses dan jalur gagal sudah diuji ke stub.
-
-Dukungan structured output, latensi nyata, dan token reasoning pada model ini tetap **belum terbukti** sampai skrip di atas dijalankan dengan key.
 
 ## Butir 5: deepagents 0.7.32
 
@@ -144,9 +179,22 @@ Kesimpulan: batas keamanan tidak boleh ditaruh di prompt induk, dan pembatasan h
 | 0 ms | 4,0 ms (maks 5,6) | 9,9 ms (maks 19,5) | +5,9 ms |
 | 500 ms | 504,0 ms | 508,8 ms | +4,8 ms |
 
-Panjang prompt yang dikirim identik (selisih 0 karakter pada stub, karena profil default deepagents tidak menambah system prompt dan `ToolAllowlist` mengosongkan daftar tool). Artinya overhead deepagents di sini murni latency kerangka, sekitar 5-10 ms per pemanggilan, sementara latensi provider nyata berada di kisaran ratusan sampai ribuan milidetik. Selisih token pada provider nyata belum terukur: stub mengembalikan `usage` tetap, jadi angka token hidup menunggu butir 4.
+Panjang prompt yang dikirim identik (selisih 0 karakter pada stub, karena profil default deepagents tidak menambah system prompt dan `ToolAllowlist` mengosongkan daftar tool). Artinya overhead deepagents di sini murni latency kerangka, sekitar 5-10 ms per pemanggilan, sementara latensi provider nyata berada di kisaran ratusan sampai ribuan milidetik. Angka provider nyata ada di bagian "Hidup: deepagents lawan panggilan langsung" di bawah.
 
-Keputusan sementara: voter cepat tidak perlu deepagents; deepagents dipakai untuk agen analis yang memang butuh tool, bukan untuk voter.
+### Hidup: deepagents lawan panggilan langsung
+
+Sel yang sama (`prompt`), model nutaraline, 20 contoh:
+
+| Effort | Jalur | Latensi median | p90 | Token masuk | Token keluar |
+| --- | --- | --- | --- | --- | --- |
+| bawaan | direct | 1,22 s | 1,50 s | 333 | 36 |
+| bawaan | deepagents | 1,23 s | 1,57 s | 333 | 36 |
+| high | direct | 5,23 s | 8,75 s | 358 | 431 |
+| high | deepagents | 4,89 s | 9,84 s | 358 | 356 |
+
+Token masuk identik pada kedua jalur (333 dan 358): deepagents tidak menambah prompt. Latensi median pada effort bawaan beda 0,01 s; pada effort `high` deepagents lebih cepat 0,34 s tetapi p90-nya 1,1 s lebih lambat. Itu di dalam derau satu putaran 20 contoh dengan reasoning acak, jadi selisihnya tidak bisa dibaca sebagai keuntungan atau kerugian. Yang terukur hanya bahwa overhead kerangka (5-10 ms pada stub) tidak terlihat di atas latensi jaringan.
+
+Keputusan: voter cepat tidak perlu deepagents (tidak ada manfaat terukur, dan satu lapisan lebih banyak yang harus dijaga batasnya); deepagents dipakai untuk agen analis yang memang butuh tool.
 
 ### Agen voter
 
@@ -193,12 +241,12 @@ Median antar jalur karena itu bisa dibuat dan masuk akal sebagai voter bayangan:
 
 ## Yang belum terbukti
 
-1. Dukungan structured output `deepseek-v4.1-flash-1017` di `nutaraline` (tiga mode) dan perilaku `reasoning` yang aktif: butuh key.
-2. Latensi, token reasoning, dan tingkat jawaban valid model itu: butuh key.
-3. Selisih token deepagents vs panggilan langsung pada provider nyata: butuh key.
-4. Skema autentikasi dan path OpenRouter Decisions: baru dari dokumentasi, belum diuji hidup.
+1. Bahwa `json_object` dan `json_schema` ditegakkan di sisi server: pada 20 contoh mode `prompt` juga 20/20 valid, jadi tidak ada selisih yang bisa dikaitkan dengan penegakan.
+2. Batas laju per kunci pada gateway nutaraline (angka pastinya) dan perilaku tujuh voter paralel pada satu kunci: yang terukur baru bahwa empat sel berurutan tanpa jeda terkena 429.
+3. Kualitas keputusan model: 20/20 valid berarti bentuk jawaban benar, bukan bahwa jawabannya tepat. Tidak ada label kebenaran.
+4. Skema autentikasi dan path OpenRouter Decisions serta System One: baru dari dokumentasi, belum diuji hidup (tidak ada kunci untuk keduanya).
 5. Akurasi Kronos: sengaja tidak disimpulkan, dan datanya sintetis.
-6. Biaya harian swarm: belum ada angka karena semua panggilan model masih ke stub.
+6. Biaya harian swarm: respons nutaraline tidak membawa `usage.cost`, jadi belum ada angka moneter.
 
 ## Cara menjalankan ulang
 
