@@ -1,0 +1,18 @@
+#!/bin/sh
+msg_file="$1"
+subject=$(head -n 1 "$msg_file")
+case "$subject" in
+  "Merge "*|"Revert \""*) exit 0 ;;
+esac
+if ! printf '%s' "$subject" | grep -Eq '^(feat|fix|perf|refactor|docs|test|build|ci|chore|style|revert)(\([a-z0-9._/-]+\))?!?: .+'; then
+  echo "commit-msg: subject must be a Conventional Commit: type(scope): subject"
+  exit 1
+fi
+if [ "$(printf '%s' "$subject" | wc -c)" -ge 72 ]; then
+  echo "commit-msg: subject must be under 72 characters"
+  exit 1
+fi
+if grep -qi '^co-authored-by:' "$msg_file"; then
+  echo "commit-msg: Co-Authored-By trailers are not allowed"
+  exit 1
+fi

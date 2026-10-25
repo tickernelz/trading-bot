@@ -1,0 +1,97 @@
+mode: dry_run
+capital:
+  initial_idr: 2000000
+  compounding: true
+risk:
+  max_daily_loss_pct: 1.0
+  max_total_drawdown_pct: 10.0
+  risk_per_trade_pct: 0.5
+  max_open_trades: 3
+  leverage: none
+  on_breach: stop_new_entries
+exchange:
+  name: indodax
+  pairs: [BTC/IDR, ETH/IDR, SOL/IDR]
+  timeframe: 1h
+providers:
+  - id: nutaraline
+    type: openai-completions
+    base_url: from_import
+    key: secret:nutaraline
+    models: [deepseek-v4.1-flash-1017]
+swarm:
+  enabled: true
+  mode: shadow
+  shuffle_options: true
+  min_voters_answered: 5
+  max_spread: null
+  voters:
+    - id: v1
+      adapter: llm_structured
+      provider: nutaraline
+      model: deepseek-v4.1-flash-1017
+      variation: option_order
+      timeout_s: 30
+      weight: 1.0
+      enabled: true
+    - id: v2
+      adapter: llm_structured
+      provider: nutaraline
+      model: deepseek-v4.1-flash-1017
+      variation: option_order
+      timeout_s: 30
+      weight: 1.0
+      enabled: true
+    - id: v3
+      adapter: llm_structured
+      provider: nutaraline
+      model: deepseek-v4.1-flash-1017
+      variation: option_order
+      timeout_s: 30
+      weight: 1.0
+      enabled: true
+    - id: v4
+      adapter: llm_structured
+      provider: nutaraline
+      model: deepseek-v4.1-flash-1017
+      variation: option_order
+      timeout_s: 30
+      weight: 1.0
+      enabled: true
+    - id: v5
+      adapter: llm_structured
+      provider: nutaraline
+      model: deepseek-v4.1-flash-1017
+      variation: option_order
+      timeout_s: 30
+      weight: 1.0
+      enabled: true
+    - id: v6
+      adapter: llm_structured
+      provider: nutaraline
+      model: deepseek-v4.1-flash-1017
+      variation: option_order
+      timeout_s: 30
+      weight: 1.0
+      enabled: true
+    - id: v7
+      adapter: llm_structured
+      provider: nutaraline
+      model: deepseek-v4.1-flash-1017
+      variation: option_order
+      timeout_s: 30
+      weight: 1.0
+      enabled: true
+llm:
+  backend: deepagents
+  analyst_model: nutaraline:deepseek-v4.1-flash-1017
+compute:
+  max_cost_idr_per_day: off
+  on_exceed: skip_new_entries
+  log_cost: true
+data:
+  news_rss: [coindesk, cointelegraph]
+  fear_greed: true
+  social: off
+notify:
+  web_push: true
