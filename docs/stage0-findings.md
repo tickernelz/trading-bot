@@ -86,7 +86,7 @@ Aturan keputusan (`swarm/tb_swarm/runner.py`):
 - Kuorum: kurang dari `min_voters_answered` (5) jawaban sah berarti hasil `skip` dengan alasan `quorum_not_met`. Fail-closed: tidak ada agregat, sehingga konsumen tidak bisa mengambil keputusan.
 - Urutan opsi diacak per voter per keputusan dengan RNG ber-seed (`seed:decision_id:voter_id`), termasuk membalik rubrik `score`; jawaban dipulihkan ke urutan asli sebelum digabung. Voter tetap menjawab berdasarkan nama kunci, jadi pengacakan hanya menghapus bias posisi.
 - Penggabungan: median berbobot (bobot voter) untuk `noul` dan `score`, plus sebaran kuartil (q25, q75, IQR, min, maks); untuk `choice` dipakai median probabilitas per opsi (distribusi ternormalisasi; satu-panas bila model tidak memberi probabilitas), pemenang, tanda seri, jumlah suara, dan tingkat kesepakatan berbobot.
-- `max_spread` opsional: bila IQR melebihi ambang, hasil `skip` dengan alasan `spread_exceeded:<pertanyaan>`.
+- `max_spread` opsional: bila IQR melebihi ambang, hasil `skip` dengan alasan `spread_exceeded:<pertanyaan>`. Ambang ini berlaku untuk `noul` dan untuk probabilitas pemenang `choice`; `score` tidak ikut diperiksa karena satuannya level rubrik, bukan probabilitas, sehingga satu angka ambang tidak bisa adil untuk keduanya.
 - Setiap keputusan dapat dicatat ke JSONL (`swarm.log_path`): request, status, agregat, dan satu baris per voter (status, latency, model, usage, jawaban, urutan opsi yang disajikan, rubrik yang dibalik).
 
 ## Butir 3: uji ke stub lokal
@@ -164,7 +164,7 @@ Mesin: Intel i5-12600K, 16 CPU logis, semua job lewat antrean `heavy` (kuota 400
 | lookback 512 | 1 jam | 4 | 4 | 185 ms | 223 ms | 704 MB |
 | lookback 512 | 1 jam | 8 | 4 | 342 ms | 411 ms | 765 MB |
 | lookback 512 | 1 jam | 16 | 4 | 718 ms | 804 ms | 851 MB |
-| lookback 512 | 1 jam | 32 | 4 | 1.448 ms | 1.555 ms | 1.068 MB |
+| lookback 512 | 1 jam | 32 | 4 | 1.448 ms | 1.555 ms | 1.068 MB (naik dari 677 MB) |
 | lookback 512 | 1 jam | 8 | 1 | 903 ms | 965 ms | 751 MB |
 | lookback 512 | 1 jam | 8 | 2 | 517 ms | 545 ms | 758 MB |
 | lookback 512 | 1 jam | 8 | 8 | 649 ms | 696 ms | 773 MB |
