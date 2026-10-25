@@ -53,6 +53,9 @@ class HttpDecisionProvider(DecisionProvider):
             cost=float(cost) if isinstance(cost, (int, float)) else None,
         )
 
+    def secrets(self) -> tuple[str, ...]:
+        return (self._api_key,) if self._api_key else ()
+
     async def decide(self, request: DecisionRequest) -> DecisionResponse:
         headers = self._headers()
         started = time.perf_counter()

@@ -17,6 +17,7 @@ from tb_swarm.errors import ConfigError, ProviderError
 from tb_swarm.models import Answer, DecisionRequest, DecisionResponse, Usage
 from tb_swarm.providers.base import DecisionProvider
 from tb_swarm.providers.factory import AgentFactory, build_provider
+from tb_swarm.redact import redact
 from tb_swarm.shuffle import OptionOrder, identity_order, plan_order
 from tb_swarm.validate import parse_answers
 
@@ -136,7 +137,11 @@ class SwarmRunner:
         presented = order.present(request, rng) if shuffle else request
         started = time.perf_counter()
 
+        secrets = self._providers[voter.id].secrets()
+
         def record(status: VoterStatus, **extra: Any) -> VoterRecord:
+            if extra.get("error"):
+                extra["error"] = redact(extra["error"], secrets)[:MAX_ERROR_CHARS]
             return VoterRecord(
                 voter_id=voter.id,
                 status=status,
@@ -186,6 +191,11 @@ class SwarmRunner:
         if len(ballots) < required:
             return DecisionOutcome(decision_id, "skip", "quorum_not_met", required, len(ballots), None, records)
         merged = aggregate(request, ballots)
+        for name, result in merged.questions.items():
+            if isinstance(result, ChoiceResult) and result.tie:
+                return DecisionOutcome(
+                    decision_id, "skip", f"choice_tie:{name}", required, len(ballots), merged, records
+                )
         limit = self._settings.max_spread
         if limit is not None:
             for name, result in merged.questions.items():

@@ -113,7 +113,7 @@ def classify_exception(exc: BaseException) -> ProviderError:
         return classify_status(status, str(getattr(exc, "message", exc)))
     if isinstance(exc, (openai.APIConnectionError, anthropic.APIConnectionError)):
         return ProviderError("network", f"transport error: {exc!r}")
-    return ProviderError("network", f"unexpected {type(exc).__name__}: {exc}")
+    return ProviderError("internal", f"unexpected {type(exc).__name__}: {exc}")
 
 
 def build_chat_model(
@@ -217,6 +217,9 @@ class LlmStructuredProvider(DecisionProvider):
         self._agent_factory = agent_factory
         self._chat: BaseChatModel | None = None
         self._agent: Any = None
+
+    def secrets(self) -> tuple[str, ...]:
+        return (self._api_key,) if self._api_key else ()
 
     def _model(self) -> BaseChatModel:
         if self._chat is None:

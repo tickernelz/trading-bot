@@ -116,7 +116,11 @@ def parse_config(raw: Mapping[str, Any]) -> SwarmConfig:
     try:
         return SwarmConfig.model_validate({"providers": providers, "swarm": raw.get("swarm") or {}})
     except ValidationError as exc:
-        raise ConfigError(str(exc)) from exc
+        lines = [
+            f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}"
+            for item in exc.errors(include_input=False, include_url=False, include_context=False)
+        ]
+        raise ConfigError("invalid swarm config:\n" + "\n".join(lines)) from None
 
 
 def load_config(path: str | Path) -> SwarmConfig:

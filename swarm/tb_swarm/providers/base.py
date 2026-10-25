@@ -42,5 +42,8 @@ class DecisionProvider(ABC):
             raise ProviderError("invalid", "expected score answer")
         return answer
 
+    def secrets(self) -> tuple[str, ...]:
+        return ()
+
     async def aclose(self) -> None:
         return None
