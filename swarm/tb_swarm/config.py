@@ -75,6 +75,29 @@ class SwarmSettings(BaseModel):
     log_path: str | None = None
 
 
+def _reject_ignored_options(voter: VoterSpec, provider: ProviderSpec) -> None:
+    if voter.adapter != "llm_structured":
+        ignored = [
+            name
+            for name, active in (
+                ("temperature", voter.temperature is not None),
+                ("structured_mode", voter.structured_mode != "prompt"),
+                ("backend", voter.backend != "direct"),
+                ("extra_body", voter.extra_body is not None),
+            )
+            if active
+        ]
+        if ignored:
+            raise ValueError(f"voter {voter.id!r}: adapter {voter.adapter!r} does not support {ignored}")
+        return
+    if voter.backend == "deepagents" and voter.structured_mode != "prompt":
+        raise ValueError(f"voter {voter.id!r}: structured_mode {voter.structured_mode!r} needs backend 'direct'")
+    if voter.structured_mode != "prompt" and provider.type != "openai-completions":
+        raise ValueError(
+            f"voter {voter.id!r}: structured_mode {voter.structured_mode!r} needs an openai-completions provider"
+        )
+
+
 class SwarmConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -95,6 +118,7 @@ class SwarmConfig(BaseModel):
                 raise ValueError(
                     f"voter {voter.id!r}: adapter {voter.adapter!r} cannot use provider type {provider.type!r}"
                 )
+            _reject_ignored_options(voter, provider)
             if provider.models and voter.model not in provider.models:
                 raise ValueError(f"voter {voter.id!r}: model {voter.model!r} not listed for provider {provider.id!r}")
         enabled = sum(1 for voter in self.swarm.voters if voter.enabled)

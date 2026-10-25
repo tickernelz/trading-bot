@@ -14,6 +14,7 @@ from tb_swarm.llm_prompt import SYSTEM_PROMPT
 from tb_swarm.models import ChoiceQuestion, DecisionRequest, DecisionResponse, NoulQuestion, Usage
 from tb_swarm.providers.base import DecisionProvider
 from tb_swarm.providers.http_wire import classify_status
+from tb_swarm.redact import redact
 from tb_swarm.validate import parse_answers
 
 ApiType = Literal["openai-completions", "openai-responses", "anthropic-messages"]
@@ -103,17 +104,17 @@ def extract_json(text: str) -> Any:
         raise ProviderError("invalid", "model output is not valid JSON") from exc
 
 
-def classify_exception(exc: BaseException) -> ProviderError:
+def classify_exception(exc: BaseException, secrets: tuple[str, ...] = ()) -> ProviderError:
     if isinstance(exc, ProviderError):
         return exc
     if isinstance(exc, (TimeoutError, openai.APITimeoutError, anthropic.APITimeoutError)):
-        return ProviderError("timeout", f"request timed out: {exc!r}")
+        return ProviderError("timeout", f"request timed out: {redact(repr(exc), secrets)}")
     status = getattr(exc, "status_code", None)
     if isinstance(status, int):
-        return classify_status(status, str(getattr(exc, "message", exc)))
+        return classify_status(status, str(getattr(exc, "message", exc)), secrets)
     if isinstance(exc, (openai.APIConnectionError, anthropic.APIConnectionError)):
-        return ProviderError("network", f"transport error: {exc!r}")
-    return ProviderError("internal", f"unexpected {type(exc).__name__}: {exc}")
+        return ProviderError("network", f"transport error: {redact(repr(exc), secrets)}")
+    return ProviderError("internal", redact(f"unexpected {type(exc).__name__}: {exc}", secrets))
 
 
 def build_chat_model(
@@ -204,6 +205,8 @@ class LlmStructuredProvider(DecisionProvider):
             raise ConfigError(f"structured_mode {structured_mode!r} is only supported for openai-completions")
         if backend == "deepagents" and agent_factory is None:
             raise ConfigError("backend 'deepagents' needs an agent_factory")
+        if backend == "deepagents" and structured_mode != "prompt":
+            raise ConfigError(f"structured_mode {structured_mode!r} is not supported by the deepagents backend")
         self._api_type = api_type
         self._base_url = base_url
         self._api_key = api_key
@@ -274,7 +277,7 @@ class LlmStructuredProvider(DecisionProvider):
         except ProviderError:
             raise
         except Exception as exc:
-            raise classify_exception(exc) from exc
+            raise classify_exception(exc, self.secrets()) from exc
         latency = time.perf_counter() - started
         payload = extract_json(text)
         if not isinstance(payload, dict):

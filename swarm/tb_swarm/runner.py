@@ -166,9 +166,9 @@ class SwarmRunner:
                 status = "timeout"
             else:
                 status = "failed"
-            return record(status, error_kind=exc.kind, error=str(exc)[:MAX_ERROR_CHARS])
+            return record(status, error_kind=exc.kind, error=str(exc))
         except Exception as exc:
-            return record("failed", error_kind="internal", error=f"{type(exc).__name__}: {exc}"[:MAX_ERROR_CHARS])
+            return record("failed", error_kind="internal", error=f"{type(exc).__name__}: {exc}")
         return record("ok", model=restored.model, usage=restored.usage, answers=answers)
 
     async def decide(self, request: DecisionRequest, decision_id: str | None = None) -> DecisionOutcome:

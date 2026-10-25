@@ -30,6 +30,7 @@ class Behavior:
     policy: Policy = first_option_policy
     delay_s: float = 0.0
     fail_status: int | None = None
+    fail_body: str | None = None
     malformed: str | None = None
     reasoning_tokens: int = 0
 
@@ -118,7 +119,10 @@ class _Handler(BaseHTTPRequestHandler):
         if behavior.delay_s:
             time.sleep(behavior.delay_s)
         if behavior.fail_status is not None:
-            self._send(behavior.fail_status, {"error": {"message": f"stub failure {behavior.fail_status}"}})
+            if behavior.fail_body is not None:
+                self._send(behavior.fail_status, behavior.fail_body, raw=True)
+            else:
+                self._send(behavior.fail_status, {"error": {"message": f"stub failure {behavior.fail_status}"}})
             return
         if path in DECISION_PATHS:
             self._decision(path, body, behavior)

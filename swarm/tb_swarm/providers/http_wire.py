@@ -6,11 +6,12 @@ import httpx
 from tb_swarm.errors import ProviderError
 from tb_swarm.models import DecisionRequest, DecisionResponse, Usage
 from tb_swarm.providers.base import DecisionProvider
+from tb_swarm.redact import redact
 from tb_swarm.validate import parse_answers
 
 
-def classify_status(status: int, body: str) -> ProviderError:
-    snippet = body[:200].replace("\n", " ")
+def classify_status(status: int, body: str, secrets: tuple[str, ...] = ()) -> ProviderError:
+    snippet = redact(body, secrets).replace("\n", " ")[:200]
     if status in (401, 403):
         return ProviderError("auth", f"HTTP {status}: {snippet}", status)
     if status == 429:
@@ -67,7 +68,7 @@ class HttpDecisionProvider(DecisionProvider):
             raise ProviderError("network", f"transport error: {exc!r}") from exc
         latency = time.perf_counter() - started
         if response.status_code != 200:
-            raise classify_status(response.status_code, response.text)
+            raise classify_status(response.status_code, response.text, self.secrets())
         try:
             body = response.json()
         except ValueError as exc:
