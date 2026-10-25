@@ -17,7 +17,8 @@ providers:
   - id: nutaraline
     type: openai-completions
     base_url: from_import
-    key: secret:nutaraline
+    api_key_env: NUTARALINE_API_KEY
+    api_key: null
     models: [deepseek-v4.1-flash-1017]
 swarm:
   enabled: true
