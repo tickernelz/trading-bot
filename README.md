@@ -44,10 +44,11 @@ Isi FT_API_USERNAME, FT_API_PASSWORD, FT_API_JWT_SECRET, FT_API_WS_TOKEN di .env
 
 Bot listen di 127.0.0.1:8080 (api.listen dan api.port di config). Bila konfigurasi tidak valid, kontainer berhenti dengan kode 2 dan pesan refusing to start; tidak ada order yang dibuat.
 
-Perintah Freqtrade lain memakai launcher yang sama, sehingga validasi tetap berlaku:
+Perintah Freqtrade lain memakai launcher yang sama, sehingga validasi tetap berlaku. Jalankan langsung dari image yang sudah dibangun (docker compose run akan membangun ulang image dasar yang butuh belasan menit):
 
-    docker compose run --rm --entrypoint python bot -m engine.launch download-data --days 120 --timeframes 1h
-    docker compose run --rm --entrypoint python bot -m engine.launch backtesting --timerange 20250601-
+    docker run --rm --network host --env-file .env -v ./config:/opt/trading-bot/config:ro -v ./user_data:/freqtrade/user_data trading-bot/engine:dev download-data --days 120 --timeframes 1h
+    docker run --rm --network host --env-file .env -v ./config:/opt/trading-bot/config:ro -v ./user_data:/freqtrade/user_data trading-bot/engine:dev backtesting --timerange 20250601-
+    docker run --rm --network host --env-file .env -v ./config:/opt/trading-bot/config:ro -v ./user_data:/freqtrade/user_data trading-bot/engine:dev show-config
 
 Jaringan: network_mode host dipakai supaya bot bisa menjangkau provider LLM yang hanya listen di 127.0.0.1 host (dibuktikan di WSL2: 127.0.0.1:62173 dan 127.0.0.1:20128 menjawab 401 dari dalam kontainer, sedangkan host.docker.internal dengan host-gateway hanya menghasilkan 000). Jalur Docker Desktop di Windows belum diuji; di sana host.docker.internal biasanya menunjuk loopback Windows sehingga api.listen perlu 0.0.0.0.
 

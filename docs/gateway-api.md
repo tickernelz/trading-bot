@@ -444,6 +444,8 @@ Klien WebSocket Freqtrade mengirim `{"type": "subscribe", "data": ["entry", "exi
 
 ## 10. Batasan yang harus tercermin di kontrak
 
+- Respons `/show_config` Freqtrade memuat `api_server.jwt_secret_key` dan `api_server.ws_token` dalam bentuk asli (hanya `password` yang disensor). Gateway tidak boleh meneruskannya apa adanya: ambil hanya field yang dibutuhkan 5.1 (`version`, `dry_run`, `stake_currency`, `timeframe`, `max_open_trades`, `state`) dan jangan pernah mengembalikan seluruh objek `/show_config` ke browser.
+
 - Indodax bukan exchange yang didukung resmi Freqtrade 2026.9; Freqtrade memakai kelas exchange generik dan mencetak peringatan saat start. Kontrak ini tetap sah, tetapi tidak ada subclass khusus Indodax.
 - Indodax tidak menyediakan `fetchMyTrades` dan `watchOHLCV` (dilaporkan Freqtrade sebagai `missing opt`); riwayat trade diambil dari database bot, bukan dari exchange.
 - Riwayat OHLCV 1h Indodax hanya ±649 candle terakhir (≈27 hari) walau diminta lebih; permintaan 1d mengembalikan 1000 candle dalam satu panggilan (batas satu permintaan, bukan bukti batas exchange). Grafik jangka panjang di PWA harus memakai 1d, bukan 1h.
