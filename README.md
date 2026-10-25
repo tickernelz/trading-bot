@@ -16,6 +16,7 @@ Status: tahap 0a (mesin dasar). Belum ada akun atau uang yang terhubung, belum a
 - docs/plan.md: plan final
 - docs/gateway-api.md: kontrak API gateway dan feed event untuk PWA
 - docs/research-swarm-pwa.md: riset dan sumber
+- pwa: panel PWA baca-saja tahap 1 dan gateway tiruan berdata contoh (lihat pwa/README.md)
 - config/config.example.yaml: contoh konfigurasi
 - tests/: tes pytest untuk skema, lapisan risiko, strategi, launcher
 - .env.example: nama variabel lingkungan

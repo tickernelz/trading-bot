@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": [
+      "ES2023",
+      "DOM",
+      "DOM.Iterable",
+      "WebWorker"
+    ],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "types": [
+      "vite/client",
+      "node"
+    ],
+    "allowImportingTsExtensions": false
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.svelte",
+    "tests/**/*.ts",
+    "mock-gateway/**/*.ts",
+    "vite.config.ts"
+  ]
+}
