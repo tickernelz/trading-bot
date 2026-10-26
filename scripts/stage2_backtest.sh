@@ -15,10 +15,19 @@ image=${IMAGE:?set IMAGE}
 mount=/opt/trading-bot/run
 mkdir -p "$out"
 
+docker run --rm --memory 512m --memory-swap 512m \
+  -v "$out:$mount" -v "$root/config/config.example.yaml:/tmp/example.yaml:ro" \
+  --entrypoint python "$image" -c "
+import yaml
+raw = yaml.safe_load(open('/tmp/example.yaml', encoding='utf-8'))
+raw['strategy'] = {'name': 'SwingEmaRsi'}
+yaml.safe_dump(raw, open('$mount/stage2-config.yaml', 'w', encoding='utf-8'), sort_keys=False)
+"
+
 run() {
   docker run --rm --memory 2g --memory-swap 2g \
     -v "$out:$mount" \
-    -v "$root/config/config.example.yaml:/opt/trading-bot/config/config.yaml:ro" \
+    -e TRADING_BOT_CONFIG="$mount/stage2-config.yaml" \
     "$@"
 }
 

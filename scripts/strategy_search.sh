@@ -13,7 +13,7 @@ shift 2
 root=$(cd "$(dirname "$0")/.." && pwd)
 image=${IMAGE:?set IMAGE}
 sha=$(git -C "$root" rev-parse HEAD)
-dirty=$(git -C "$root" status --porcelain -- engine scripts tests | grep -q . && echo yes || echo no)
+dirty=$([ -n "$(git -C "$root" status --porcelain -- engine scripts tests)" ] && echo yes || echo no)
 mkdir -p "$run_dir/out"
 
 exec nice -n 19 docker run --rm --cpus "${CPUS:-2}" --memory "${MEMORY:-3g}" --memory-swap "${MEMORY:-3g}" \

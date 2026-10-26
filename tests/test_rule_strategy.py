@@ -9,6 +9,7 @@ import pytest
 from freqtrade.enums import RunMode
 from freqtrade.persistence import Trade, init_db
 
+from engine import search_plan
 from engine.launch import freqtrade_config
 from engine.risk import loss_ratio_at_stop
 from engine.rules import RuleSpec
@@ -67,6 +68,15 @@ def analyzed(instance: RuleStrategy, frame: pd.DataFrame) -> pd.DataFrame:
     out = instance.populate_indicators(frame.copy(), {"pair": "BTC/IDR"})
     out = instance.populate_entry_trend(out, {"pair": "BTC/IDR"})
     return instance.populate_exit_trend(out, {"pair": "BTC/IDR"})
+
+
+ROUND1_SELECTED = "J-rsi14-1h-tp3-sl10"
+
+
+def test_example_config_runs_the_round_one_selection():
+    [selected] = [candidate for candidate in search_plan.candidates() if candidate.id == ROUND1_SELECTED]
+    strategy = load_settings(EXAMPLE).strategy
+    assert (strategy.name, strategy.rule) == ("RuleStrategy", selected.spec)
 
 
 def test_default_rule_enters_where_the_shared_signal_enters():
