@@ -211,13 +211,18 @@ def test_costs_list_analyst_tokens_in_their_own_rows_per_window(rig):
     assert costs["total"]["input_tokens"] == 0
 
 
-def test_the_analyst_usage_query_is_served_by_the_audit_index(rig):
-    marks = ",".join("?" for _ in range(2))
-    plan = rig.gateway.ledger._db.execute(
-        f"EXPLAIN QUERY PLAN SELECT COUNT(*) FROM audit WHERE action IN ({marks}) AND result = 'ok' AND ts >= ?",
-        ["analyst.report", "analyst.ask", "2026-01-01T00:00:00.000Z"],
-    ).fetchall()
-    assert any("audit_action_ts" in row["detail"] for row in plan)
+def test_the_analyst_usage_queries_are_served_by_the_audit_index(rig):
+    db = rig.gateway.ledger._db
+    traced = []
+    db.set_trace_callback(traced.append)
+    rig.gateway.ledger.analyst_usage("2026-01-01T00:00:00.000Z")
+    rig.gateway.ledger.analyst_usage(None)
+    db.set_trace_callback(None)
+    queries = [sql for sql in traced if "GROUP BY action" in sql]
+    assert len(queries) == 2
+    for sql in queries:
+        plan = db.execute(f"EXPLAIN QUERY PLAN {sql}").fetchall()
+        assert any("audit_action_ts" in row["detail"] for row in plan), plan
 
 
 def test_ask_is_rate_limited_per_minute(rig):
