@@ -7,6 +7,7 @@ from tb_swarm.config import ProviderSpec, VoterSpec
 from tb_swarm.errors import ConfigError
 from tb_swarm.providers.base import DecisionProvider
 from tb_swarm.providers.llm_structured import LlmStructuredProvider
+from tb_swarm.providers.openai_decisions import OpenAiDecisionsProvider
 from tb_swarm.providers.openrouter_decisions import OpenRouterDecisionsProvider
 from tb_swarm.providers.systemone import SystemOneProvider
 
@@ -28,6 +29,8 @@ def build_provider(
         raise ConfigError(f"provider {provider.id!r} has no resolvable base_url")
     if voter.adapter == "systemone":
         return SystemOneProvider(base_url=base_url, api_key=api_key, model=voter.model, timeout_s=voter.timeout_s)
+    if voter.adapter == "openai_decisions":
+        return OpenAiDecisionsProvider(base_url=base_url, api_key=api_key, model=voter.model, timeout_s=voter.timeout_s)
     return LlmStructuredProvider(
         api_type=provider.type,
         base_url=base_url,
