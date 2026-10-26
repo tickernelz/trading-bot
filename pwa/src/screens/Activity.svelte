@@ -9,21 +9,21 @@
   const FILTERS: ("all" | FeedKind)[] = ["all", "order", "swarm", "risk", "system"];
   let filter = $state<"all" | FeedKind>("all");
   const items = $derived(filter === "all" ? g.feed : g.feed.filter((i) => i.kind === filter));
-  const filterLabel = (f: "all" | FeedKind) => (f === "all" ? t("aksi.all") : t(FEED_KINDS[f]));
+  const filterLabel = (f: "all" | FeedKind) => (f === "all" ? t("activity.all") : t(FEED_KINDS[f]));
 </script>
 
-<div class="chips" role="group" aria-label={t("aksi.filter")}>
+<div class="chips" role="group" aria-label={t("activity.filter")}>
   {#each FILTERS as f (f)}
     <button class="chip" type="button" aria-pressed={filter === f} onclick={() => (filter = f)}>{filterLabel(f)}</button>
   {/each}
 </div>
 
-<h2 class="sec">{t("aksi.title")} <span class="meta">{t("aksi.meta", { n: g.feed.length })}</span></h2>
-<ol class="feed" role="log" aria-label={t("aksi.title")}>
+<h2 class="sec">{t("activity.title")} <span class="meta">{t("activity.meta", { n: g.feed.length })}</span></h2>
+<ol class="feed" role="log" aria-label={t("activity.title")}>
   {#each items as item (item.seq)}
     <li class:warn={item.warn}>
       <time class="num" datetime={item.ts}>{clock(item.ts, true)}</time>
-      <span class="kind">{item.warn ? t("aksi.warning") : t(FEED_KINDS[item.kind])}</span>
+      <span class="kind">{item.warn ? t("activity.warning") : t(FEED_KINDS[item.kind])}</span>
       <span class="text">
         {item.text}
         {#if item.outcome !== undefined}<span class="sr-only"><Outcome value={item.outcome} /></span>{/if}
@@ -32,9 +32,9 @@
   {:else}
     <li class="empty">
       {#if g.link.state === "open"}
-        {filter === "all" ? t("aksi.empty") : t("aksi.empty_kind", { kind: filterLabel(filter) })}
+        {filter === "all" ? t("activity.empty") : t("activity.empty_kind", { kind: filterLabel(filter) })}
       {:else}
-        {t("aksi.not_connected")}
+        {t("activity.not_connected")}
       {/if}
     </li>
   {/each}

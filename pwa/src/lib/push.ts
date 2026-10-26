@@ -1,5 +1,5 @@
 import type { Api } from "./api";
-import { t } from "./i18n";
+import { lang, t } from "./i18n";
 
 export type PushSupport = "supported" | "ios-needs-home-screen" | "unsupported";
 
@@ -45,8 +45,21 @@ export async function enablePush(api: Api): Promise<PushSubscription> {
   const reg = await navigator.serviceWorker.ready;
   const { public_key } = await api.get<{ public_key: string }>("/gw/v1/push/key");
   const sub = (await reg.pushManager.getSubscription()) ?? (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(public_key) }));
-  await api.post("/gw/v1/push/subscriptions", { subscription: sub.toJSON(), kinds: PUSH_KINDS.map((k) => k.kind) });
+  await register(api, sub);
   return sub;
+}
+
+export const PUSH_LANG_KEY = "tb.push_lang";
+
+async function register(api: Api, sub: PushSubscription): Promise<void> {
+  await api.post("/gw/v1/push/subscriptions", { subscription: sub.toJSON(), kinds: PUSH_KINDS.map((k) => k.kind), lang });
+  localStorage.setItem(PUSH_LANG_KEY, lang);
+}
+
+export async function syncPushLang(api: Api): Promise<void> {
+  if (!("serviceWorker" in navigator) || localStorage.getItem(PUSH_LANG_KEY) === lang) return;
+  const sub = await (await navigator.serviceWorker.getRegistration())?.pushManager.getSubscription();
+  if (sub) await register(api, sub);
 }
 
 export async function disablePush(api: Api): Promise<void> {
@@ -54,4 +67,5 @@ export async function disablePush(api: Api): Promise<void> {
   if (!sub) return;
   await api.del("/gw/v1/push/subscriptions", { endpoint: sub.endpoint });
   await sub.unsubscribe();
+  localStorage.removeItem(PUSH_LANG_KEY);
 }

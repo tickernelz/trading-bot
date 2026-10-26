@@ -36,7 +36,7 @@ const BASE = (import.meta.env.VITE_GATEWAY_BASE as string | undefined) ?? "";
 export interface PendingOrder {
   trade_id: number;
   pair: string;
-  side: "beli" | "jual";
+  side: "buy" | "sell";
   price: number;
   ts: string;
 }
@@ -404,7 +404,7 @@ class Gateway {
       case "exit":
         this.pending = [
           ...this.pending.filter((o) => o.trade_id !== Number(data.trade_id)),
-          { trade_id: Number(data.trade_id), pair: String(data.pair), side: event.type === "entry" ? "beli" : "jual", price: Number(data.limit), ts: event.ts },
+          { trade_id: Number(data.trade_id), pair: String(data.pair), side: event.type === "entry" ? "buy" : "sell", price: Number(data.limit), ts: event.ts },
         ];
         this.scheduleTradeRefresh();
         break;

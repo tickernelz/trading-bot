@@ -3,17 +3,17 @@
   import { GROUPS, inGroup } from "../lib/route.svelte";
 
   const ABOUT: Record<string, Key> = {
-    ringkas: "more.ringkas",
-    grafik: "more.grafik",
-    aksi: "more.aksi",
+    summary: "more.summary",
+    chart: "more.chart",
+    activity: "more.activity",
     swarm: "more.swarm",
-    kontrol: "more.kontrol",
-    konfigurasi: "more.konfigurasi",
+    control: "more.control",
+    config: "more.config",
     provider: "more.provider",
-    riwayat: "more.riwayat",
+    history: "more.history",
     ab: "more.ab",
     audit: "more.audit",
-    sistem: "more.sistem",
+    system: "more.system",
   };
 </script>
 

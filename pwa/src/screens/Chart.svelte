@@ -64,28 +64,28 @@
   }
 </script>
 
-<div class="chips" role="tablist" aria-label={t("grafik.pick")}>
+<div class="chips" role="tablist" aria-label={t("chart.pick")}>
   {#each [...pairs, AB] as p (p)}
-    <button class="chip" type="button" role="tab" aria-selected={selected === p} onclick={() => pick(p)}>{p === AB ? t("grafik.ab") : p}</button>
+    <button class="chip" type="button" role="tab" aria-selected={selected === p} onclick={() => pick(p)}>{p === AB ? t("chart.ab") : p}</button>
   {/each}
 </div>
 
 {#if selected === AB}
-  <h2 class="sec">{t("grafik.ab_title")} <span class="meta">{t("grafik.ab_meta")}</span></h2>
+  <h2 class="sec">{t("chart.ab_title")} <span class="meta">{t("chart.ab_meta")}</span></h2>
   {#if ab}
     {#await charts}
       <div class="pad"><span class="skeleton" style="height:260px"></span></div>
     {:then [, Equity]}
       <Equity.default equity={ab} />
     {:catch}
-      <p class="note warn-text">{t("grafik.module_failed")}</p>
+      <p class="note warn-text">{t("chart.module_failed")}</p>
     {/await}
     <ul class="legend">
-      <li><span class="key dashed" aria-hidden="true"></span>{t("grafik.bot_a")}</li>
-      <li><span class="key solid" aria-hidden="true"></span>{t("grafik.bot_b")}</li>
+      <li><span class="key dashed" aria-hidden="true"></span>{t("chart.bot_a")}</li>
+      <li><span class="key solid" aria-hidden="true"></span>{t("chart.bot_b")}</li>
     </ul>
     <table class="table">
-      <thead><tr><th>Bot</th><th class="n">{t("grafik.equity")}</th><th class="n">{t("grafik.days7")}</th></tr></thead>
+      <thead><tr><th>Bot</th><th class="n">{t("chart.equity")}</th><th class="n">{t("chart.days7")}</th></tr></thead>
       <tbody>
         {#each finals as s (s.bot)}
           <tr>
@@ -97,10 +97,10 @@
       </tbody>
     </table>
     {#if finals.length === 2}
-      <p class="note">{t("grafik.diff")} <Outcome value={finals[1].end - finals[0].end} unit="idr" word={false} />. {t("grafik.diff_note")}</p>
+      <p class="note">{t("chart.diff")} <Outcome value={finals[1].end - finals[0].end} unit="idr" word={false} />. {t("chart.diff_note")}</p>
     {/if}
   {:else if g.panelFaults.equityWeek}
-    <p class="note warn-text">{t("grafik.ab_failed", { code: g.panelFaults.equityWeek.code })}</p>
+    <p class="note warn-text">{t("chart.ab_failed", { code: g.panelFaults.equityWeek.code })}</p>
   {:else}
     <div class="pad"><span class="skeleton" style="height:260px"></span></div>
   {/if}
@@ -108,12 +108,12 @@
   <div class="head">
     <div>
       <h2>{selected}</h2>
-      <p class="muted small">{t("grafik.candles_meta", { n: frame?.data.length ?? 0 })}</p>
+      <p class="muted small">{t("chart.candles_meta", { n: frame?.data.length ?? 0 })}</p>
     </div>
     {#if lastRow}
       <div class="price">
         <span class="num big">{price(Number(lastRow[4]))}</span>
-        {#if change !== null}<span class="small"><Outcome value={change} word={false} /> {t("grafik.h24")}</span>{/if}
+        {#if change !== null}<span class="small"><Outcome value={change} word={false} /> {t("chart.h24")}</span>{/if}
       </div>
     {/if}
   </div>
@@ -151,22 +151,22 @@
         {focus}
       />
     {:catch}
-      <p class="note warn-text">{t("grafik.module_failed")}</p>
+      <p class="note warn-text">{t("chart.module_failed")}</p>
     {/await}
     <p class="note age">
-      {t("grafik.last_candle", { at: lastRow ? dayClock(String(lastRow[0])) : "-" })}{frame.last_analyzed ? " · " + t("grafik.analyzed", { at: clock(frame.last_analyzed) }) : ""}. {t("grafik.next_candle")}
+      {t("chart.last_candle", { at: lastRow ? dayClock(String(lastRow[0])) : "-" })}{frame.last_analyzed ? " · " + t("chart.analyzed", { at: clock(frame.last_analyzed) }) : ""}. {t("chart.next_candle")}
     </p>
   {:else if g.panelFaults.candles}
-    <p class="note warn-text">{t("grafik.candles_failed", { code: g.panelFaults.candles.code })}</p>
+    <p class="note warn-text">{t("chart.candles_failed", { code: g.panelFaults.candles.code })}</p>
   {:else}
     <div class="pad"><span class="skeleton" style="height:340px"></span></div>
   {/if}
-  <h2 class="sec">{t("grafik.layers")}</h2>
+  <h2 class="sec">{t("chart.layers")}</h2>
   <div class="toggles">
-    <label><input type="checkbox" bind:checked={showMarkers} /> {t("grafik.markers")}</label>
-    <label><input type="checkbox" bind:checked={showFast} /> {t("grafik.ema_fast")}</label>
-    <label><input type="checkbox" bind:checked={showSlow} /> {t("grafik.ema_slow")}</label>
-    <label><input type="checkbox" bind:checked={showRsi} /> {t("grafik.rsi")}</label>
+    <label><input type="checkbox" bind:checked={showMarkers} /> {t("chart.markers")}</label>
+    <label><input type="checkbox" bind:checked={showFast} /> {t("chart.ema_fast")}</label>
+    <label><input type="checkbox" bind:checked={showSlow} /> {t("chart.ema_slow")}</label>
+    <label><input type="checkbox" bind:checked={showRsi} /> {t("chart.rsi")}</label>
     <label><input type="checkbox" bind:checked={showNews} /> {t("layer.news")}</label>
     <label><input type="checkbox" bind:checked={showSentiment} /> {t("layer.sentiment")}</label>
   </div>
@@ -203,7 +203,7 @@
   {#if showNews || showSentiment}
     <p class="note">{t("layer.display_only")}</p>
   {/if}
-  <p class="note">{t("grafik.legend")}</p>
+  <p class="note">{t("chart.legend")}</p>
 {/if}
 
 <style>

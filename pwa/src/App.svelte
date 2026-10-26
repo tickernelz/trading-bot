@@ -5,21 +5,21 @@
   import TopBar from "./components/TopBar.svelte";
   import { gateway } from "./lib/gateway.svelte";
   import { route, SCREENS, type Screen } from "./lib/route.svelte";
-  import Aksi from "./screens/Aksi.svelte";
-  import Grafik from "./screens/Grafik.svelte";
-  import Lainnya from "./screens/Lainnya.svelte";
+  import Activity from "./screens/Activity.svelte";
+  import Chart from "./screens/Chart.svelte";
+  import More from "./screens/More.svelte";
   import Login from "./screens/Login.svelte";
-  import Ringkas from "./screens/Ringkas.svelte";
+  import Summary from "./screens/Summary.svelte";
   import { t } from "./lib/i18n";
 
-  const EAGER: Partial<Record<Screen, Component>> = { ringkas: Ringkas, grafik: Grafik, aksi: Aksi, lainnya: Lainnya };
+  const EAGER: Partial<Record<Screen, Component>> = { summary: Summary, chart: Chart, activity: Activity, more: More };
   const LAZY: Partial<Record<Screen, () => Promise<{ default: Component }>>> = {
     swarm: () => import("./screens/Swarm.svelte"),
-    sistem: () => import("./screens/Sistem.svelte"),
-    kontrol: () => import("./screens/Kontrol.svelte"),
-    konfigurasi: () => import("./screens/Konfigurasi.svelte"),
+    system: () => import("./screens/System.svelte"),
+    control: () => import("./screens/Control.svelte"),
+    config: () => import("./screens/Config.svelte"),
     provider: () => import("./screens/Provider.svelte"),
-    riwayat: () => import("./screens/Riwayat.svelte"),
+    history: () => import("./screens/History.svelte"),
     ab: () => import("./screens/AvsB.svelte"),
     audit: () => import("./screens/Audit.svelte"),
   };
@@ -28,7 +28,11 @@
   const lazy = $derived(LAZY[route.screen]?.() ?? null);
 
   $effect(() => {
-    document.title = title + " · Bot Trading";
+    document.title = title ? t("app.title", { screen: title }) : t("app.name");
+  });
+
+  $effect(() => {
+    if (gateway.token) import("./lib/push").then((push) => push.syncPushLang(gateway.api)).catch(() => undefined);
   });
 </script>
 
@@ -37,7 +41,7 @@
 {:else}
   <div class="shell">
     <aside class="rail">
-      <p class="brand">Bot Trading</p>
+      <p class="brand">{t("app.name")}</p>
       <Nav current={route.screen} variant="rail" />
     </aside>
     <div class="body">

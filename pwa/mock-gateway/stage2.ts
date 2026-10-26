@@ -55,8 +55,8 @@ type Reply = { status: number; body: unknown };
 type Raw = Record<string, unknown>;
 
 const BOTS = [
-  { id: "A", label: "Bot A", strategy: "aturan saja" },
-  { id: "B", label: "Bot B", strategy: "aturan + swarm bayangan" },
+  { id: "A", label: "Bot A", strategy: "rules only" },
+  { id: "B", label: "Bot B", strategy: "rules + shadow swarm" },
 ];
 
 const FT = {
@@ -73,11 +73,11 @@ const RAISING = ["risk.max_daily_loss_pct", "risk.max_total_drawdown_pct", "risk
 const IDEMPOTENCY = /^[A-Za-z0-9_-]{8,128}$/;
 const ENV_SET = new Set(["NUTARALINE_API_KEY"]);
 const MODELS_YML = [
-  { name: "nutaraline", type: "openai-completions", base_url: "https://api.contoh.invalid/v1", models: ["deepseek-v4.1-flash-1017"], key_source: "env" as const },
-  { name: "modelrouter", type: "openai-completions", base_url: "https://router.contoh.invalid/v1", models: ["jev-contoh", "clef-contoh"], key_source: "literal" as const },
-  { name: "omniroute", type: "openai-completions", base_url: "http://127.0.0.1:20128/v1", models: ["contoh-model-lokal"], key_source: "none" as const },
-  { name: "shellkey", type: "openai-completions", base_url: "https://shell.contoh.invalid/v1", models: ["m1"], key_source: "command" as const },
-  { name: "Odd Name", type: "openai-completions", base_url: "https://odd.contoh.invalid/v1", models: ["m1"], key_source: "none" as const },
+  { name: "nutaraline", type: "openai-completions", base_url: "https://api.example.invalid/v1", models: ["deepseek-v4.1-flash-1017"], key_source: "env" as const },
+  { name: "modelrouter", type: "openai-completions", base_url: "https://router.example.invalid/v1", models: ["jev-example", "clef-example"], key_source: "literal" as const },
+  { name: "omniroute", type: "openai-completions", base_url: "http://127.0.0.1:20128/v1", models: ["example-local-model"], key_source: "none" as const },
+  { name: "shellkey", type: "openai-completions", base_url: "https://shell.example.invalid/v1", models: ["m1"], key_source: "command" as const },
+  { name: "Odd Name", type: "openai-completions", base_url: "https://odd.example.invalid/v1", models: ["m1"], key_source: "none" as const },
 ];
 
 interface StoredProvider {
@@ -110,8 +110,8 @@ function baseRaw(bot: string): Raw {
     risk: { max_daily_loss_pct: 1.0, max_total_drawdown_pct: 10.0, risk_per_trade_pct: 0.5, max_open_trades: 3, leverage: "none", on_breach: "stop_new_entries", daily_reset_timezone: "Asia/Jakarta" },
     exchange: { name: "indodax", pairs: ["BTC/IDR", "ETH/IDR", "SOL/IDR"], timeframe: "1h", fee_pct: 0.2 },
     providers: [
-      { id: "nutaraline", type: "openai-completions", base_url: "https://api.contoh.invalid/v1", api_key_env: "NUTARALINE_API_KEY", api_key: null, models: ["deepseek-v4.1-flash-1017"] },
-      { id: "omniroute", type: "openai-completions", base_url: "from_import", api_key_env: "OMNIROUTE_API_KEY", api_key: null, models: ["contoh-model-lokal"] },
+      { id: "nutaraline", type: "openai-completions", base_url: "https://api.example.invalid/v1", api_key_env: "NUTARALINE_API_KEY", api_key: null, models: ["deepseek-v4.1-flash-1017"] },
+      { id: "omniroute", type: "openai-completions", base_url: "from_import", api_key_env: "OMNIROUTE_API_KEY", api_key: null, models: ["example-local-model"] },
     ],
     swarm: { enabled: true, mode: "shadow", shuffle_options: true, min_voters_answered: 5, max_spread: null, voters: voters() },
     llm: { backend: "deepagents", analyst_model: "nutaraline:deepseek-v4.1-flash-1017" },
@@ -365,7 +365,7 @@ export function createStage2(ctx: Ctx) {
     const at = rows.find((r) => Date.parse(r[0]) === ts);
     const after = rows.find((r) => Date.parse(r[0]) === ts + 4 * HOUR);
     const base = { horizon_h: 4, settles_at: iso(settles), trade_id: null, is_open: null, profit_abs: null, profit_pct: null };
-    if (d.status === "ok" && d.verdict === "izinkan") {
+    if (d.status === "ok" && d.verdict === "allow") {
       const t = ctx.trades.find((x) => x.pair === d.pair && Math.abs(x.open_ms - ts) < 6 * HOUR);
       if (t) {
         const rate = t.close_ms ? t.close_rate! : ctx.prices.get(t.pair)!;
@@ -482,7 +482,7 @@ export function createStage2(ctx: Ctx) {
       if (path === "/gw/v1/equity" && url.searchParams.get("window") === "total") {
         const from = ctx.started - 9 * 24 * HOUR;
         const risk = ctx.overview() as { balance: { total: number } };
-        return { status: 200, body: { window: "total", start_equity: ctx.startCapital, series: [ctx.equitySeries("A", "Bot A", "aturan saja", from, HOUR, ctx.startCapital, risk.balance.total, 41, 0.000004), ctx.equitySeries("B", "Bot B", "aturan + swarm bayangan", from, HOUR, ctx.startCapital, risk.balance.total + 3820, 43, 0.00001)] } };
+        return { status: 200, body: { window: "total", start_equity: ctx.startCapital, series: [ctx.equitySeries("A", "Bot A", "rules only", from, HOUR, ctx.startCapital, risk.balance.total, 41, 0.000004), ctx.equitySeries("B", "Bot B", "rules + shadow swarm", from, HOUR, ctx.startCapital, risk.balance.total + 3820, 43, 0.00001)] } };
       }
       if (path === "/gw/v1/profit") {
         const window = url.searchParams.get("window") ?? "total";
@@ -768,7 +768,7 @@ export function createStage2(ctx: Ctx) {
           const entry: StoredProvider = found ?? { id, type: m.type, base_url: m.base_url, api_key_env: id.toUpperCase() + "_API_KEY", api_key: null, models };
           Object.assign(entry, { type: m.type, base_url: m.base_url, models });
           if (item.with_key) {
-            entry.api_key = m.key_source === "literal" ? "sk-contoh-impor-" + id + "-x9Qa" : null;
+            entry.api_key = m.key_source === "literal" ? "sk-example-import-" + id + "-x9Qa" : null;
             entry.api_key_env = m.key_source === "env" ? id.toUpperCase() + "_API_KEY" : null;
           }
           if (!found) list.push(entry);

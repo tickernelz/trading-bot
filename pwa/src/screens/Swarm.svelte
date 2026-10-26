@@ -12,7 +12,7 @@
 
   const g = gateway;
   const PAGE = 30;
-  let filter = $state<DecisionFilter>("semua");
+  let filter = $state<DecisionFilter>("all");
   let items = $state<Decision[]>([]);
   let loading = $state(false);
   let fault = $state<Fault | null>(null);
@@ -20,7 +20,7 @@
   let pickedId = $state<string | null>(null);
 
   function matches(d: Decision): boolean {
-    return filter === "semua" || d.status === filter;
+    return filter === "all" || d.status === filter;
   }
 
   async function load(append: boolean) {
@@ -54,7 +54,7 @@
   const view = $derived(outcomeView(decision?.outcome));
 
   const FILTERS: { id: DecisionFilter; label: string }[] = [
-    { id: "semua", label: t("swarm.filter_all") },
+    { id: "all", label: t("swarm.filter_all") },
     { id: "skip", label: t("swarm.filter_skip") },
     { id: "ok", label: t("swarm.filter_ok") },
   ];
@@ -89,9 +89,9 @@
   <div class="pad"><VoterDots {decision} /></div>
 
   <dl class="rows">
-    <div><dt>{t("ringkas.quorum")}</dt><dd class="num" class:warn-text={decision.answered < decision.required}>{t("tm.quorum", { answered: decision.answered, total: decision.voters.length, required: decision.required })}{decision.answered >= decision.required ? t("swarm.quorum_met") : t("swarm.quorum_failed")}</dd></div>
+    <div><dt>{t("summary.quorum")}</dt><dd class="num" class:warn-text={decision.answered < decision.required}>{t("tm.quorum", { answered: decision.answered, total: decision.voters.length, required: decision.required })}{decision.answered >= decision.required ? t("swarm.quorum_met") : t("swarm.quorum_failed")}</dd></div>
     {#if action}
-      <div><dt>{t("swarm.median")}</dt><dd class="num">{decimal(action.median_probabilities?.izinkan ?? 0)}</dd></div>
+      <div><dt>{t("swarm.median")}</dt><dd class="num">{decimal(action.median_probabilities?.allow ?? 0)}</dd></div>
       <div><dt>{t("swarm.iqr")}</dt><dd class="num" class:warn-text={action.spread.iqr > decision.iqr_limit}>{t("swarm.iqr_value", { iqr: decimal(action.spread.iqr), limit: decimal(decision.iqr_limit) })}</dd></div>
       <div><dt>{t("swarm.votes")}</dt><dd class="num">{Object.entries(action.votes ?? {}).map(([k, n]) => choiceText(k) + " " + n).join(" · ")}</dd></div>
     {/if}
@@ -105,7 +105,7 @@
         <tr class:dropped={v.status !== "ok"}>
           <td><b>{v.voter_id}</b> {v.provider}<br /><span class="muted small">{v.model ?? "-"} · {t("dur.s", { n: decimal(v.latency_s, 1) })}</span></td>
           <td>{answerText(v)}{#if v.answers?.news_aligned?.noul !== undefined}<br /><span class="muted small">{t("swarm.news_aligned", { v: decimal(v.answers.news_aligned.noul) })}</span>{/if}</td>
-          <td class="n num">{v.status === "ok" ? decimal(v.answers?.action?.probabilities?.izinkan ?? 0) : t("swarm.dropped")}</td>
+          <td class="n num">{v.status === "ok" ? decimal(v.answers?.action?.probabilities?.allow ?? 0) : t("swarm.dropped")}</td>
         </tr>
       {/each}
     </tbody>
@@ -132,7 +132,7 @@
 {:else if fault}
   <p class="note empty warn-text">{t("swarm.failed", { code: fault.code })} {explainRead(fault)}</p>
   <div class="inline-actions"><button class="btn quiet" type="button" onclick={() => load(false)}>{t("common.retry")}</button></div>
-{:else if filter !== "semua"}
+{:else if filter !== "all"}
   <p class="note empty">{t("swarm.filter_empty")}</p>
 {:else}
   <p class="note empty">{t("swarm.empty")}</p>

@@ -5,11 +5,11 @@
 
   const g = gateway;
   const word = $derived(
-    g.safety === "aman"
+    g.safety === "safe"
       ? t("board.safe")
-      : g.safety === "ditahan"
+      : g.safety === "held"
         ? t("board.held")
-        : g.safety === "berhenti"
+        : g.safety === "stopped"
           ? t("board.stopped")
           : g.coreFault
             ? t("board.unknown")
@@ -20,10 +20,10 @@
     if (!risk || !g.safety) return "";
     const loss = percent(risk.daily_loss_pct);
     const limit = percent(risk.limits.max_daily_loss_pct, 1);
-    if (g.safety === "berhenti") {
+    if (g.safety === "stopped") {
       return t("board.s_stopped", { n: g.openTrades.length });
     }
-    if (g.safety === "ditahan") {
+    if (g.safety === "held") {
       if (risk.breaches.includes("total_drawdown"))
         return t("board.s_drawdown", { loss: percent(risk.drawdown_pct), limit: percent(risk.limits.max_total_drawdown_pct, 1) });
       return t("board.s_daily_hit", { loss: MINUS + loss, limit });
@@ -57,8 +57,8 @@
     color: var(--onink);
     transition: background-color var(--t) var(--ease), color var(--t) var(--ease);
   }
-  .board.ditahan,
-  .board.berhenti {
+  .board.held,
+  .board.stopped {
     background: var(--sig);
     color: var(--onsig);
   }

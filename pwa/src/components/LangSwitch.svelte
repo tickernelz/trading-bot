@@ -1,12 +1,11 @@
 <script lang="ts">
-  import { lang, LANGS, setLang, t, type Lang } from "../lib/i18n";
-
-  const NAMES: Record<Lang, string> = { id: "Bahasa Indonesia", en: "English" };
+  import { lang, setLang, t } from "../lib/i18n";
+  import { LANGUAGES } from "../lib/locales/index";
 </script>
 
 <div class="lang" role="group" aria-label={t("lang.label")}>
-  {#each LANGS as code (code)}
-    <button class="chip" type="button" lang={code} aria-pressed={lang === code} onclick={() => setLang(code)}>{NAMES[code]}</button>
+  {#each LANGUAGES as l (l.code)}
+    <button class="chip" type="button" lang={l.htmlLang} aria-pressed={lang === l.code} onclick={() => setLang(l.code)}>{l.nativeName}</button>
   {/each}
 </div>
 

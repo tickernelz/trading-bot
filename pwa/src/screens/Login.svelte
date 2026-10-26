@@ -37,7 +37,7 @@
 </script>
 
 <main class="login">
-  <h1>Bot Trading</h1>
+  <h1>{t("app.name")}</h1>
   <p class="muted">{t("login.lead")}</p>
   {#if !online && gateway.savedAt}
     <div class="offline" role="status">

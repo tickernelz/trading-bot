@@ -158,7 +158,7 @@ export interface Decision {
   reason: string | null;
   required: number;
   answered: number;
-  verdict: "izinkan" | "kecilkan" | "lewati";
+  verdict: "allow" | "reduce" | "skip";
   iqr_limit: number;
   aggregate: { questions: Record<string, QuestionResult>; voters: number } | null;
   voters: VoterRecord[];

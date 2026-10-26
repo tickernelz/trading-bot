@@ -67,9 +67,9 @@ describe("reconnect greeting", () => {
 
 describe("safety state", () => {
   it("puts a stopped bot ahead of the risk gate", () => {
-    expect(safetyOf(health("stopped"), risk(false))).toBe("berhenti");
-    expect(safetyOf(health("running"), risk(false))).toBe("ditahan");
-    expect(safetyOf(health("running"), risk(true))).toBe("aman");
+    expect(safetyOf(health("stopped"), risk(false))).toBe("stopped");
+    expect(safetyOf(health("running"), risk(false))).toBe("held");
+    expect(safetyOf(health("running"), risk(true))).toBe("safe");
     expect(safetyOf(null, risk(true))).toBeNull();
   });
 });
@@ -89,7 +89,7 @@ describe("snapshot loading", () => {
 
   it("keeps the safety core when an optional panel endpoint fails", async () => {
     const snap = await loadSnapshot(getter("/gw/v1/decisions"), () => 5);
-    expect(safetyOf(snap.core!.health, snap.core!.risk)).toBe("aman");
+    expect(safetyOf(snap.core!.health, snap.core!.risk)).toBe("safe");
     expect(snap.coreFault).toBeNull();
     expect(snap.panelFaults).toEqual({ decisions: { code: "not_found", message: "missing", at: 5 } });
     expect(snap.panels.closed).toEqual([{ trade_id: 1, is_open: false }]);

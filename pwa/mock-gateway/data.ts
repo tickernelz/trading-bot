@@ -99,10 +99,10 @@ export const VOTERS = [
   { voter_id: "v1", provider: "modelrouter", model: "jev-1.13" },
   { voter_id: "v2", provider: "experientiallabs", model: "clef" },
   { voter_id: "v3", provider: "experientiallabs", model: "jev-latest" },
-  { voter_id: "v4", provider: "xai-hm", model: "model chat (contoh)" },
-  { voter_id: "v5", provider: "tiprouter", model: "model chat (contoh)" },
+  { voter_id: "v4", provider: "xai-hm", model: "chat model (example)" },
+  { voter_id: "v5", provider: "tiprouter", model: "chat model (example)" },
   { voter_id: "v6", provider: "nutaraline", model: "deepseek-v4.1-flash-1017" },
-  { voter_id: "v7", provider: "lucif", model: "model chat (contoh)" },
+  { voter_id: "v7", provider: "lucif", model: "chat model (example)" },
 ];
 
 function quantile(sorted: number[], q: number): number {
@@ -119,7 +119,7 @@ export function buildDecision(random: () => number, pair: string, candleMs: numb
       return { ...v, status: "timeout" as const, latency_s: 30, error_kind: "timeout", answers: null };
     }
     const allow = Math.min(0.95, Math.max(0.05, 0.62 + (random() - 0.5) * 0.4));
-    const choice = allow >= 0.5 ? "izinkan" : "kecilkan";
+    const choice = allow >= 0.5 ? "allow" : "reduce";
     return {
       ...v,
       status: "ok" as const,
@@ -132,7 +132,7 @@ export function buildDecision(random: () => number, pair: string, candleMs: numb
           type: "choice" as const,
           choice,
           confidence: 0.7,
-          probabilities: { izinkan: Number(allow.toFixed(2)), kecilkan: Number(((1 - allow) * 0.7).toFixed(2)), lewati: Number(((1 - allow) * 0.3).toFixed(2)) },
+          probabilities: { allow: Number(allow.toFixed(2)), reduce: Number(((1 - allow) * 0.7).toFixed(2)), skip: Number(((1 - allow) * 0.3).toFixed(2)) },
         },
       },
     };
@@ -152,28 +152,28 @@ export function buildDecision(random: () => number, pair: string, candleMs: numb
     voters,
   };
   if (answered.length < required) {
-    return { ...base, status: "skip" as const, reason: "quorum_not_met", verdict: "lewati" as const, aggregate: null };
+    return { ...base, status: "skip" as const, reason: "quorum_not_met", verdict: "skip" as const, aggregate: null };
   }
-  const allows = answered.map((v) => v.answers!.action.probabilities.izinkan).sort((a, b) => a - b);
+  const allows = answered.map((v) => v.answers!.action.probabilities.allow).sort((a, b) => a - b);
   const q25 = quantile(allows, 0.25);
   const q75 = quantile(allows, 0.75);
   const median = quantile(allows, 0.5);
-  const votes: Record<string, number> = { izinkan: 0, kecilkan: 0, lewati: 0 };
+  const votes: Record<string, number> = { allow: 0, reduce: 0, skip: 0 };
   for (const v of answered) votes[v.answers!.action.choice] += 1;
   const iqr = q75 - q25;
-  const verdict = iqr > 0.25 ? "lewati" : median >= 0.5 ? "izinkan" : "kecilkan";
+  const verdict = iqr > 0.25 ? "skip" : median >= 0.5 ? "allow" : "reduce";
   return {
     ...base,
     status: iqr > 0.25 ? ("skip" as const) : ("ok" as const),
     reason: iqr > 0.25 ? "spread_too_wide" : null,
-    verdict: verdict as "izinkan" | "kecilkan" | "lewati",
+    verdict: verdict as "allow" | "reduce" | "skip",
     aggregate: {
       voters: answered.length,
       questions: {
         action: {
-          winner: median >= 0.5 ? "izinkan" : "kecilkan",
+          winner: median >= 0.5 ? "allow" : "reduce",
           tie: false,
-          median_probabilities: { izinkan: Number(median.toFixed(3)) },
+          median_probabilities: { allow: Number(median.toFixed(3)) },
           agreement: Math.max(...Object.values(votes)) / answered.length,
           votes,
           spread: { q25, q75, iqr, minimum: allows[0], maximum: allows[allows.length - 1] },
@@ -196,7 +196,7 @@ export function buildNews(random: () => number, pair: string, now: number) {
     return {
       id: "n_contoh_" + asset.toLowerCase() + "_" + k,
       source: source.id,
-      title: "Judul berita contoh " + (k + 1) + " tentang " + asset + " (bukan berita sungguhan)",
+      title: "Example headline " + (k + 1) + " about " + asset + " (not real news)",
       url: source.url,
       published: iso(published),
       assets: [asset],
@@ -205,7 +205,7 @@ export function buildNews(random: () => number, pair: string, now: number) {
   return {
     as_of: iso(now),
     enabled: true,
-    sources: NEWS_SOURCES.map((s, i) => ({ ...s, ok: i === 0, error: i === 0 ? null : "contoh: HTTPError 503", fetched_at: iso(now - (i === 0 ? 4 : 47) * 60000) })),
+    sources: NEWS_SOURCES.map((s, i) => ({ ...s, ok: i === 0, error: i === 0 ? null : "example: HTTPError 503", fetched_at: iso(now - (i === 0 ? 4 : 47) * 60000) })),
     items,
   };
 }
