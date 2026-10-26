@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import socket
 import stat
 import sys
@@ -41,6 +42,21 @@ def test_first_run_creates_valid_configs_on_the_chosen_ports(home):
     assert len(password) >= 12
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX file modes")
+def test_a_first_run_interrupted_after_the_secrets_can_be_repeated(home):
+    target, _ = home
+    (target / "config" / "gateway.yaml").unlink()
+    stale = target / "secrets" / "ft.env"
+    stale.write_text("FT_API_USERNAME=old\n", encoding="utf-8")
+    password = provision(target, ROOT, Ports(31000))
+    assert password is not None
+    assert read_env_file(stale)["FT_API_USERNAME"] == "bot"
+    assert stat.S_IMODE(stale.stat().st_mode) == 0o600
+    assert sorted(path.name for path in (target / "secrets").iterdir()) == [
+        "analyst.env", "ft.env", "gateway.env", "shadow.env", "swarm.env",
+    ]
+
+
 def test_second_run_keeps_existing_files(home):
     target, _ = home
     before = {path: path.read_bytes() for path in target.rglob("*") if path.is_file()}
@@ -51,6 +67,7 @@ def test_second_run_keeps_existing_files(home):
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX file modes")
 def test_secret_files_are_private(home):
     target, _ = home
+    assert stat.S_IMODE((target / "secrets").stat().st_mode) == 0o700
     for path in (target / "secrets").iterdir():
         assert stat.S_IMODE(path.stat().st_mode) == 0o600
 
@@ -77,6 +94,66 @@ def test_each_process_receives_only_its_own_secrets(home, monkeypatch):
     assert all("SOME_PROVIDER_API_KEY" not in env and env["KEPT_SETTING"] == "kept" for env in envs.values())
     assert envs["bot-b"]["TRADING_BOT_CONFIG"] == str(target / "config" / "bot-b.yaml")
     assert envs["gateway"]["GATEWAY_CONFIG"] == str(target / "config" / "gateway.yaml")
+
+
+def _child():
+    return supervisor.Child("bot-a", Path("c"), Path("u"), ())
+
+
+@pytest.mark.parametrize("code", [1, 2, 137])
+def test_a_child_that_fails_is_restarted_with_backoff(home, code):
+    target, _ = home
+    runner = supervisor.Supervisor(target)
+    child = _child()
+    child.started_at = supervisor.time.monotonic()
+    runner.exited(child, code)
+    assert child.retry_at is not None and not child.refused
+    first = child.retry_at - supervisor.time.monotonic()
+    child.started_at = supervisor.time.monotonic()
+    runner.exited(child, code)
+    assert child.retry_at - supervisor.time.monotonic() > first
+
+
+def test_a_child_that_refuses_its_configuration_is_not_restarted(home):
+    target, _ = home
+    runner = supervisor.Supervisor(target)
+    child = _child()
+    runner.exited(child, supervisor.REFUSED)
+    assert child.refused and child.retry_at is None
+
+
+def test_the_refusal_code_is_not_one_freqtrade_uses():
+    import freqtrade.main
+
+    source = Path(freqtrade.main.__file__).read_text(encoding="utf-8")
+    used = {int(token) for token in re.findall(r"return_code = (\d+)", source)}
+    assert supervisor.REFUSED not in used
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="running logs are rotated only on POSIX")
+def test_a_log_over_the_limit_is_rotated_while_the_child_runs(home, monkeypatch):
+    target, _ = home
+    monkeypatch.setattr(supervisor, "LOG_LIMIT", 100)
+    runner = supervisor.Supervisor(target)
+    child = _child()
+    child.log = runner.open_log(child)
+    child.proc = object()
+    child.log.write(b"x" * 500)
+    child.log.flush()
+    runner.rotate(child)
+    child.log.write(b"after")
+    child.log.flush()
+    path = target / "logs" / "bot-a.log"
+    assert path.read_bytes() == b"after"
+    assert (target / "logs" / "bot-a.log.old").stat().st_size == 500
+    child.log.close()
+
+
+def test_children_get_no_path_to_the_secrets_folder(home):
+    target, _ = home
+    for child in supervisor.build_children(target):
+        env = supervisor.child_environment(child, target)
+        assert all(str(target / "secrets") not in value for value in env.values())
 
 
 def test_busy_ports_are_reported_by_component(home):

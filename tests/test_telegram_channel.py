@@ -18,6 +18,7 @@ from freqtrade.rpc.telegram import Telegram
 from telegram.ext import Application
 
 from engine import launch
+from engine.exitcodes import REFUSED
 from engine.settings import ConfigError, load_settings
 from tests.conftest import EXAMPLE
 from tests.test_launch import SECRETS
@@ -147,7 +148,7 @@ def test_enabled_channel_refuses_to_start_without_token(monkeypatch, tmp_path, e
     enabled_settings(example_raw, write_config)
     monkeypatch.setenv("TRADING_BOT_CONFIG", str(tmp_path / "config.yaml"))
     monkeypatch.setenv("TRADING_BOT_USERDIR", str(tmp_path / "user_data"))
-    assert launch.main(["trade"]) == 2
+    assert launch.main(["trade"]) == REFUSED
     assert calls == []
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", TOKEN)
     launch.main(["trade"])

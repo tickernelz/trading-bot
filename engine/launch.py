@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from engine.exitcodes import REFUSED
 from engine.modectl import LIVE_ENGINE_PROVEN, MODE_FILE, read_mode, write_capabilities
 from engine.settings import ConfigError, Settings, load_settings
 
@@ -148,7 +149,7 @@ def run_freqtrade(command: list[str], env: dict[str, str]) -> int:
 def main(argv: list[str]) -> int:
     if not argv:
         print("usage: python -m engine.launch <freqtrade-command> [args...]", file=sys.stderr)
-        return 2
+        return REFUSED
     config_file = os.environ.get("TRADING_BOT_CONFIG", "config/config.yaml")
     userdir = os.environ.get("TRADING_BOT_USERDIR", "user_data")
     try:
@@ -159,13 +160,13 @@ def main(argv: list[str]) -> int:
         overrides = secret_env(settings, dict(os.environ), telegram, shadow) if serve_api else {}
     except (ConfigError, MissingSecret) as exc:
         print(f"trading-bot: refusing to start: {exc}", file=sys.stderr)
-        return 2
+        return REFUSED
     if read_mode(Path(userdir) / MODE_FILE)[0] == "live" and not LIVE_ENGINE_PROVEN:
         print(
             "trading-bot: refusing to start: mode.json records live but the engine has no live order path",
             file=sys.stderr,
         )
-        return 2
+        return REFUSED
     write_capabilities(userdir, os.environ)
     rendered = Path(userdir) / "trading-bot.freqtrade.json"
     rendered.parent.mkdir(parents=True, exist_ok=True)
