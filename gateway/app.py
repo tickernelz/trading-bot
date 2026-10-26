@@ -25,6 +25,7 @@ from fastapi import Body, Depends, FastAPI, Query, Request, WebSocket, WebSocket
 from fastapi import Path as PathParam
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -971,7 +972,7 @@ class Gateway:
         return request.query_params.get("token") if isinstance(request, WebSocket) else None
 
 
-def create_app(gateway: Gateway, admin: Admin | None = None) -> FastAPI:
+def create_app(gateway: Gateway, admin: Admin | None = None, pwa_dir: Path | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_: FastAPI):
         await gateway.start()
@@ -1583,4 +1584,6 @@ def create_app(gateway: Gateway, admin: Admin | None = None) -> FastAPI:
 
     install_analyst(app, gateway, reader)
     install_mode(app, gateway, reader)
+    if pwa_dir is not None:
+        app.mount("/", StaticFiles(directory=pwa_dir, html=True), name="pwa")
     return app

@@ -1,0 +1,8 @@
+-r ../vendor/freqtrade/requirements.txt
+pyyaml==6.0.3
+pywebpush==2.5.0
+http_ece==1.2.1
+py-vapid==1.9.6
+langchain-core==1.7.0
+langchain-openai==1.7.2
+langchain-anthropic==1.7.6

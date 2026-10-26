@@ -37,3 +37,6 @@ coverage/
 *.swp
 .DS_Store
 Thumbs.db
+
+tbapp/_build.py
+build/

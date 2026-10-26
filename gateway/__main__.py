@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+from pathlib import Path
 
 import uvicorn
 
@@ -21,8 +22,9 @@ def main() -> int:
     except (OSError, ValueError, ConfigError) as exc:
         print(f"trading-bot gateway: refusing to start: {exc}", file=sys.stderr)
         return 2
+    pwa_dir = os.environ.get("TRADING_BOT_PWA_DIR")
     uvicorn.run(
-        create_app(gateway),
+        create_app(gateway, pwa_dir=Path(pwa_dir) if pwa_dir else None),
         host=settings.listen,
         port=settings.port,
         log_level="warning",

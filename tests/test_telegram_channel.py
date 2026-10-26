@@ -140,7 +140,7 @@ def test_enabled_channel_must_name_chat_and_users(example_raw, write_config, mis
 
 def test_enabled_channel_refuses_to_start_without_token(monkeypatch, tmp_path, example_raw, write_config):
     calls = []
-    monkeypatch.setattr(launch.os, "execvpe", lambda *args: calls.append(args))
+    monkeypatch.setattr(launch, "run_freqtrade", lambda argv, env: calls.append((argv[0], argv, env)) or 0)
     for name, value in SECRETS.items():
         monkeypatch.setenv(name, value)
     monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
