@@ -1,8 +1,43 @@
 # Default strategy search
 
+**Round 3 result (ZHA-3876): tier T4 (provisional); the default is unchanged.** Thirty-two trend configurations behind a BTC/IDR daily regime gate won 24% to 53% of trades, so none reaches the 60% target, and Zhafron's new measure (profit per month on Rp 2,000,000) puts the best of them at Rp 7,144 a month, against Rp 52,864 for equal-weight buy-and-hold of the same pairs - at 2.5% drawdown against 61.4%. Ranked by tier first, the default stays. Section "Round 3" below.
+
 **Round 2 result (ZHA-3876): not enough data; the default is unchanged.** The default stays round 1's `RuleStrategy` with rule `J-rsi14-1h-tp3-sl10` (often wins but loses money net of costs; section "Round 1"). Round 2's best configuration, `S-don1d20-sma50-tp5-lock3` (1d Donchian 20 breakout while the daily close is above its SMA50, take-profit 5%, profit lock at 3%, Donchian-mid exit, 8% stop) on BTC/IDR, ETH/IDR, SOL/IDR, XRP/IDR and DOGE/IDR, meets the locked win-rate target on the walk-forward (2022-07-01 to 2026-04-26): 382 trades, net win rate 66.8% (Wilson 95% lower bound 61.9%), net expectancy +0.076% per trade (95% CI -0.436% to +0.598%), walk-forward tier T2. The task accepts only the holdout or forward data for the final evaluation; the round 1 holdout is used and the forward data after 2026-10-26 holds 0 trades, so no target is reported as met and the configuration is not the default. A once-only check on untouched older data (2018-09-01 to 2021-01-01) is supporting evidence only: 189 trades on 4 pairs, net win rate 69.8% (Wilson 63.0%), net expectancy +0.739% per trade (95% CI -0.028% to +1.484%). At 0.41% per side or with +0.10% slippage per side the walk-forward mean is negative. Nothing here is shown to be profitable. Live mode stays locked (`LIVE_ENGINE_PROVEN = False`).
 
 Generated tables for round 2: [strategy-research/round2/results.md](strategy-research/round2/results.md) (every configuration, fold, control and the pre-sample run), `round2/walk-forward-summary.json` and `round2/presample.json`. Locked plan: [strategy-research/plan.md](strategy-research/plan.md), section "Round 2". Ledger: [strategy-research/ledger.jsonl](strategy-research/ledger.jsonl).
+
+## Round 3: trend entries behind a BTC regime gate, ranked by profit per month (ZHA-3876)
+
+**Result: tier T4 (provisional until forward data) for every configuration; the default does not change.** No configuration reached the 60% net win rate the target needs: the round 3 families are trend followers, which win 24% to 53% of trades. What they do have is positive expectancy: on the five selection pairs `F3-don1d55-exit55-btc-above-sma100-sl20` made 57 trades at +15.31% per trade (95% CI +2.89% to +27.7%), `F3-don1d55-exit20-...` 80 trades at +9.73% (+2.77%), `M-tsmom-90-sma100` 106 trades at +9.12% (-1.07%) and the selected `F3-tsmom-55-btcabove-sma100-sl20` 162 trades at +5.95% (-0.21%), all beating the random-entry 95th percentile (3.2%).
+
+Profit per month on one Rp 2,000,000 account, 3 slots, compounded (Zhafron's ranking measure from 2026-10-26 13:39 UTC), on the five selection pairs:
+
+| Config | Trades | Win rate | Mean net | Profit/month at 0.5% risk | at 2% risk | Max DD at 0.5% / 2% | Worst month | Largest loss |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| F3-tsmom-55-btcabove-sma100-sl20 (selected) | 162 | 24.1% | +5.95% | Rp 7,144 | Rp 24,003 | 2.5% / 9.6% | Rp -16,796 | -20.5% |
+| M-tsmom-90-sma100 | 106 | 25.5% | +9.12% | Rp 6,542 | Rp 20,205 | 2.4% / 9.6% | Rp -27,640 | -20.5% |
+| F3-don1d55-exit55-btc-above-sma100-sl20 | 57 | 49.1% | +15.31% | Rp 6,281 | Rp 23,059 | 1.5% / 5.7% | Rp -15,763 | -20.5% |
+| F3-don1d55-exit20-btc-above-sma100-sl20 | 80 | 47.5% | +9.73% | Rp 5,720 | Rp 21,469 | 1.4% / 5.6% | Rp -15,089 | -19.3% |
+| L-don1d-30-nofilter-trail4atr | 83 | 45.8% | +12.97% | Rp 7,595 | Rp 27,135 | 2.0% / 7.7% | Rp -18,634 | -20.5% |
+| Equal-weight buy-and-hold of the same five pairs | - | - | - | Rp 52,864 | - | 61.4% | - | - |
+
+Cross-asset, on the six pairs nobody used for selection (BNB, NEAR, HBAR, ADA, LTC, TRX), taker costs, research mode:
+
+| Config | Trades | Win rate | Mean net | Profit/month 0.5% | at 2% | Max DD | Worst month | Pairs with a positive mean |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| F3-don1d55-exit20-btc-above-sma100-sl20 | 94 | 37.2% | +5.29% | Rp 4,301 | Rp 15,066 | 1.9% | Rp -17,884 | 5 of 6 |
+| F3-tsmom-55-btcabove-sma100-sl20 | 169 | 27.8% | +5.47% | Rp 2,610 | Rp 8,238 | 4.2% | Rp -18,850 | 5 of 6 |
+| F3-don1d55-exit55-btc-above-sma100-sl20 | 61 | 39.3% | +12.79% | Rp 2,181 | Rp 7,926 | 1.6% | Rp -18,223 | 5 of 6 |
+| Equal-weight buy-and-hold of the six pairs | - | - | - | Rp 34,090 | - | 53.0% | - | - |
+
+What this says:
+
+- Zhafron's measure (profit per month) leaves the same verdict as the win rate: buy-and-hold made six to twelve times the monthly profit of the best trend rule over the same years, at 53% to 61% drawdown against 1.4% to 4.2%. Per unit of drawdown the trend rules are far better, but in absolute rupiah they are not close, and a 20% stop with a 24% win rate cannot close that gap on 1h or 1d candles with taker fees.
+- The BTC regime gate does transfer: every F3 configuration kept 5 of 6 unseen pairs positive, and the gate is exactly what Laras's report found. The per-pair version still falls short of her portfolio version, which splits capital across the four pairs equally (3.29% a month in her test).
+- Loss limits were never reached on the round 3 trades (0 refusals in the account model on both data sets), so research mode and the bot's limits give identical round 3 numbers; the one-off measurement of the limits on the round 2 default stands at 592 to 367 trades and 23.2% to 10.8% drawdown.
+- Round 3 used 32 configurations (168 cumulative of 1,500, plus the six batch B configurations at 174). Nothing here is deployed: the default stays `J-rsi14-1h-tp3-sl10`.
+
+Not shown, and the next thing to build: Laras's F1, F2, F4 and F6 are portfolio strategies (equal weight across pairs, rotation, ensemble), not per-pair rules; a portfolio engine in the runner is the round 4 subject, and her numbers (3.29% a month for F1, 2.91% for F6) are the bar to reproduce here without her out-of-sample pairs.
 
 ## Cross-asset check of the round 1 and 2 candidates (ZHA-3876, direction of 2026-10-26 12:28 UTC)
 
