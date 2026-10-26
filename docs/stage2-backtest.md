@@ -18,11 +18,13 @@ Tahap 0a mencatat riwayat 1h Indodax hanya sekitar 649 candle (27 hari). Itu bat
 
 `engine/history.py` mengambil riwayat dalam jendela 500 candle (`since` dan `until` per jendela) lalu menyimpannya sebagai data feather Freqtrade. Hasil (`history.json`):
 
-| Pair | Candle | Pertama (UTC) | Terakhir (UTC) | Candle hilang di dalam rentang | Candle volume 0 | Permintaan |
+| Pair | Candle | Pertama (UTC) | Terakhir (UTC) | Hilang sebelum / di dalam / sesudah | Candle volume 0 | Permintaan |
 | --- | --- | --- | --- | --- | --- | --- |
-| BTC/IDR | 26904 | 2023-10-01 00:00 | 2026-10-25 23:00 | 0 | 92 | 54 |
-| ETH/IDR | 26904 | 2023-10-01 00:00 | 2026-10-25 23:00 | 0 | 99 | 54 |
-| SOL/IDR | 26904 | 2023-10-01 00:00 | 2026-10-25 23:00 | 0 | 102 | 54 |
+| BTC/IDR | 26904 | 2023-10-01 00:00 | 2026-10-25 23:00 | 0 / 0 / 0 | 92 | 54 |
+| ETH/IDR | 26904 | 2023-10-01 00:00 | 2026-10-25 23:00 | 0 / 0 / 0 | 99 | 54 |
+| SOL/IDR | 26904 | 2023-10-01 00:00 | 2026-10-25 23:00 | 0 / 0 / 0 | 102 | 54 |
+
+"Sebelum" dan "sesudah" dihitung terhadap rentang yang diminta (`requested_since`, `requested_until`), "di dalam" di antara candle pertama dan terakhir; ketiganya dari `history.json` lari ulang di commit perbaikan review.
 
 Riwayat lebih tua dari 2023-10-01 tidak diminta. Probe terpisah dengan jendela 500 candle mengembalikan 1h BTC/IDR penuh untuk 2023-10-22 dan 2024-08-17, sedangkan tanpa `until` setiap `since` (30 sampai 2000 hari) menghasilkan 649 candle yang sama.
 

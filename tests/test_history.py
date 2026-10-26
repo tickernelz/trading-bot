@@ -53,6 +53,7 @@ def test_collect_reaches_old_candles_when_windows_stay_under_the_server_cap():
         2,
         2,
     )
+    assert (report["missing_before"], report["missing_after"]) == (0, 0)
     assert report["requests"] == 4
 
 
@@ -60,11 +61,23 @@ def test_coverage_exposes_a_window_larger_than_the_server_cap():
     stamps = [START + index * HOUR for index in range(2000)]
     _, report = collect(IndodaxLike(stamps, cap=649), "BTC/IDR", "1h", START, START + 2000 * HOUR, size=1000)
     assert report["candles"] == 2 * 649
+    assert report["missing_before"] == 1000 - 649
     assert report["missing_inside"] == 1000 - 649
+    assert report["missing_after"] == 0
+
+
+def test_coverage_counts_candles_missing_at_both_edges_of_the_request():
+    report = coverage([START + 2 * HOUR, START + 3 * HOUR], [1.0, 1.0], HOUR, START + 5, START + 7 * HOUR)
+    assert (report["missing_before"], report["missing_inside"], report["missing_after"]) == (2, 0, 3)
+
+
+def test_coverage_of_an_empty_series_counts_every_requested_candle_missing():
+    report = coverage([], [], HOUR, START, START + 24 * HOUR)
+    assert (report["candles"], report["missing_before"], report["missing_after"]) == (0, 24, 0)
 
 
 def test_coverage_counts_zero_volume_candles():
-    report = coverage([START, START + HOUR, START + 3 * HOUR], [0.0, 2.0, 0.0], HOUR)
+    report = coverage([START, START + HOUR, START + 3 * HOUR], [0.0, 2.0, 0.0], HOUR, START, START + 4 * HOUR)
     assert report["zero_volume"] == 2
     assert report["missing_inside"] == 1
 

@@ -55,14 +55,20 @@ def fetch_window(
             attempt += 1
 
 
-def coverage(stamps_ms: list[int], volumes: list[float], timeframe_ms: int) -> dict[str, Any]:
-    """Describe a sorted candle series: span, candles missing inside it, and zero-volume candles."""
+def coverage(
+    stamps_ms: list[int], volumes: list[float], timeframe_ms: int, since_ms: int, until_ms: int
+) -> dict[str, Any]:
+    """Describe sorted candles against the requested [since, until) range: span, missing and zero-volume candles."""
+    expected_first = since_ms - since_ms % timeframe_ms
+    expected_last = (until_ms - 1) // timeframe_ms * timeframe_ms
     if not stamps_ms:
         return {
             "candles": 0,
             "first": None,
             "last": None,
+            "missing_before": (expected_last - expected_first) // timeframe_ms + 1,
             "missing_inside": 0,
+            "missing_after": 0,
             "gaps": 0,
             "largest_gap_candles": 0,
             "zero_volume": 0,
@@ -73,7 +79,9 @@ def coverage(stamps_ms: list[int], volumes: list[float], timeframe_ms: int) -> d
         "candles": len(stamps_ms),
         "first": _iso(stamps_ms[0]),
         "last": _iso(stamps_ms[-1]),
+        "missing_before": (stamps_ms[0] - expected_first) // timeframe_ms,
         "missing_inside": sum(holes),
+        "missing_after": (expected_last - stamps_ms[-1]) // timeframe_ms,
         "gaps": len(holes),
         "largest_gap_candles": max(holes, default=0),
         "zero_volume": sum(1 for volume in volumes if volume == 0),
@@ -103,7 +111,7 @@ def collect(
     for column in COLUMNS[1:]:
         frame[column] = frame[column].astype(float)
     frame["date"] = to_datetime(frame["date"], unit="ms", utc=True)
-    report = coverage(sorted(rows), frame["volume"].tolist(), timeframe_ms)
+    report = coverage(sorted(rows), frame["volume"].tolist(), timeframe_ms, since_ms, until_ms)
     report.update({"pair": pair, "timeframe": timeframe, "requests": requests})
     return frame, report
 
