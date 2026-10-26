@@ -1,9 +1,25 @@
 <script lang="ts">
+  import LangSwitch from "../components/LangSwitch.svelte";
+  import { ApiError } from "../lib/api";
   import { gateway } from "../lib/gateway.svelte";
+  import { dayClock } from "../lib/format";
+  import { t } from "../lib/i18n";
 
   let password = $state("");
   let busy = $state(false);
   let error = $state<string | null>(null);
+  let online = $state(navigator.onLine);
+
+  $effect(() => {
+    const up = () => (online = true);
+    const down = () => (online = false);
+    addEventListener("online", up);
+    addEventListener("offline", down);
+    return () => {
+      removeEventListener("online", up);
+      removeEventListener("offline", down);
+    };
+  });
 
   async function submit(event: SubmitEvent) {
     event.preventDefault();
@@ -13,7 +29,7 @@
       await gateway.login(password);
       password = "";
     } catch (e) {
-      error = e instanceof Error && e.message ? (e.message === "Sesi berakhir" ? "Kata sandi salah." : e.message) : "Gagal masuk.";
+      error = e instanceof ApiError && e.code === "unauthorized" ? t("login.wrong_password") : e instanceof Error && e.message ? e.message : t("login.failed");
     } finally {
       busy = false;
     }
@@ -22,14 +38,21 @@
 
 <main class="login">
   <h1>Bot Trading</h1>
-  <p class="muted">Panel baca-saja. Masuk ke gateway di PC untuk melihat keadaan bot.</p>
+  <p class="muted">{t("login.lead")}</p>
+  {#if !online && gateway.savedAt}
+    <div class="offline" role="status">
+      <p>{t("login.offline")}</p>
+      <button class="btn" type="button" onclick={() => gateway.openSaved()}>{t("login.open_saved", { at: dayClock(gateway.savedAt) })}</button>
+    </div>
+  {/if}
   <form onsubmit={submit}>
-    <label for="pw">Kata sandi gateway</label>
+    <label for="pw">{t("login.password")}</label>
     <input id="pw" type="password" autocomplete="current-password" bind:value={password} required />
     {#if error}<p class="err" role="alert">{error}</p>{/if}
-    <button class="btn" type="submit" disabled={busy || !password}>{busy ? "Masuk..." : "Masuk"}</button>
+    <button class="btn" type="submit" disabled={busy || !password}>{busy ? t("login.busy") : t("login.submit")}</button>
   </form>
-  <p class="muted small">Token sesi hanya disimpan selama tab atau aplikasi ini terbuka.</p>
+  <p class="muted small">{t("login.session_note")}</p>
+  <LangSwitch />
 </main>
 
 <style>
@@ -78,5 +101,14 @@
   }
   .small {
     font-size: var(--step--1);
+  }
+  .offline {
+    margin-bottom: var(--space-5);
+    padding: var(--space-3) var(--space-4);
+    background: var(--panel);
+    border-top: 2px solid var(--sig);
+  }
+  .offline p {
+    margin: 0 0 var(--space-3);
   }
 </style>

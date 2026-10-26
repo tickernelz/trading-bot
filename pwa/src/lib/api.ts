@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import type { ErrorEnvelope } from "./types";
 
 export class ApiError extends Error {
@@ -42,14 +43,14 @@ export function createApi(base: string, token: () => string | null, onUnauthoriz
     }
     if (response.status === 401) {
       onUnauthorized();
-      throw new ApiError(401, "unauthorized", "Sesi berakhir");
+      throw new ApiError(401, "unauthorized", t("api.session_ended"));
     }
     const text = await response.text();
     let parsed: unknown = null;
     try {
       parsed = text ? JSON.parse(text) : null;
     } catch {
-      if (response.ok) throw new ApiError(response.status, "invalid_response", "Gateway mengirim respons yang bukan JSON");
+      if (response.ok) throw new ApiError(response.status, "invalid_response", t("api.not_json"));
     }
     if (!response.ok) {
       const envelope = parsed as ErrorEnvelope | null;

@@ -3,8 +3,8 @@ import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApi, type Api } from "../src/lib/api";
 import { idempotencyKey, send } from "../src/lib/control";
-import { diff, strip } from "../src/lib/settings";
-import type { AuditRow, ControlResult, Decision, Equity, Overview, Provider, ProfitTotal, SessionInfo, SettingsDoc, SettingsSaved, Trade } from "../src/lib/types";
+import { diff, EDITABLE, patchBody, schemaErrors } from "../src/lib/settings";
+import type { AuditRow, ChangeEntry, ControlResult, Decision, Equity, ImportCandidate, ImportResult, Overview, Provider, ProviderList, ProviderTest, ProfitTotal, Roles, SessionInfo, Settings, Trade, VoterList, VoterView, WriteResult } from "../src/lib/types";
 
 const PORT = 18000 + Math.floor(Math.random() * 2000);
 const BASE = "http://127.0.0.1:" + PORT;
@@ -53,7 +53,7 @@ afterAll(() => {
   gateway?.kill("SIGTERM");
 });
 
-describe("scope and control (2, 3, 6, 13 of ZHA-3774; 14.1, 14.2)", () => {
+describe("scope and control (ZHA-3774, 15.1)", () => {
   it("gives control only to a loopback login and refuses control from a read session with an audit row", async () => {
     expect((await login()).scope).toBe("control");
     await remotely(async (remote) => {
@@ -118,86 +118,147 @@ describe("scope and control (2, 3, 6, 13 of ZHA-3774; 14.1, 14.2)", () => {
   });
 });
 
-describe("settings (5.15, 14.3)", () => {
-  async function patch(changes: { key: string; value: unknown }[], confirm?: string, key = idempotencyKey()) {
-    const doc = await api.get<SettingsDoc>("/gw/v1/settings?bot=A");
-    return { doc, out: await send<SettingsSaved>(api, { method: "patch", path: "/gw/v1/settings?bot=A", body: { revision: doc.revision, changes, note: "uji kontrak" } }, key, confirm), key };
+describe("2a failures and keys (ZHA-3774)", () => {
+  it("stores a Freqtrade failure per key and replays it, and audits a malformed key as rejected", async () => {
+    await dev("fail", { path: "/gw/v1/control/reload-config", status: 502 });
+    try {
+      const key = idempotencyKey();
+      const request = { method: "post" as const, path: "/gw/v1/control/reload-config?bot=B", body: {} };
+      const first = await send(api, request, key);
+      expect(first).toMatchObject({ kind: "failed", error: { status: 502, code: "upstream_error" } });
+      await dev("fail", { path: "/gw/v1/control/reload-config", status: 0 });
+      expect(await send(api, request, key)).toMatchObject({ kind: "failed", error: { status: 502 } });
+      const rows = await api.get<AuditRow[]>("/gw/v1/audit?action=control.reload_config&limit=2");
+      expect(rows.map((r) => r.result)).toEqual(["replayed", "failed"]);
+    } finally {
+      await dev("fail", { path: "/gw/v1/control/reload-config", status: 0 });
+    }
+    const bad = await send(api, { method: "post", path: "/gw/v1/control/resume?bot=B", body: {} }, "bad key!");
+    expect(bad).toMatchObject({ kind: "failed", error: { status: 400, code: "invalid_request" } });
+    const [row] = await api.get<AuditRow[]>("/gw/v1/audit?action=control.resume&limit=1");
+    expect(row).toMatchObject({ result: "rejected", idempotency_key: null });
+  });
+});
+
+describe("configuration (2b ZHA-3775, 15.1)", () => {
+  async function patch(changes: Record<string, unknown>, confirm?: string, key = idempotencyKey(), bot = "A") {
+    return { key, out: await send<WriteResult>(api, { method: "patch", path: "/gw/v1/settings?bot=" + bot, body: { changes } }, key, confirm) };
   }
 
-  it("never returns a key value and carries the file revision", async () => {
-    const doc = await api.get<SettingsDoc>("/gw/v1/settings?bot=A");
-    expect(doc.revision).toMatch(/^[0-9a-f]{64}$/);
+  it("never returns a key value", async () => {
+    const doc = await api.get<Settings>("/gw/v1/settings?bot=A");
     for (const p of doc.providers) expect(p.api_key).toBeNull();
   });
 
-  it("lowers a limit at once from loopback and refuses any change from a read session", async () => {
-    const lower = await patch([{ key: "risk.max_daily_loss_pct", value: 0.9 }]);
-    expect(lower.out).toMatchObject({ kind: "done", result: { applied: [{ key: "risk.max_daily_loss_pct", old: 1, new: 0.9 }] } });
-    await remotely(async (remote) => {
-      const doc = await remote.get<SettingsDoc>("/gw/v1/settings?bot=A");
-      const out = await send(remote, { method: "patch", path: "/gw/v1/settings?bot=A", body: { revision: doc.revision, changes: [{ key: "risk.max_daily_loss_pct", value: 0.8 }], note: "x" } }, idempotencyKey());
-      expect(out).toMatchObject({ kind: "failed", error: { code: "forbidden_local_only" } });
-    });
+  it("lowers a limit at once with the nested body the client builds, and lists the change", async () => {
+    const before = await api.get<Settings>("/gw/v1/settings?bot=A");
+    const next = structuredClone(before);
+    next.risk.max_daily_loss_pct = 0.9;
+    const out = await patch(patchBody(diff(before, next)));
+    expect(out.out).toMatchObject({ kind: "done", result: { bot: "A", changes: [{ key: "risk.max_daily_loss_pct", old: 1, new: 0.9 }], restart_required: true } });
+    const [entry] = await api.get<ChangeEntry[]>("/gw/v1/settings/changes?bot=A&limit=1");
+    expect(entry).toMatchObject({ action: "config.update", actor: "owner", key: "risk.max_daily_loss_pct", old: 1, new: 0.9, bot: "A" });
   });
 
-  it("raises a limit locally only after the second step, and records the note in audit", async () => {
-    const first = await patch([{ key: "risk.max_daily_loss_pct", value: 1.1 }]);
+  it("raises a limit or the capital only after the second step", async () => {
+    const changes = { risk: { max_daily_loss_pct: 1.1 }, capital: { initial_idr: 2500000 } };
+    const first = await patch(changes);
     expect(first.out.kind).toBe("confirm");
     if (first.out.kind !== "confirm") return;
-    const second = await send<SettingsSaved>(api, { method: "patch", path: "/gw/v1/settings?bot=A", body: { revision: first.doc.revision, changes: [{ key: "risk.max_daily_loss_pct", value: 1.1 }], note: "uji kontrak" } }, first.key, first.out.confirmation.id);
-    expect(second.kind).toBe("done");
-    const [row] = await api.get<AuditRow[]>("/gw/v1/audit?action=config.changed&result=ok&limit=1");
-    expect(row.detail).toMatchObject({ note: "uji kontrak", changes: [{ key: "risk.max_daily_loss_pct", old: 0.9, new: 1.1 }] });
+    expect(first.out.confirmation.summary).toMatch(/capital\.initial_idr/);
+    const second = await patch(changes, first.out.confirmation.id, first.key);
+    expect(second.out).toMatchObject({ kind: "done", result: { changes: [{ key: "capital.initial_idr" }, { key: "risk.max_daily_loss_pct", old: 0.9, new: 1.1 }] } });
   });
 
-  it("rejects a stale revision and returns schema errors per key", async () => {
-    const stale = await send(api, { method: "patch", path: "/gw/v1/settings?bot=A", body: { revision: "0".repeat(64), changes: [], note: "x" } }, idempotencyKey());
-    expect(stale).toMatchObject({ kind: "failed", error: { code: "stale_revision" } });
-    const invalid = await patch([{ key: "swarm.min_voters_answered", value: 9 }]);
-    expect(invalid.out).toMatchObject({ kind: "failed", error: { code: "invalid_request", detail: { fields: [{ key: "swarm.min_voters_answered" }] } } });
+  it("refuses frozen roots, voters through settings, schema errors, and any write from a read session", async () => {
+    for (const changes of [{ mode: "live" }, { providers: [] }, { api: { force_entry: true } }, { swarm: { voters: [] } }]) {
+      expect((await patch(changes)).out).toMatchObject({ kind: "failed", error: { status: 400, code: "invalid_request" } });
+    }
+    const schema = (await patch({ swarm: { min_voters_answered: 9 } })).out;
+    expect(schema).toMatchObject({ kind: "failed", error: { code: "invalid_request" } });
+    if (schema.kind === "failed") expect(schemaErrors(schema.error.message, EDITABLE).fields.map((f) => f.key)).toEqual(["swarm.min_voters_answered"]);
+    await remotely(async (remote) => {
+      const out = await send(remote, { method: "patch", path: "/gw/v1/settings?bot=A", body: { changes: { risk: { max_daily_loss_pct: 0.8 } } } }, idempotencyKey());
+      expect(out).toMatchObject({ kind: "failed", error: { code: "forbidden_local_only" } });
+    });
+    const [denied] = await api.get<AuditRow[]>("/gw/v1/audit?action=admin.denied&limit=1");
+    expect(denied).toMatchObject({ result: "forbidden", actor: "read_session" });
   });
 
-  it("applies voter changes keyed by id", async () => {
-    const doc = await api.get<SettingsDoc>("/gw/v1/settings?bot=B");
-    const next = structuredClone(strip(doc));
-    next.swarm.voters[6].enabled = false;
-    const changes = diff(strip(doc), next);
-    expect(changes.map((c) => c.key)).toEqual(["swarm.voters[v7].enabled"]);
-    const out = await send<SettingsSaved>(api, { method: "patch", path: "/gw/v1/settings?bot=B", body: { revision: doc.revision, changes: changes.map((c) => ({ key: c.key, value: c.new })), note: "matikan v7" } }, idempotencyKey());
-    expect(out.kind).toBe("done");
-    expect((await api.get<SettingsDoc>("/gw/v1/settings?bot=B")).swarm.voters.find((v) => v.id === "v7")?.enabled).toBe(false);
+  it("adds, edits and removes a voter through the voters routes, and refuses an unmet quorum", async () => {
+    const fields = { adapter: "llm_structured", provider: "nutaraline", model: "deepseek-v4.1-flash-1017", variation: "temperature", timeout_s: 20, weight: 1, enabled: true };
+    const added = await send<WriteResult & { voters: VoterView[] }>(api, { method: "put", path: "/gw/v1/voters/v8?bot=B", body: fields }, idempotencyKey());
+    expect(added.kind).toBe("done");
+    if (added.kind === "done") expect(added.result.voters.map((v) => v.id)).toContain("v8");
+    expect((await api.get<VoterList>("/gw/v1/voters?bot=B")).swarm.enabled_voters).toBe(8);
+    expect((await api.get<VoterList>("/gw/v1/voters?bot=A")).voters.map((v) => v.id)).not.toContain("v8");
+    expect(await send(api, { method: "del", path: "/gw/v1/voters/v8?bot=B", body: {} }, idempotencyKey())).toMatchObject({ kind: "done" });
+    for (const id of ["v7", "v6"]) await send(api, { method: "put", path: "/gw/v1/voters/" + id + "?bot=B", body: { ...fields, enabled: false } }, idempotencyKey());
+    const tooFew = await send(api, { method: "put", path: "/gw/v1/voters/v5?bot=B", body: { ...fields, enabled: false } }, idempotencyKey());
+    expect(tooFew).toMatchObject({ kind: "failed", error: { status: 400 } });
+  });
+
+  it("sets the analyst through roles", async () => {
+    const out = await send<WriteResult>(api, { method: "put", path: "/gw/v1/roles?bot=A", body: { analyst: { provider: "omniroute", model: "contoh-model-lokal" } } }, idempotencyKey());
+    expect(out).toMatchObject({ kind: "done", result: { changes: [{ key: "llm.analyst_model", new: "omniroute:contoh-model-lokal" }] } });
+    expect((await api.get<Roles>("/gw/v1/roles?bot=A")).analyst).toEqual({ provider: "omniroute", model: "contoh-model-lokal" });
   });
 });
 
-describe("providers (14.4)", () => {
-  it("lets a read session see status and test, and keeps key management on loopback", async () => {
+describe("providers and keys (2b ZHA-3775, 15.1, 15.2)", () => {
+  it("lets a read session list and test, and nothing else", async () => {
     await remotely(async (remote) => {
-      const list = await remote.get<Provider[]>("/gw/v1/providers");
-      expect(list.map((p) => p.id)).toContain("nutaraline");
-      for (const p of list) expect(p.api_key_last4).toBeNull();
-      const tested = await send(remote, { method: "post", path: "/gw/v1/providers/nutaraline/test", body: {} }, idempotencyKey());
-      expect(tested).toMatchObject({ kind: "done", result: { ok: true } });
-      const put = await send(remote, { method: "put", path: "/gw/v1/providers/nutaraline", body: { id: "nutaraline", type: "openai-completions", base_url: "from_import", models: ["m"], api_key: "sk-contoh-1234" } }, idempotencyKey());
-      expect(put).toMatchObject({ kind: "failed", error: { code: "forbidden_local_only" } });
-      await expect(remote.get("/gw/v1/providers/import")).rejects.toMatchObject({ code: "forbidden_local_only" });
+      const list = await remote.get<ProviderList>("/gw/v1/providers?bot=A");
+      expect(list.bot).toBe("A");
+      expect(list.providers.map((p) => p.id)).toContain("nutaraline");
+      const tested = await send<ProviderTest>(remote, { method: "post", path: "/gw/v1/providers/nutaraline/test?bot=A", body: { model: "deepseek-v4.1-flash-1017" } }, idempotencyKey());
+      expect(tested).toMatchObject({ kind: "done", result: { ok: true, status: 200 } });
+      const again = await send(remote, { method: "post", path: "/gw/v1/providers/nutaraline/test?bot=A", body: {} }, idempotencyKey());
+      expect(again).toMatchObject({ kind: "failed", error: { status: 429, code: "rate_limited" } });
+      for (const request of [
+        { method: "put" as const, path: "/gw/v1/providers/nutaraline?bot=A", body: { type: "openai-completions", base_url: "https://x.invalid/v1", models: ["m"] } },
+        { method: "put" as const, path: "/gw/v1/providers/nutaraline/key?bot=A", body: { api_key: "sk-contoh-12345678" } },
+        { method: "post" as const, path: "/gw/v1/providers/nutaraline/state?bot=A", body: { enabled: false } },
+      ]) {
+        expect(await send(remote, request, idempotencyKey())).toMatchObject({ kind: "failed", error: { code: "forbidden_local_only" } });
+      }
+      await expect(remote.get("/gw/v1/providers/import?bot=A")).rejects.toMatchObject({ code: "forbidden_local_only" });
     });
   });
 
-  it("stores a key from loopback, shows only its last four characters, and audits it as set", async () => {
-    const out = await send<Provider>(api, { method: "put", path: "/gw/v1/providers/omniroute", body: { id: "omniroute", type: "openai-completions", base_url: "from_import", models: ["contoh-model-lokal"], api_key_env: null, api_key: "sk-contoh-WXYZ" } }, idempotencyKey());
-    expect(out).toMatchObject({ kind: "done", result: { api_key_configured: true, api_key_last4: "WXYZ" } });
-    const rows = await api.get<AuditRow[]>("/gw/v1/audit?action=provider.update&limit=1");
-    expect(JSON.stringify(rows)).not.toContain("sk-contoh");
-    expect(rows[0].detail).toMatchObject({ changes: [{ new: "<set>" }] });
+  it("stores a key only through the key route, shows its last four characters, and masks it in audit and changes", async () => {
+    const inBody = await send(api, { method: "put", path: "/gw/v1/providers/omniroute?bot=A", body: { type: "openai-completions", base_url: "https://omni.invalid/v1", models: ["contoh-model-lokal"], api_key: "sk-contoh-WXYZ" } }, idempotencyKey());
+    expect(inBody).toMatchObject({ kind: "failed", error: { status: 400 } });
+    const out = await send<WriteResult & { provider: Provider }>(api, { method: "put", path: "/gw/v1/providers/omniroute/key?bot=A", body: { api_key: "sk-contoh-PENANDA-WXYZ" } }, idempotencyKey());
+    expect(out).toMatchObject({ kind: "done", result: { provider: { key: { source: "config", configured: true, last4: "WXYZ" } } } });
+    const everything = JSON.stringify([await api.get("/gw/v1/audit?limit=200"), await api.get("/gw/v1/settings/changes?limit=200"), await api.get("/gw/v1/settings?bot=A"), await api.get("/gw/v1/providers?bot=A")]);
+    expect(everything).not.toContain("PENANDA");
+    expect(everything).toContain("****WXYZ");
+    const env = await send<WriteResult & { provider: Provider }>(api, { method: "put", path: "/gw/v1/providers/omniroute/key?bot=A", body: { api_key_env: "OMNIROUTE_API_KEY" } }, idempotencyKey());
+    expect(env).toMatchObject({ kind: "done", result: { provider: { key: { source: "env", env_name: "OMNIROUTE_API_KEY", last4: null } } } });
+  });
+
+  it("refuses removing a provider still in use", async () => {
+    expect(await send(api, { method: "del", path: "/gw/v1/providers/nutaraline?bot=A", body: {} }, idempotencyKey())).toMatchObject({ kind: "failed", error: { status: 400 } });
+  });
+
+  it("previews models.yml without key values and imports a key only when ticked and allowed", async () => {
+    const preview = await api.get<{ providers: ImportCandidate[] }>("/gw/v1/providers/import?bot=B");
+    expect(JSON.stringify(preview)).not.toMatch(/sk-/);
+    expect(preview.providers.find((c) => c.name === "Odd Name")?.blocker).toBeTruthy();
+    const command = await send(api, { method: "post", path: "/gw/v1/providers/import?bot=B", body: { providers: [{ name: "shellkey", with_key: true, models: null, replace: false }] } }, idempotencyKey());
+    expect(command).toMatchObject({ kind: "failed", error: { status: 400 } });
+    const out = await send<{ results: ImportResult[] }>(api, { method: "post", path: "/gw/v1/providers/import?bot=B", body: { providers: [{ name: "modelrouter", with_key: true, models: null, replace: false }, { name: "nutaraline", with_key: false, models: null, replace: false }] } }, idempotencyKey());
+    expect(out).toMatchObject({ kind: "done", result: { results: [{ name: "modelrouter", result: "created", with_key: true }, { name: "nutaraline", result: "skipped" }] } });
   });
 });
 
-describe("history, decisions, A vs B, audit (14.5 to 14.8)", () => {
+describe("history, decisions, A vs B, audit (15.3)", () => {
   it("pages decisions by timestamp and attaches an outcome", async () => {
     const first = await api.get<Decision[]>("/gw/v1/decisions?limit=10");
-    const next = await api.get<Decision[]>("/gw/v1/decisions?limit=10&before=" + encodeURIComponent(first.at(-1)!.ts));
+    const next = await api.get<Decision[]>("/gw/v1/decisions?limit=10&before=" + encodeURIComponent(first.at(-1)!.candle));
     expect(first).toHaveLength(10);
-    expect(next[0].ts < first.at(-1)!.ts).toBe(true);
+    expect(Date.parse(next[0].candle) < Date.parse(first.at(-1)!.candle)).toBe(true);
     for (const d of [...first, ...next]) expect(["pending", "insufficient_data", "settled"]).toContain(d.outcome?.state);
     const skipped = await api.get<Decision[]>("/gw/v1/decisions?limit=50&status=skip");
     expect(skipped.every((d) => d.status === "skip")).toBe(true);

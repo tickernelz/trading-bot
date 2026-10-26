@@ -193,6 +193,47 @@ export interface ErrorEnvelope {
   error: { code: string; message: string; retry_after_ms?: number; [extra: string]: unknown };
 }
 
+export interface NewsSource {
+  id: string;
+  name: string;
+  url: string;
+  feed: string;
+  ok: boolean;
+  error: string | null;
+  fetched_at: string | null;
+}
+
+export interface NewsItem {
+  id: string;
+  source: string;
+  title: string;
+  url: string;
+  published: string;
+  assets: string[];
+}
+
+export interface News {
+  as_of: string;
+  enabled: boolean;
+  sources: NewsSource[];
+  items: NewsItem[];
+}
+
+export type FearGreedClass = "Extreme Fear" | "Fear" | "Neutral" | "Greed" | "Extreme Greed";
+
+export interface SentimentPoint {
+  date: string;
+  value: number;
+  classification: FearGreedClass;
+}
+
+export interface Sentiment {
+  as_of: string;
+  enabled: boolean;
+  source: { name: string; provider: string; url: string; ok?: boolean; error?: string | null; fetched_at?: string | null };
+  points: SentimentPoint[];
+}
+
 export type PushKind = "fill" | "risk_breach" | "kill_switch" | "heartbeat_lost" | "quorum_failed" | "daily_summary";
 
 export type Scope = "read" | "control";
@@ -233,19 +274,20 @@ export interface Pairs {
   locks: { lock_count: number; locks: Lock[] };
 }
 
+export type ProviderType = "openai-completions" | "openai-responses" | "anthropic-messages";
+
 export interface ProviderSetting {
   id: string;
-  type: "openai-completions" | "openai-responses" | "anthropic-messages";
+  type: string;
   base_url: string;
   api_key_env: string | null;
   api_key: null;
-  api_key_configured: boolean;
+  api_key_configured?: boolean;
+  api_key_last4?: string | null;
   models: string[];
-  enabled?: boolean;
 }
 
-export interface VoterSetting {
-  id: string;
+export interface VoterFields {
   adapter: "llm_structured" | "systemone" | "openrouter_decisions" | "openai_decisions";
   provider: string;
   model: string;
@@ -255,19 +297,23 @@ export interface VoterSetting {
   enabled: boolean;
 }
 
+export interface VoterSetting extends VoterFields {
+  id: string;
+}
+
 export interface Settings {
-  mode: "dry_run";
+  mode: string;
   capital: { initial_idr: number; compounding: boolean };
   risk: {
     max_daily_loss_pct: number;
     max_total_drawdown_pct: number;
     risk_per_trade_pct: number;
     max_open_trades: number;
-    leverage: "none";
-    on_breach: "stop_new_entries";
+    leverage: string;
+    on_breach: string;
     daily_reset_timezone: string;
   };
-  exchange: { name: string; pairs: string[]; timeframe: "1h"; fee_pct: number };
+  exchange: { name: string; pairs: string[]; timeframe: string; fee_pct: number };
   providers: ProviderSetting[];
   swarm: {
     enabled: boolean;
@@ -277,23 +323,11 @@ export interface Settings {
     max_spread: number | null;
     voters: VoterSetting[];
   };
-  llm: { backend: "deepagents"; analyst_model: string };
-  compute: { max_cost_idr_per_day: false | number; on_exceed: "skip_new_entries"; log_cost: boolean };
+  llm: { backend: string; analyst_model: string };
+  compute: { max_cost_idr_per_day: false | number; on_exceed: string; log_cost: boolean };
   data: { news_rss: string[]; fear_greed: boolean; social: boolean };
-  notify: { web_push: boolean };
-  api: {
-    listen: string;
-    port: number;
-    username_env: string;
-    password_env: string;
-    jwt_secret_env: string;
-    ws_token_env: string;
-    force_entry: boolean;
-  };
-}
-
-export interface SettingsDoc extends Settings {
-  revision: string;
+  notify: { web_push: boolean; [extra: string]: unknown };
+  [section: string]: unknown;
 }
 
 export interface Change {
@@ -302,43 +336,90 @@ export interface Change {
   new: unknown;
 }
 
-export interface SettingsSaved {
-  revision: string;
-  applied: Change[];
+export interface WriteResult {
+  bot: string;
+  changes: Change[];
   restart_required: boolean;
+  audit_id?: number;
+}
+
+export interface ChangeEntry extends Change {
+  audit_id: number;
+  ts: string;
+  actor: string;
+  ip: string | null;
+  action: string;
+  bot: string | null;
 }
 
 export interface ProviderTest {
-  at: string;
-  ok: boolean;
-  latency_ms: number | null;
+  tested_at: string;
   model: string | null;
-  error_kind: string | null;
+  ok: boolean;
+  status: number | null;
+  latency_ms: number | null;
+  error: string | null;
+  detail: string | null;
+}
+
+export interface KeyState {
+  source: "config" | "env" | "none";
+  configured: boolean;
+  last4: string | null;
+  env_name: string | null;
+  env_set: boolean | null;
 }
 
 export interface Provider {
   id: string;
-  type: ProviderSetting["type"];
+  type: string;
   base_url: string;
   host: string | null;
   models: string[];
-  enabled: boolean;
-  api_key_configured: boolean;
-  api_key_source: "env" | "config" | null;
-  api_key_env: string | null;
-  api_key_last4: string | null;
-  used_by: { analyst: boolean; voters: string[] };
+  active_models: string[];
+  key: KeyState;
   last_test: ProviderTest | null;
-  health: { calls: number; ok: number; latency_p50_s: number | null; latency_max_s: number | null; last_status: string | null } | null;
+}
+
+export interface ProviderList {
+  bot: string;
+  providers: Provider[];
 }
 
 export interface ImportCandidate {
+  name: string;
   id: string;
-  type: ProviderSetting["type"];
-  base_url: string;
+  type: string | null;
+  base_url: string | null;
+  host: string | null;
   models: string[];
-  has_key: boolean;
+  key_source: "literal" | "env" | "command" | "none";
   exists: boolean;
+  blocker: string | null;
+}
+
+export interface ImportResult {
+  name: string;
+  id: string;
+  result: "created" | "updated" | "skipped";
+  reason?: string;
+  with_key: boolean;
+}
+
+export interface VoterView extends VoterSetting {
+  last_test: ProviderTest | null;
+}
+
+export interface VoterList {
+  bot: string;
+  swarm: { enabled: boolean; mode: string; min_voters_answered: number; enabled_voters: number };
+  voters: VoterView[];
+}
+
+export interface Roles {
+  bot: string;
+  analyst: { provider: string; model: string };
+  voters: { id: string; provider: string; model: string; enabled: boolean }[];
 }
 
 export interface AuditRow {

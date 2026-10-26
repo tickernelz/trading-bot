@@ -1,21 +1,28 @@
+import { t } from "./i18n";
+
 export const SCREENS = [
-  { id: "ringkas", label: "Ringkas", group: "Pantau", tab: true },
-  { id: "grafik", label: "Grafik", group: "Pantau", tab: true },
-  { id: "aksi", label: "Aksi", group: "Pantau", tab: true },
-  { id: "swarm", label: "Swarm", group: "Pantau", tab: false },
-  { id: "kontrol", label: "Kontrol", group: "Kendali", tab: true },
-  { id: "konfigurasi", label: "Konfigurasi", group: "Kendali", tab: false },
-  { id: "provider", label: "Provider dan key", group: "Kendali", tab: false },
-  { id: "riwayat", label: "Riwayat", group: "Catatan", tab: false },
-  { id: "ab", label: "A vs B", group: "Catatan", tab: false },
-  { id: "audit", label: "Audit", group: "Catatan", tab: false },
-  { id: "sistem", label: "Sistem", group: "Sistem", tab: false },
-  { id: "lainnya", label: "Lainnya", group: null, tab: true },
+  { id: "ringkas", label: t("nav.ringkas"), group: "pantau", tab: true },
+  { id: "grafik", label: t("nav.grafik"), group: "pantau", tab: true },
+  { id: "aksi", label: t("nav.aksi"), group: "pantau", tab: true },
+  { id: "swarm", label: t("nav.swarm"), group: "pantau", tab: false },
+  { id: "kontrol", label: t("nav.kontrol"), group: "kendali", tab: true },
+  { id: "konfigurasi", label: t("nav.konfigurasi"), group: "kendali", tab: false },
+  { id: "provider", label: t("nav.provider"), group: "kendali", tab: false },
+  { id: "riwayat", label: t("nav.riwayat"), group: "catatan", tab: false },
+  { id: "ab", label: t("nav.ab"), group: "catatan", tab: false },
+  { id: "audit", label: t("nav.audit"), group: "catatan", tab: false },
+  { id: "sistem", label: t("nav.sistem"), group: "sistem", tab: false },
+  { id: "lainnya", label: t("nav.lainnya"), group: null, tab: true },
 ] as const;
 
 export type Screen = (typeof SCREENS)[number]["id"];
 
-export const GROUPS = ["Pantau", "Kendali", "Catatan", "Sistem"] as const;
+export const GROUPS = [
+  { id: "pantau", label: t("nav.group.pantau") },
+  { id: "kendali", label: t("nav.group.kendali") },
+  { id: "catatan", label: t("nav.group.catatan") },
+  { id: "sistem", label: t("nav.group.sistem") },
+] as const;
 
 export function inGroup(group: string) {
   return SCREENS.filter((s) => s.group === group);

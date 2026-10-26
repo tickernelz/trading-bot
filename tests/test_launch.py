@@ -98,7 +98,10 @@ def test_serving_commands_pass_api_secrets_through_env(monkeypatch, tmp_path, ex
     [(_, argv, env)] = exec_calls
     assert argv[1] == command
     assert env["FREQTRADE__API_SERVER__WS_TOKEN"] == "ws-example"
-    assert ("--strategy" in argv) is (command in launch.STRATEGY_COMMANDS)
+    assert ("--strategy" in argv) is (command == "trade")
+    assert ("--strategy-path" in argv) is (command == "trade")
+    rendered = json.loads((tmp_path / "user_data" / "trading-bot.freqtrade.json").read_text(encoding="utf-8"))
+    assert rendered["strategy_path"] == str(launch.ENGINE_ROOT / "strategies")
 
 
 def test_valid_config_execs_freqtrade_with_strategy(monkeypatch, tmp_path, exec_calls):

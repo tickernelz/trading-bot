@@ -1,4 +1,5 @@
 import { ApiError, type Api, type Headers } from "./api";
+import { t, type Key } from "./i18n";
 import type { Confirmation } from "./types";
 
 export type Method = "post" | "put" | "patch" | "del";
@@ -46,8 +47,40 @@ export async function send<T>(api: Api, request: Request, key: string, confirm?:
   }
 }
 
+const MESSAGES: Record<string, Key> = {
+  forbidden_local_only: "err.forbidden_local_only",
+  unauthorized: "err.unauthorized",
+  upstream_unavailable: "err.upstream_unavailable",
+  upstream_error: "err.upstream_error",
+  risk_limit_breached: "err.risk_limit_breached",
+  invalid_request: "err.invalid_request",
+  rate_limited: "err.rate_limited",
+  network: "err.network",
+  not_found: "err.not_found",
+  config_unwritable: "err.config_unwritable",
+};
+
+const READ_MESSAGES: Record<string, Key> = {
+  upstream_error: "err.read_upstream_error",
+  upstream_unavailable: "err.read_upstream_unavailable",
+  network: "err.read_network",
+  not_found: "err.not_found",
+  forbidden_local_only: "err.read_forbidden",
+};
+
+export function explainRead(error: { code: string }): string {
+  const key = READ_MESSAGES[error.code];
+  return (key ? t(key) : t("err.read_generic")) + " " + t("err.read_retry");
+}
+
+export function explain(error: { code: string; message: string }): string {
+  const key = MESSAGES[error.code];
+  if (key) return t(key) + (error.code === "risk_limit_breached" && error.message ? " " + error.message : "");
+  return t("err.generic") + (error.message ? " " + error.message : "");
+}
+
 export function restartText(reason: "expired" | "invalid"): string {
-  return reason === "expired" ? "Konfirmasi kedaluwarsa (60 detik). Tidak ada yang dijalankan; mulai lagi dari langkah 1." : "Konfirmasi tidak berlaku (sudah dipakai atau untuk aksi lain). Tidak ada yang dijalankan; mulai lagi dari langkah 1.";
+  return reason === "expired" ? t("err.confirm_expired") : t("err.confirm_invalid");
 }
 
 export function resultText(result: unknown): string {
@@ -56,39 +89,9 @@ export function resultText(result: unknown): string {
     if (typeof r.status === "string") return r.status;
     if (typeof r.result === "string") return r.result;
   }
-  return "perintah diterima";
+  return t("common.accepted");
 }
 
 export function secondsLeft(confirmation: Confirmation, now: number): number {
   return Math.max(0, Math.ceil((Date.parse(confirmation.expires_at) - now) / 1000));
-}
-
-const MESSAGES: Record<string, string> = {
-  forbidden_local_only: "Hanya bisa dari PC bot (localhost), bukan lewat tunnel atau jaringan.",
-  unauthorized: "Sesi berakhir. Masuk lagi.",
-  upstream_unavailable: "Bot tidak menjawab. Coba lagi setelah bot tersambung.",
-  upstream_error: "Bot menolak perintah ini.",
-  risk_limit_breached: "Ditolak lapisan risiko: batas rugi sudah terlewati.",
-  invalid_request: "Permintaan tidak sah.",
-  stale_revision: "Konfigurasi berubah sejak dibuka. Muat ulang lalu tinjau lagi.",
-  rate_limited: "Terlalu banyak permintaan. Tunggu sebentar.",
-  network: "Gateway tidak terjangkau. Periksa koneksi.",
-  not_found: "Endpoint ini belum ada di gateway.",
-};
-
-const READ_MESSAGES: Record<string, string> = {
-  upstream_error: "Gateway gagal membaca dari bot.",
-  upstream_unavailable: "Bot tidak menjawab gateway.",
-  network: "Gateway tidak terjangkau.",
-  not_found: "Endpoint ini belum ada di gateway.",
-  forbidden_local_only: "Hanya bisa dibaca dari PC bot (localhost).",
-};
-
-export function explainRead(error: { code: string }): string {
-  return (READ_MESSAGES[error.code] ?? "Gagal dimuat.") + " Data dimuat lagi saat layar dibuka atau Coba lagi ditekan.";
-}
-
-export function explain(error: { code: string; message: string }): string {
-  const base = MESSAGES[error.code] ?? "Gagal.";
-  return error.message && !MESSAGES[error.code] ? base + " " + error.message : base;
 }

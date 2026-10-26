@@ -98,6 +98,11 @@ data:
   social: off
 notify:
   web_push: true
+  telegram:
+    enabled: false
+    token_env: TELEGRAM_BOT_TOKEN
+    chat_id: null
+    authorized_users: []
 api:
   listen: 127.0.0.1
   port: 8080
@@ -106,3 +111,19 @@ api:
   jwt_secret_env: FT_API_JWT_SECRET
   ws_token_env: FT_API_WS_TOKEN
   force_entry: false
+analytics:
+  scoreboard:
+    enabled: true
+    auto_disable: true
+    min_samples: 30
+    max_ece: 0.25
+    brier_margin: 0.05
+    accuracy_margin: 0.05
+    bins: 5
+    interval_s: 3600
+  stress:
+    drop_pct: 10.0
+  tax:
+    pph22_final_pct: 0.21
+  portfolio:
+    max_pair_share_pct: 50.0

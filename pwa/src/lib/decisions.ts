@@ -1,4 +1,5 @@
 import { clock } from "./format";
+import { t } from "./i18n";
 import type { Decision, DecisionOutcome } from "./types";
 
 export type DecisionFilter = "semua" | "skip" | "ok";
@@ -19,32 +20,16 @@ export function decisionsPath(filter: DecisionFilter, before: string | null, bot
   return "/gw/v1/decisions?" + q.toString();
 }
 
-export function tookEntry(d: Decision): boolean {
-  return d.outcome?.basis === "trade";
-}
-
 export function outcomeView(o: DecisionOutcome | undefined): OutcomeView | null {
   if (!o) return null;
   if (o.basis === "trade") {
-    if (o.is_open) {
-      return { settled: false, headline: "Masuk, trade #" + o.trade_id + " masih terbuka", value: o.profit_pct, unit: "pct", note: "Angka sementara dari harga terakhir; belum hasil akhir." };
-    }
-    if (o.state !== "settled" || o.profit_pct === null) {
-      return { settled: false, headline: "Masuk, hasil trade belum tercatat", value: null, unit: "pct", note: "Belum cukup data." };
-    }
-    return { settled: true, headline: "Masuk, trade #" + o.trade_id + " ditutup", value: o.profit_pct, unit: "pct", note: "Hasil trade sungguhan (dry-run), sesudah biaya." };
+    if (o.is_open) return { settled: false, headline: t("out.trade_open", { id: o.trade_id ?? "-" }), value: o.profit_pct, unit: "pct", note: t("out.trade_open_note") };
+    if (o.state !== "settled" || o.profit_pct === null) return { settled: false, headline: t("out.trade_pending"), value: null, unit: "pct", note: t("out.not_enough") };
+    return { settled: true, headline: t("out.trade_closed", { id: o.trade_id ?? "-" }), value: o.profit_pct, unit: "pct", note: t("out.trade_closed_note") };
   }
   if (o.state === "pending") {
-    return { settled: false, headline: "Dilewati, belum cukup data", value: null, unit: "pct", note: "Harga " + o.horizon_h + " jam sesudahnya baru ada " + (o.settles_at ? "pukul " + clock(o.settles_at) : "nanti") + "." };
+    return { settled: false, headline: t("out.skip_pending"), value: null, unit: "pct", note: o.settles_at ? t("out.skip_pending_at", { h: o.horizon_h, at: clock(o.settles_at) }) : t("out.skip_pending_later", { h: o.horizon_h }) };
   }
-  if (o.state === "insufficient_data" || o.return_after_fees_pct === null) {
-    return { settled: false, headline: "Dilewati, data harga sesudahnya tidak ada", value: null, unit: "pct", note: "Kandel sesudah horizon tidak tersedia; tidak dihitung." };
-  }
-  return {
-    settled: true,
-    headline: "Dilewati. Seandainya masuk, " + o.horizon_h + " jam kemudian",
-    value: o.return_after_fees_pct,
-    unit: "pct",
-    note: "Pengandaian dari harga penutupan, sesudah biaya dua sisi; bukan trade.",
-  };
+  if (o.state === "insufficient_data" || o.return_after_fees_pct === null) return { settled: false, headline: t("out.skip_nodata"), value: null, unit: "pct", note: t("out.skip_nodata_note") };
+  return { settled: true, headline: t("out.skip_settled", { h: o.horizon_h }), value: o.return_after_fees_pct, unit: "pct", note: t("out.skip_settled_note") };
 }

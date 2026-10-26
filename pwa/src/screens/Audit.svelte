@@ -3,6 +3,7 @@
   import { explainRead } from "../lib/control";
   import { dayClock } from "../lib/format";
   import { gateway } from "../lib/gateway.svelte";
+  import { t } from "../lib/i18n";
   import { faultOf, type Fault } from "../lib/state";
   import type { AuditRow } from "../lib/types";
 
@@ -50,13 +51,13 @@
     if (typeof d.message === "string" && d.message) return d.message;
     if (typeof d.error === "string" && d.error) return d.error;
     const n = changeLines(row).length;
-    return n > 0 ? n + " kunci berubah" : "";
+    return n > 0 ? t("audit.n_keys", { n }) : "";
   }
 </script>
 
 <div class="filters">
   <div class="field">
-    <label for="f-action">Jenis</label>
+    <label for="f-action">{t("audit.kind")}</label>
     <select id="f-action" class="input" bind:value={action}>
       {#each ACTION_GROUPS as a (a.id)}<option value={a.id}>{a.label}</option>{/each}
     </select>
@@ -64,26 +65,26 @@
   <div class="field">
     <label for="f-target">Bot</label>
     <select id="f-target" class="input" bind:value={target}>
-      <option value="">Semua</option>
+      <option value="">{t("audit.g_all")}</option>
       {#each g.bots as bot (bot.id)}<option value={bot.id}>{bot.label}</option>{/each}
     </select>
   </div>
   <div class="field">
-    <label for="f-result">Hasil</label>
+    <label for="f-result">{t("audit.result")}</label>
     <select id="f-result" class="input" bind:value={result}>
       {#each RESULTS as r (r.id)}<option value={r.id}>{r.label}</option>{/each}
     </select>
   </div>
 </div>
-<p class="note">Log tambah-saja. Nilai key tidak pernah dicatat; perubahan key tampil sebagai terpasang atau kosong.</p>
+<p class="note">{t("audit.note")}</p>
 
 {#if loading && rows.length === 0}
-  <div class="skel-rows" aria-busy="true" aria-label="Memuat audit"><span class="skeleton" style="width: 90%"></span><span class="skeleton" style="width: 80%"></span><span class="skeleton" style="width: 85%"></span><span class="skeleton" style="width: 70%"></span></div>
+  <div class="skel-rows" aria-busy="true" aria-label={t("audit.loading")}><span class="skeleton" style="width: 90%"></span><span class="skeleton" style="width: 80%"></span><span class="skeleton" style="width: 85%"></span><span class="skeleton" style="width: 70%"></span></div>
 {:else if fault && rows.length === 0}
-  <p class="note warn-text">Audit gagal dimuat ({fault.code}). {explainRead(fault)}</p>
-  <div class="inline-actions"><button class="btn quiet" type="button" onclick={() => load(false)}>Coba lagi</button></div>
+  <p class="note warn-text">{t("audit.failed", { code: fault.code })} {explainRead(fault)}</p>
+  <div class="inline-actions"><button class="btn quiet" type="button" onclick={() => load(false)}>{t("common.retry")}</button></div>
 {:else if rows.length === 0}
-  <p class="note">{action || result || target ? "Tidak ada baris dengan saringan ini." : "Belum ada baris audit. Masuk, kontrol, perubahan konfigurasi, dan provider tercatat di sini."}</p>
+  <p class="note">{action || result || target ? t("audit.filter_empty") : t("audit.empty")}</p>
 {:else}
   <ol class="audit">
     {#each rows as row (row.id)}
@@ -97,16 +98,15 @@
         {#if open === row.id}
           <div class="detail" id={"a-" + row.id}>
             <dl class="rows">
-              <div><dt>Pelaku</dt><dd>{row.actor === "file" ? "berkas (di luar PWA)" : row.actor}</dd></div>
+              <div><dt>{t("audit.actor")}</dt><dd>{row.actor === "file" ? t("cfg.actor_file") : row.actor}</dd></div>
               <div><dt>IP</dt><dd class="num">{row.ip ?? "-"}</dd></div>
-              <div><dt>Aksi</dt><dd><code>{row.action}</code></dd></div>
-              {#if row.idempotency_key}<div><dt>Kunci idempotensi</dt><dd class="num"><code>{row.idempotency_key.slice(0, 8)}…</code></dd></div>{/if}
-              {#if row.detail?.note}<div><dt>Catatan</dt><dd>{String(row.detail.note)}</dd></div>{/if}
-              {#if row.detail?.params && typeof row.detail.params === "object" && Object.keys(row.detail.params).length > 0}<div><dt>Parameter</dt><dd><code>{Object.entries(row.detail.params).map(([k, v]) => k + "=" + show(v)).join(" · ")}</code></dd></div>{/if}
+              <div><dt>{t("audit.action")}</dt><dd><code>{row.action}</code></dd></div>
+              {#if row.idempotency_key}<div><dt>{t("audit.idem")}</dt><dd class="num"><code>{row.idempotency_key.slice(0, 8)}…</code></dd></div>{/if}
+              {#if row.detail?.params && typeof row.detail.params === "object" && Object.keys(row.detail.params).length > 0}<div><dt>{t("audit.params")}</dt><dd><code>{Object.entries(row.detail.params).map(([k, v]) => k + "=" + show(v)).join(" · ")}</code></dd></div>{/if}
             </dl>
             {#if lines.length > 0}
               <table class="table">
-                <thead><tr><th>Kunci</th><th>Lama</th><th>Baru</th></tr></thead>
+                <thead><tr><th>{t("cfg.col_key")}</th><th>{t("cfg.col_old")}</th><th>{t("cfg.col_new")}</th></tr></thead>
                 <tbody>
                   {#each lines as c (c.key)}<tr><td><code>{c.key}</code></td><td class="num">{c.old}</td><td class="num"><b>{c.new}</b></td></tr>{/each}
                 </tbody>
@@ -117,9 +117,9 @@
       </li>
     {/each}
   </ol>
-  {#if fault}<p class="note warn-text">Halaman berikutnya gagal dimuat ({fault.code}).</p>{/if}
+  {#if fault}<p class="note warn-text">{t("common.next_failed", { code: fault.code })}</p>{/if}
   {#if more}
-    <div class="inline-actions"><button class="btn quiet" type="button" disabled={loading} aria-busy={loading} onclick={() => load(true)}>{loading ? "Memuat…" : "Muat lebih lama"}</button></div>
+    <div class="inline-actions"><button class="btn quiet" type="button" disabled={loading} aria-busy={loading} onclick={() => load(true)}>{loading ? t("common.loading") : t("audit.older")}</button></div>
   {/if}
 {/if}
 

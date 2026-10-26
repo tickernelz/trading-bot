@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { t } from "../lib/i18n";
+
   let {
     id,
     label,
@@ -34,14 +36,14 @@
     {step}
     {disabled}
     bind:value
-    placeholder={optional ? "kosong" : undefined}
+    placeholder={optional ? t("audit.v_empty") : undefined}
     aria-invalid={error ? "true" : undefined}
     aria-describedby={id + "-h"}
   />
   <span id={id + "-h"} class="hint-group">
     {#if error}<span class="err">{error}</span>{/if}
     {#if hint}<span class="hint">{hint}</span>{/if}
-    {#if was !== null}<span class="hint was">Diubah, sebelumnya {was}</span>{/if}
+    {#if was !== null}<span class="hint was">{t("cfg.was", { v: was })}</span>{/if}
   </span>
 </div>
 

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { secondsLeft } from "../lib/control";
   import { gateway } from "../lib/gateway.svelte";
+  import { t } from "../lib/i18n";
   import type { Confirmation } from "../lib/types";
 
   let {
@@ -20,15 +21,15 @@
 </script>
 
 <div class="confirm" role="alertdialog" tabindex="-1" bind:this={panel} aria-labelledby={"cf-" + confirmation.id} aria-describedby={"cf-d-" + confirmation.id}>
-  <p class="title" id={"cf-" + confirmation.id}>Langkah 2 dari 2: konfirmasi</p>
+  <p class="title" id={"cf-" + confirmation.id}>{t("confirm.title")}</p>
   <div id={"cf-d-" + confirmation.id}>
     <p class="summary">{confirmation.summary}</p>
     {#if consequence}<p class="consequence">{consequence}</p>{/if}
-    <p class="muted small num" aria-live="off">{left > 0 ? "Berlaku " + left + " detik lagi. Sasaran: " + confirmation.targets.join(", ") : "Konfirmasi kedaluwarsa. Mulai lagi dari langkah 1."}</p>
+    <p class="muted small num" aria-live="off">{left > 0 ? t("confirm.left", { s: left, targets: confirmation.targets.join(", ") }) : t("err.confirm_expired")}</p>
   </div>
   <div class="row">
-    <button class="btn" type="button" disabled={busy || left === 0} aria-busy={busy} onclick={onconfirm}>{busy ? "Menjalankan…" : "Ya, jalankan"}</button>
-    <button class="btn secondary" type="button" disabled={busy} onclick={oncancel}>Batal</button>
+    <button class="btn" type="button" disabled={busy || left === 0} aria-busy={busy} onclick={onconfirm}>{busy ? t("confirm.running") : t("confirm.go")}</button>
+    <button class="btn secondary" type="button" disabled={busy} onclick={oncancel}>{t("common.cancel")}</button>
   </div>
 </div>
 

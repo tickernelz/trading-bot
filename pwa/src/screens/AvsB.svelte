@@ -3,6 +3,7 @@
   import { explainRead } from "../lib/control";
   import { clock, decimal, rupiah } from "../lib/format";
   import { gateway } from "../lib/gateway.svelte";
+  import { t } from "../lib/i18n";
   import { Resource } from "../lib/resource.svelte";
   import type { Equity, ProfitTotal } from "../lib/types";
 
@@ -26,25 +27,25 @@
 
   const finals = $derived(equity.data ? equity.data.series.map((s) => ({ ...s, end: s.points.at(-1)?.[1] ?? equity.data!.start_equity, from: s.points[0]?.[0] ?? null })) : []);
   const WINDOWS = [
-    { id: "total" as const, label: "Sejak awal dry-run" },
-    { id: "7d" as const, label: "7 hari" },
+    { id: "total" as const, label: t("ab.since_start") },
+    { id: "7d" as const, label: t("ab.days7") },
   ];
 </script>
 
-<div class="chips" role="group" aria-label="Rentang waktu">
+<div class="chips" role="group" aria-label={t("ab.range")}>
   {#each WINDOWS as w (w.id)}
     <button class="chip" type="button" aria-pressed={window === w.id} onclick={() => (window = w.id)}>{w.label}</button>
   {/each}
 </div>
 
-<h2 class="sec">Kurva ekuitas bertumpuk <span class="meta">dry-run, uang simulasi</span></h2>
+<h2 class="sec">{t("ab.curve")} <span class="meta">{t("ab.curve_meta")}</span></h2>
 {#if equity.data}
   {#await chart}
     <div class="pad"><span class="skeleton" style="height: 260px"></span></div>
   {:then Equity}
-    <Equity.default equity={equity.data} label={"Kurva ekuitas " + g.bots.map((b) => b.label).join(" dan ") + ", " + (window === "7d" ? "tujuh hari" : "sejak awal dry-run")} />
+    <Equity.default equity={equity.data} label={t("ab.curve_label", { bots: g.bots.map((b) => b.label).join(" · "), range: window === "7d" ? t("ab.days7") : t("ab.since_start") })} />
   {:catch}
-    <p class="note warn-text">Modul grafik gagal dimuat. Muat ulang aplikasi.</p>
+    <p class="note warn-text">{t("app.screen_failed")}</p>
   {/await}
   <ul class="legend">
     {#each finals as s, i (s.bot)}
@@ -52,11 +53,11 @@
     {/each}
   </ul>
   <table class="table">
-    <thead><tr><th>Bot</th><th class="n">Ekuitas akhir</th><th class="n">Perubahan</th></tr></thead>
+    <thead><tr><th>Bot</th><th class="n">{t("ab.col_end")}</th><th class="n">{t("ab.col_change")}</th></tr></thead>
     <tbody>
       {#each finals as s (s.bot)}
         <tr>
-          <td><b>{s.label}</b><br /><span class="muted small">sejak {s.from ? clock(s.from) + " " + s.from.slice(0, 10) : "-"}</span></td>
+          <td><b>{s.label}</b><br /><span class="muted small">{t("ab.since", { at: s.from ? clock(s.from) + " " + s.from.slice(0, 10) : "-" })}</span></td>
           <td class="n num">{rupiah(s.end)}</td>
           <td class="n"><Outcome value={((s.end - equity.data.start_equity) / equity.data.start_equity) * 100} /></td>
         </tr>
@@ -64,13 +65,13 @@
     </tbody>
   </table>
 {:else if equity.fault}
-  <p class="note warn-text">Ekuitas gagal dimuat ({equity.fault.code}). {explainRead(equity.fault)}</p>
-  <div class="inline-actions"><button class="btn quiet" type="button" onclick={() => equity.load()}>Coba lagi</button></div>
+  <p class="note warn-text">{t("ab.equity_failed", { code: equity.fault.code })} {explainRead(equity.fault)}</p>
+  <div class="inline-actions"><button class="btn quiet" type="button" onclick={() => equity.load()}>{t("common.retry")}</button></div>
 {:else}
   <div class="pad" aria-busy="true"><span class="skeleton" style="height: 260px"></span></div>
 {/if}
 
-<h2 class="sec">Pembanding <span class="meta">trade ditutup sejak awal</span></h2>
+<h2 class="sec">{t("ab.compare")} <span class="meta">{t("ab.compare_meta")}</span></h2>
 {#if profits.data}
   <div class="scroll">
     <table class="table">
@@ -78,18 +79,18 @@
         <tr><th></th>{#each profits.data as row (row.bot.id)}<th class="n">{row.bot.label}</th>{/each}</tr>
       </thead>
       <tbody>
-        <tr><th scope="row">Trade ditutup</th>{#each profits.data as row (row.bot.id)}<td class="n num">{row.p.closed_trade_count}</td>{/each}</tr>
-        <tr><th scope="row">Menang / kalah</th>{#each profits.data as row (row.bot.id)}<td class="n num">{row.p.winning_trades} / {row.p.losing_trades}</td>{/each}</tr>
-        <tr><th scope="row">Profit tertutup</th>{#each profits.data as row (row.bot.id)}<td class="n"><Outcome value={row.p.profit_closed_coin} unit="idr" word={false} /></td>{/each}</tr>
-        <tr><th scope="row">Profit tertutup (%)</th>{#each profits.data as row (row.bot.id)}<td class="n"><Outcome value={row.p.profit_closed_percent} word={false} /></td>{/each}</tr>
-        <tr><th scope="row">Drawdown maksimal</th>{#each profits.data as row (row.bot.id)}<td class="n num">{row.p.max_drawdown === undefined ? "-" : decimal(row.p.max_drawdown * 100) + "%" + (row.p.max_drawdown_abs === undefined ? "" : " · " + rupiah(row.p.max_drawdown_abs))}</td>{/each}</tr>
-        <tr><th scope="row">Pair terbaik / terburuk</th>{#each profits.data as row (row.bot.id)}<td class="n">{row.p.best_pair ?? "-"} / {row.p.worst_pair ?? "-"}</td>{/each}</tr>
+        <tr><th scope="row">{t("hist.closed")}</th>{#each profits.data as row (row.bot.id)}<td class="n num">{row.p.closed_trade_count}</td>{/each}</tr>
+        <tr><th scope="row">{t("ab.win_loss")}</th>{#each profits.data as row (row.bot.id)}<td class="n num">{row.p.winning_trades} / {row.p.losing_trades}</td>{/each}</tr>
+        <tr><th scope="row">{t("ab.closed_profit")}</th>{#each profits.data as row (row.bot.id)}<td class="n"><Outcome value={row.p.profit_closed_coin} unit="idr" word={false} /></td>{/each}</tr>
+        <tr><th scope="row">{t("ab.closed_profit_pct")}</th>{#each profits.data as row (row.bot.id)}<td class="n"><Outcome value={row.p.profit_closed_percent} word={false} /></td>{/each}</tr>
+        <tr><th scope="row">{t("ab.max_dd")}</th>{#each profits.data as row (row.bot.id)}<td class="n num">{row.p.max_drawdown === undefined ? "-" : decimal(row.p.max_drawdown * 100) + "%" + (row.p.max_drawdown_abs === undefined ? "" : " · " + rupiah(row.p.max_drawdown_abs))}</td>{/each}</tr>
+        <tr><th scope="row">{t("ab.best_worst")}</th>{#each profits.data as row (row.bot.id)}<td class="n">{row.p.best_pair ?? "-"} / {row.p.worst_pair ?? "-"}</td>{/each}</tr>
       </tbody>
     </table>
   </div>
-  <p class="note">Bot A aturan saja; Bot B aturan dengan swarm. Selama swarm dalam mode bayangan, selisih kedua bot bukan bukti swarm berguna. Syarat adopsi swarm ada di plan bagian 8 (minimal 4 minggu dan 30 keputusan veto).</p>
+  <p class="note">{t("ab.note")}</p>
 {:else if profits.fault}
-  <p class="note warn-text">Pembanding gagal dimuat ({profits.fault.code}). {explainRead(profits.fault)}</p>
+  <p class="note warn-text">{t("ab.compare_failed", { code: profits.fault.code })} {explainRead(profits.fault)}</p>
 {:else}
   <div class="skel-rows" aria-busy="true"><span class="skeleton" style="width: 80%"></span><span class="skeleton" style="width: 70%"></span><span class="skeleton" style="width: 75%"></span></div>
 {/if}

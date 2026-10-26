@@ -10,6 +10,7 @@ Status: tahap 0a (mesin dasar). Belum ada akun atau uang yang terhubung, belum a
 - engine/: launcher, skema konfigurasi, lapisan risiko, strategi
 - engine/settings.py: skema tunggal config/config.yaml, divalidasi sebelum mesin start
 - engine/risk.py: batas rugi harian, batas drawdown, ukuran posisi berbasis risiko
+- engine/news.py: pengambil judul RSS CoinDesk dan Cointelegraph serta Fear and Greed alternative.me untuk lapisan grafik (cache 15 menit dan 1 jam, diambil hanya saat diminta)
 - engine/strategies/swing_ema_rsi.py: strategi swing 1h (EMA 20/50 + RSI) dengan gerbang risiko
 - engine/launch.py: validasi config, render config Freqtrade, exec Freqtrade
 - docker/Dockerfile, docker-compose.yml: image turunan dari vendor/freqtrade, jaringan host
@@ -53,6 +54,23 @@ Perintah Freqtrade lain memakai launcher yang sama, sehingga validasi tetap berl
 
 Jaringan: network_mode host dipakai supaya bot bisa menjangkau provider LLM yang hanya listen di 127.0.0.1 host (dibuktikan di WSL2: 127.0.0.1:62173 dan 127.0.0.1:20128 menjawab 401 dari dalam kontainer, sedangkan host.docker.internal dengan host-gateway hanya menghasilkan 000). Jalur Docker Desktop di Windows belum diuji. api.listen dibatasi skema ke 127.0.0.1 atau ::1, jadi REST tidak pernah terbuka ke LAN; untuk Docker Desktop rencananya jaringan bridge dengan publish 127.0.0.1:8080:8080, tetap belum diuji.
 
+## Kanal Telegram (nonaktif bawaan)
+
+Kanal kontrol memakai Telegram bawaan Freqtrade (perintah /status, /profit, /balance, /daily, /stopentry, /start, /stop, /forceexit, /reload_config, /help, dan lainnya). Bawaannya mati. Untuk menyalakan, isi di config/config.yaml:
+
+    notify:
+      telegram:
+        enabled: true
+        token_env: TELEGRAM_BOT_TOKEN
+        chat_id: "<id chat>"
+        authorized_users: ["<id user Telegram>"]
+
+lalu isi TELEGRAM_BOT_TOKEN di .env. Token hanya lewat variabel lingkungan (FREQTRADE__TELEGRAM__TOKEN), tidak pernah ditulis ke config Freqtrade yang dirender. Launcher menolak start bila kanal menyala tanpa chat_id, tanpa authorized_users, atau tanpa token. Hanya perintah trade yang memuat kanal ini.
+
+Risiko yang diterima saat menyalakan: perintah Telegram dijalankan Freqtrade langsung, tanpa konfirmasi dua langkah dan tanpa log audit gateway (docs/gateway-api.md bagian 3). /forcelong tetap tertolak selama api.force_entry false. Pesan dari chat atau user lain diabaikan Freqtrade.
+
+Bukti: tests/test_telegram_channel.py menjalankan modul Telegram Freqtrade asli terhadap Bot API tiruan lokal (chat pemilik mendapat jawaban /status, /stopentry, /help; /stopentry dari chat lain tidak mengubah keadaan). Belum terbukti dengan bot Telegram sungguhan karena belum ada token.
+
 ## Tes
 
     docker compose --profile test build tests
@@ -60,12 +78,29 @@ Jaringan: network_mode host dipakai supaya bot bisa menjangkau provider LLM yang
 
 Tes berjalan di dalam image turunan Freqtrade, jadi versi Freqtrade, ccxt, dan pandas sama dengan produksi. Kontrol negatif: matikan pemeriksaan batas di engine/risk.py (ganti kedua if batas menjadi if False:) lalu jalankan tes; tes batas wajib gagal.
 
+## Analitik
+
+Paket analytics/ menyediakan pratinjau what-if batas risiko dan putar ulang jawaban voter, papan skor voter, uji stres turun 10 persen, ekspor CSV dan ringkasan pajak sebagai informasi, portofolio per pair, serta sinyal strategi dan backtest lewat instans Freqtrade mode webserver. Bentuk endpoint ada di bagian 13 docs/gateway-api.md; ambang dan tarif diatur di bagian analytics config.
+
+Sinyal dan backtest butuh instans mode webserver dengan data OHLCV di userdir-nya (bot mode trade menjawab 503 untuk /pair_history dan /backtest):
+
+    docker run --rm --network host --env-file .env -v ./config:/opt/trading-bot/config:ro -v ./user_data:/freqtrade/user_data trading-bot/engine:dev download-data --days 25 --timeframes 1h
+    docker run -d --network host --env-file .env -v ./config:/opt/trading-bot/config:ro -v ./user_data:/freqtrade/user_data trading-bot/engine:dev webserver
+
+Pair tambahan cukup ditulis di exchange.pairs (dan risk.max_open_trades dinaikkan); setiap pair menambah panggilan voter per kandidat entry.
+
 ## Batasan Indodax yang terukur
 
 - Freqtrade 2026.9 mencetak peringatan bahwa indodax tidak didukung resmi dan memakai kelas exchange generik, tetapi OHLCV 1h BTC/IDR, ETH/IDR, SOL/IDR terambil.
 - ccxt 4.5.84 melaporkan biaya taker Indodax 0.2 sebagai rasio (bukan 0,2%), sehingga Freqtrade akan memakai biaya 20% bila tidak ditimpa. Karena itu exchange.fee_pct: 0.2 wajib di config dan dirender menjadi fee: 0.002.
 - ccxt melaporkan fetchMyTrades dan watchOHLCV tidak tersedia (dilaporkan Freqtrade sebagai missing opt).
-- Riwayat OHLCV 1h hanya sekitar 649 candle terakhir (27 hari) walaupun diminta 120 hari; permintaan 1d mengembalikan 1000 candle dalam satu panggilan. Backtest 1h karena itu terbatas pada sekitar 27 hari.
+- Satu permintaan OHLCV dengan rentang panjang hanya mengembalikan candle terbaru (1h: 649 candle, 27 hari), sehingga download-data Freqtrade berhenti di 27 hari. Riwayat 1h sendiri tersedia minimal sejak 2023-10-01: engine/history.py mengambilnya per jendela 500 candle (docs/stage2-backtest.md).
+
+## Backtest tahap 2
+
+    IMAGE=trading-bot/engine:dev scripts/stage2_backtest.sh user_data/stage2
+
+Mengunduh riwayat 1h tiga pair sejak 2023-10-01, lalu menjalankan delapan backtest yang matriksnya dikunci di engine/backtest_suite.py (in-sample dan out-of-sample, fee 0,2% dan pajak 0,21% per sisi, pembanding fee saja dan tanpa biaya, batas risiko apa adanya dan dimatikan). Hasil: report.json dan report.md di direktori keluaran. Temuan: docs/stage2-backtest.md.
 
 ## Memperbarui Freqtrade
 

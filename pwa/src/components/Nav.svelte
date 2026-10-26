@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from "../lib/i18n";
   import { GROUPS, inGroup, SCREENS, tabFor, type Screen } from "../lib/route.svelte";
 
   let { current, variant = "tabs" }: { current: Screen; variant?: "tabs" | "rail" } = $props();
@@ -6,17 +7,17 @@
 </script>
 
 {#if variant === "tabs"}
-  <nav aria-label="Navigasi utama" class="tabs">
+  <nav aria-label={t("nav.main")} class="tabs">
     {#each tabs as s (s.id)}
       <a href={"#" + s.id} aria-current={tabFor(current) === s.id ? "page" : undefined}>{s.label}</a>
     {/each}
   </nav>
 {:else}
-  <nav aria-label="Navigasi samping" class="rail">
-    {#each GROUPS as group (group)}
-      <p class="group" id={"nav-" + group}>{group}</p>
-      <ul aria-labelledby={"nav-" + group}>
-        {#each inGroup(group) as s (s.id)}
+  <nav aria-label={t("nav.side")} class="rail">
+    {#each GROUPS as group (group.id)}
+      <p class="group" id={"nav-" + group.id}>{group.label}</p>
+      <ul aria-labelledby={"nav-" + group.id}>
+        {#each inGroup(group.id) as s (s.id)}
           <li><a href={"#" + s.id} aria-current={current === s.id ? "page" : undefined}>{s.label}</a></li>
         {/each}
       </ul>

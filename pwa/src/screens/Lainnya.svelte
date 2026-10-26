@@ -1,29 +1,30 @@
 <script lang="ts">
+  import { t, type Key } from "../lib/i18n";
   import { GROUPS, inGroup } from "../lib/route.svelte";
 
-  const ABOUT: Record<string, string> = {
-    ringkas: "Aman, ditahan, atau berhenti; posisi dan meter rugi",
-    grafik: "Kandel per pair dan kurva ekuitas",
-    aksi: "Feed order, swarm, risiko, dan sistem",
-    swarm: "Jawaban voter per keputusan dan hasil sesudahnya",
-    kontrol: "Jeda, lanjut, exit paksa, kunci pair, blacklist",
-    konfigurasi: "Batas risiko, swarm, voter, dan catatan perubahan",
-    provider: "Status, aktif atau nonaktif, uji koneksi",
-    riwayat: "Trade ditutup dan statistik per periode, tag, alasan exit",
-    ab: "Kurva ekuitas Bot A dan Bot B bertumpuk",
-    audit: "Siapa mengubah apa, kapan, dan hasilnya",
-    sistem: "Kesehatan bot, gateway, provider, log, notifikasi",
+  const ABOUT: Record<string, Key> = {
+    ringkas: "more.ringkas",
+    grafik: "more.grafik",
+    aksi: "more.aksi",
+    swarm: "more.swarm",
+    kontrol: "more.kontrol",
+    konfigurasi: "more.konfigurasi",
+    provider: "more.provider",
+    riwayat: "more.riwayat",
+    ab: "more.ab",
+    audit: "more.audit",
+    sistem: "more.sistem",
   };
 </script>
 
-{#each GROUPS as group (group)}
-  <h2 class="sec">{group}</h2>
+{#each GROUPS as group (group.id)}
+  <h2 class="sec">{group.label}</h2>
   <ul class="links">
-    {#each inGroup(group) as s (s.id)}
+    {#each inGroup(group.id) as s (s.id)}
       <li>
         <a href={"#" + s.id}>
           <span class="name">{s.label}</span>
-          <span class="about">{ABOUT[s.id]}</span>
+          <span class="about">{t(ABOUT[s.id])}</span>
         </a>
       </li>
     {/each}

@@ -10,6 +10,7 @@
   import Lainnya from "./screens/Lainnya.svelte";
   import Login from "./screens/Login.svelte";
   import Ringkas from "./screens/Ringkas.svelte";
+  import { t } from "./lib/i18n";
 
   const EAGER: Partial<Record<Screen, Component>> = { ringkas: Ringkas, grafik: Grafik, aksi: Aksi, lainnya: Lainnya };
   const LAZY: Partial<Record<Screen, () => Promise<{ default: Component }>>> = {
@@ -31,7 +32,7 @@
   });
 </script>
 
-{#if !gateway.token}
+{#if !gateway.token && !gateway.viewingSaved}
   <Login />
 {:else}
   <div class="shell">
@@ -49,7 +50,7 @@
           <Screen />
         {:else if lazy}
           {#await lazy}
-            <div class="loading" aria-busy="true" aria-label="Memuat layar">
+            <div class="loading" aria-busy="true" aria-label={t("app.loading_screen")}>
               <span class="skeleton" style="width: 40%"></span>
               <span class="skeleton" style="width: 85%"></span>
               <span class="skeleton" style="width: 70%"></span>
@@ -58,7 +59,7 @@
             {@const Screen = module.default}
             <Screen />
           {:catch}
-            <p class="note warn-text">Layar gagal dimuat. Muat ulang halaman; bila PWA baru diperbarui, versi lama di cache mungkin sudah dihapus.</p>
+            <p class="note warn-text">{t("app.screen_failed")}</p>
           {/await}
         {/if}
       </main>

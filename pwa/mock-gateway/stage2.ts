@@ -1,7 +1,7 @@
-import { createHash, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import type { IncomingMessage } from "node:http";
-import { anyNeedsConfirmation, diff, needsConfirmation, validate } from "../src/lib/settings";
-import type { AuditRow, Decision, DecisionOutcome, Provider, ProviderTest, Settings } from "../src/lib/types";
+import { flatten, validate } from "../src/lib/settings";
+import type { AuditRow, Decision, DecisionOutcome, ProviderTest, Settings, VoterSetting } from "../src/lib/types";
 import { HOUR, iso, isoMs, type Row } from "./data";
 
 export interface MockTrade {
@@ -47,10 +47,12 @@ export interface Ctx {
   overview: () => Record<string, unknown>;
   riskSnapshot: () => { daily_loss_pct: number; drawdown_pct: number };
   equitySeries: (bot: string, label: string, strategy: string, from: number, step: number, start: number, end: number, seed: number, drift: number) => unknown;
+  upstreamFailure: (path: string) => number | undefined;
 }
 
 type BotState = "running" | "paused" | "stopped";
 type Reply = { status: number; body: unknown };
+type Raw = Record<string, unknown>;
 
 const BOTS = [
   { id: "A", label: "Bot A", strategy: "aturan saja" },
@@ -66,7 +68,28 @@ const FT = {
   reload: "Reloading config ...",
 };
 
-function voters(): Settings["swarm"]["voters"] {
+const FROZEN = ["mode", "bot_id", "api", "shadow", "providers"];
+const RAISING = ["risk.max_daily_loss_pct", "risk.max_total_drawdown_pct", "risk.risk_per_trade_pct", "risk.max_open_trades", "capital.initial_idr"];
+const IDEMPOTENCY = /^[A-Za-z0-9_-]{8,128}$/;
+const ENV_SET = new Set(["NUTARALINE_API_KEY"]);
+const MODELS_YML = [
+  { name: "nutaraline", type: "openai-completions", base_url: "https://api.contoh.invalid/v1", models: ["deepseek-v4.1-flash-1017"], key_source: "env" as const },
+  { name: "modelrouter", type: "openai-completions", base_url: "https://router.contoh.invalid/v1", models: ["jev-contoh", "clef-contoh"], key_source: "literal" as const },
+  { name: "omniroute", type: "openai-completions", base_url: "http://127.0.0.1:20128/v1", models: ["contoh-model-lokal"], key_source: "none" as const },
+  { name: "shellkey", type: "openai-completions", base_url: "https://shell.contoh.invalid/v1", models: ["m1"], key_source: "command" as const },
+  { name: "Odd Name", type: "openai-completions", base_url: "https://odd.contoh.invalid/v1", models: ["m1"], key_source: "none" as const },
+];
+
+interface StoredProvider {
+  id: string;
+  type: string;
+  base_url: string;
+  api_key_env: string | null;
+  api_key: string | null;
+  models: string[];
+}
+
+function voters(): VoterSetting[] {
   return Array.from({ length: 7 }, (_, i) => ({
     id: "v" + (i + 1),
     adapter: "llm_structured" as const,
@@ -79,82 +102,90 @@ function voters(): Settings["swarm"]["voters"] {
   }));
 }
 
-function baseSettings(): Settings {
+function baseRaw(bot: string): Raw {
   return {
     mode: "dry_run",
+    bot_id: bot,
     capital: { initial_idr: 2000000, compounding: true },
     risk: { max_daily_loss_pct: 1.0, max_total_drawdown_pct: 10.0, risk_per_trade_pct: 0.5, max_open_trades: 3, leverage: "none", on_breach: "stop_new_entries", daily_reset_timezone: "Asia/Jakarta" },
     exchange: { name: "indodax", pairs: ["BTC/IDR", "ETH/IDR", "SOL/IDR"], timeframe: "1h", fee_pct: 0.2 },
     providers: [
-      { id: "nutaraline", type: "openai-completions", base_url: "from_import", api_key_env: "NUTARALINE_API_KEY", api_key: null, api_key_configured: true, models: ["deepseek-v4.1-flash-1017"] },
-      { id: "omniroute", type: "openai-completions", base_url: "from_import", api_key_env: null, api_key: null, api_key_configured: false, models: ["contoh-model-lokal"] },
+      { id: "nutaraline", type: "openai-completions", base_url: "https://api.contoh.invalid/v1", api_key_env: "NUTARALINE_API_KEY", api_key: null, models: ["deepseek-v4.1-flash-1017"] },
+      { id: "omniroute", type: "openai-completions", base_url: "from_import", api_key_env: "OMNIROUTE_API_KEY", api_key: null, models: ["contoh-model-lokal"] },
     ],
     swarm: { enabled: true, mode: "shadow", shuffle_options: true, min_voters_answered: 5, max_spread: null, voters: voters() },
     llm: { backend: "deepagents", analyst_model: "nutaraline:deepseek-v4.1-flash-1017" },
     compute: { max_cost_idr_per_day: false, on_exceed: "skip_new_entries", log_cost: true },
     data: { news_rss: ["coindesk", "cointelegraph"], fear_greed: true, social: false },
     notify: { web_push: true },
-    api: { listen: "127.0.0.1", port: 8080, username_env: "FT_API_USERNAME", password_env: "FT_API_PASSWORD", jwt_secret_env: "FT_API_JWT_SECRET", ws_token_env: "FT_API_WS_TOKEN", force_entry: false },
+    api: { listen: "127.0.0.1", port: 8080, username_env: "FT_API_USERNAME", password_env: "FT_API_PASSWORD", jwt_secret_env: "FT_API_JWT_SECRET", force_entry: false },
   };
-}
-
-const sha = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
-
-function tokens(key: string): (string | { id: string })[] {
-  const out: (string | { id: string })[] = [];
-  for (const m of key.matchAll(/([^.[\]]+)|\[([^\]]+)\]/g)) out.push(m[1] !== undefined ? m[1] : { id: m[2] });
-  return out;
-}
-
-function setPath(root: Record<string, unknown>, key: string, value: unknown): void {
-  const parts = tokens(key);
-  let node: unknown = root;
-  for (let i = 0; i < parts.length - 1; i++) {
-    const part = parts[i];
-    const next = parts[i + 1];
-    if (typeof part === "string") {
-      const obj = node as Record<string, unknown>;
-      if (obj[part] === undefined) obj[part] = typeof next === "string" ? {} : [];
-      node = obj[part];
-    } else {
-      const list = node as Record<string, unknown>[];
-      let item = list.find((x) => String(x.id) === part.id);
-      if (!item) {
-        item = { id: part.id };
-        list.push(item);
-      }
-      node = item;
-    }
-  }
-  const last = parts.at(-1)!;
-  if (typeof last === "string") (node as Record<string, unknown>)[last] = value;
-}
-
-function prune(value: unknown): unknown {
-  if (Array.isArray(value)) return value.filter((x) => !(x && typeof x === "object" && Object.values(x as object).every((v) => v === null))).map(prune);
-  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, prune(v)]));
-  return value;
 }
 
 function err(status: number, code: string, message: string, extra: Record<string, unknown> = {}): Reply {
   return { status, body: { error: { code, message, ...extra } } };
 }
 
+function isPlain(v: unknown): v is Raw {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+function merge(target: Raw, patch: Raw): void {
+  for (const [k, v] of Object.entries(patch)) {
+    if (isPlain(v) && isPlain(target[k])) merge(target[k] as Raw, v);
+    else target[k] = v;
+  }
+}
+
+function lookup(raw: Raw, dotted: string): unknown {
+  return dotted.split(".").reduce<unknown>((n, part) => (isPlain(n) ? n[part] : undefined), raw);
+}
+
+function last4(key: string | null): string | null {
+  return key && key.length >= 12 ? key.slice(-4) : null;
+}
+
+function masked(key: string, value: unknown): unknown {
+  if (!key.endsWith(".api_key") || value === null || value === undefined) return value;
+  const tail = last4(String(value));
+  return tail ? "****" + tail : "<set>";
+}
+
+function changesOf(oldRaw: Raw, newRaw: Raw) {
+  const a = flatten(oldRaw);
+  const b = flatten(newRaw);
+  return [...new Set([...Object.keys(a), ...Object.keys(b)])]
+    .sort()
+    .filter((k) => JSON.stringify(a[k]) !== JSON.stringify(b[k]))
+    .map((k) => ({ key: k, old: masked(k, a[k] ?? null), new: masked(k, b[k] ?? null) }));
+}
+
+function schemaMessage(raw: Raw): string | null {
+  const s = raw as unknown as Settings;
+  const errors = validate(s, s.swarm.voters.filter((v) => v.enabled).length).map((e) => e.key + ": " + e.message);
+  const providers = new Map(s.providers.map((p) => [p.id, p]));
+  for (const v of s.swarm.voters) {
+    const p = providers.get(v.provider);
+    if (!p) errors.push("swarm: voter " + v.id + " references unknown provider " + v.provider);
+    else if (!p.models.includes(v.model)) errors.push("swarm: voter " + v.id + " model " + v.model + " is not listed by provider " + p.id);
+  }
+  const [ap, am] = s.llm.analyst_model.split(":");
+  if (!providers.get(ap)?.models.includes(am)) errors.push("llm.analyst_model: not listed by its provider");
+  return errors.length ? errors.slice(0, 5).join("; ") : null;
+}
+
 export function createStage2(ctx: Ctx) {
   const state: Record<string, BotState> = { A: "running", B: "running" };
-  const settings: Record<string, Settings> = { A: baseSettings(), B: baseSettings() };
+  const configs: Record<string, Raw> = { A: baseRaw("A"), B: baseRaw("B") };
   const locks: Record<string, { id: number; pair: string; side: string; active: boolean; reason: string | null; lock_time: string; lock_end_time: string }[]> = { A: [], B: [] };
   const blacklist: Record<string, string[]> = { A: [], B: [] };
-  const extra: Record<string, { enabled: boolean; last_test: ProviderTest | null; last4: string | null; source: "env" | "config" | null }> = {
-    nutaraline: { enabled: true, last_test: { at: iso(Date.now() - 2 * HOUR), ok: true, latency_ms: 1840, model: "deepseek-v4.1-flash-1017", error_kind: null }, last4: null, source: "env" },
-    omniroute: { enabled: false, last_test: null, last4: null, source: null },
-  };
+  const tests = new Map<string, ProviderTest>();
+  const lastTestAt = new Map<string, number>();
   const audit: AuditRow[] = [];
   const confirmations = new Map<string, { request: string; session: Session; expires: number }>();
   const replies = new Map<string, { request: string; reply: Reply }>();
   let auditId = 0;
   let lockId = 0;
-  const IDEMPOTENCY = /^[A-Za-z0-9_-]{8,128}$/;
 
   function record(row: Omit<AuditRow, "id" | "ts">, bot?: string): AuditRow {
     const full: AuditRow = { id: ++auditId, ts: isoMs(Date.now()), ...row };
@@ -164,36 +195,38 @@ export function createStage2(ctx: Ctx) {
   }
 
   const ftDate = (ms: number) => isoMs(ms).replace("T", " ").slice(0, 19);
-  record({ actor: "file", ip: null, action: "config.observed", targets: ["A"], idempotency_key: null, result: "ok", detail: { file: "config/config.yaml", new_sha256: sha(settings.A), valid: true, error: null, changes: [] } });
-  record({ actor: "file", ip: null, action: "config.observed", targets: ["B"], idempotency_key: null, result: "ok", detail: { file: "config/config.bot-b.yaml", new_sha256: sha(settings.B), valid: true, error: null, changes: [] } });
+  tests.set("A:nutaraline", { tested_at: iso(Date.now() - 2 * HOUR), model: "deepseek-v4.1-flash-1017", ok: true, status: 200, latency_ms: 1840, error: null, detail: null });
+  record({ actor: "file", ip: null, action: "config.observed", targets: ["A"], idempotency_key: null, result: "ok", detail: { file: "config/config.yaml", valid: true, error: null, changes: [] } });
+  record({ actor: "file", ip: null, action: "config.observed", targets: ["B"], idempotency_key: null, result: "ok", detail: { file: "config/config.bot-b.yaml", valid: true, error: null, changes: [] } });
   record({ actor: "anonymous", ip: "127.0.0.1", action: "session.create", targets: [], idempotency_key: null, result: "denied", detail: null });
   record({ actor: "owner", ip: "127.0.0.1", action: "session.create", targets: [], idempotency_key: null, result: "ok", detail: null });
-  record({ actor: "owner", ip: "127.0.0.1", action: "config.changed", targets: ["A"], idempotency_key: "4f0c2a7e-0d3b-4c51-9e7a-3a1f2b6c9d10", result: "ok", detail: { note: "Contoh data: kuorum awal 5 dari 7", changes: [{ key: "swarm.min_voters_answered", old: 4, new: 5 }] } });
+  record({ actor: "owner", ip: "127.0.0.1", action: "config.update", targets: ["A"], idempotency_key: "4f0c2a7e-0d3b-4c51-9e7a-3a1f2b6c9d10", result: "ok", detail: { params: { changes: { swarm: { min_voters_answered: 5 } } }, changes: [{ key: "swarm.min_voters_answered", old: 4, new: 5 }] } });
 
   const ipOf = (session: Session) => (session.scope === "control" ? "127.0.0.1" : "203.0.113.7");
+  const loggable = (key: string | undefined) => (key && IDEMPOTENCY.test(key) ? key : null);
 
   function controlRow(session: Session, a: Action, key: string | undefined, result: string, extra: Record<string, unknown> = {}): AuditRow {
     const actor = result === "forbidden" ? session.scope + "_session" : "owner";
-    return record({ actor, ip: ipOf(session), action: a.name, targets: [a.bot, ...a.targets], idempotency_key: key ?? null, result, detail: { params: a.params, summary: a.summary, ...extra } }, a.bot);
+    return record({ actor, ip: ipOf(session), action: a.name, targets: [a.bot, ...a.targets], idempotency_key: loggable(key), result, detail: { params: a.params, summary: a.summary, ...extra } }, a.bot);
   }
 
-  function execute(session: Session, key: string | undefined, request: string, a: Action, confirm: unknown): Reply {
+  function execute(session: Session, key: string | undefined, request: string, path: string, a: Action, confirm: unknown): Reply {
     if (session.scope !== "control") {
       controlRow(session, a, key, "forbidden");
       return err(403, "forbidden_local_only", "control actions are accepted only from loopback");
-    }
-    if (!key || !IDEMPOTENCY.test(key)) return err(400, "invalid_request", "Idempotency-Key header (8-128 of [A-Za-z0-9_-]) is required");
-    const stored = replies.get(key);
-    if (stored) {
-      if (stored.request !== request) return err(409, "invalid_request", "Idempotency-Key was used for another request");
-      controlRow(session, a, key, "replayed");
-      return stored.reply;
     }
     const reject = (reply: Reply) => {
       const e = (reply.body as { error: { code: string; message: string } }).error;
       controlRow(session, a, key, "rejected", { error: e.code, message: e.message });
       return reply;
     };
+    if (!key || !IDEMPOTENCY.test(key)) return reject(err(400, "invalid_request", "Idempotency-Key header (8-128 of [A-Za-z0-9_-]) is required"));
+    const stored = replies.get(key);
+    if (stored) {
+      if (stored.request !== request) return reject(err(409, "invalid_request", "Idempotency-Key was used for another request"));
+      controlRow(session, a, key, "replayed");
+      return stored.reply;
+    }
     const pre = a.precheck?.();
     if (pre) return reject(pre);
     if (a.risky) {
@@ -209,12 +242,110 @@ export function createStage2(ctx: Ctx) {
       confirmations.delete(confirm);
       if (pending.expires < Date.now()) return reject(err(409, "confirmation_expired", "confirmation expired; ask for a new one"));
     }
-    const body = a.run();
+    const failure = ctx.upstreamFailure(path);
+    if (failure) {
+      const reply = err(failure, failure === 503 ? "upstream_unavailable" : "upstream_error", "Freqtrade answered " + failure);
+      controlRow(session, a, key, "failed", { error: "upstream_error", message: "Freqtrade answered " + failure });
+      replies.set(key, { request, reply });
+      return reply;
+    }
+    const result = a.run();
     controlRow(session, a, key, "ok", a.detail?.() ?? {});
-    const reply = { status: 200, body };
+    const reply = { status: 200, body: result };
     replies.set(key, { request, reply });
     return reply;
   }
+
+  function adminDenied(session: Session, bot: string, method: string, path: string): Reply {
+    record({ actor: session.scope + "_session", ip: ipOf(session), action: "admin.denied", targets: [bot], idempotency_key: null, result: "forbidden", detail: { method, path, reason: "not_local" } }, bot);
+    return err(403, "forbidden_local_only", "configuration writes are accepted only from loopback");
+  }
+
+  function write(session: Session, key: string | undefined, request: string, bot: string, action: string, params: Raw, edit: (raw: Raw) => Reply | null, confirm: unknown, render?: (raw: Raw) => Raw): Reply {
+    const auditRow = (result: string, detail: Raw) => record({ actor: "owner", ip: ipOf(session), action, targets: [bot], idempotency_key: loggable(key), result, detail: { params, ...detail } }, bot);
+    if (!key || !IDEMPOTENCY.test(key)) return err(400, "invalid_request", "Idempotency-Key header (8-128 of [A-Za-z0-9_-]) is required");
+    const stored = replies.get(key);
+    if (stored) {
+      if (stored.request !== request) return err(409, "invalid_request", "Idempotency-Key was used for another request");
+      auditRow("replayed", {});
+      return stored.reply;
+    }
+    const oldRaw = configs[bot];
+    const next = structuredClone(oldRaw);
+    const refused = edit(next);
+    if (refused) {
+      const e = (refused.body as { error: { code: string; message: string } }).error;
+      if (refused.status === 400) auditRow("rejected", { error: e.code, message: e.message });
+      return refused;
+    }
+    const problem = schemaMessage(next);
+    if (problem) {
+      auditRow("rejected", { error: "invalid_request", message: problem });
+      return err(400, "invalid_request", problem);
+    }
+    const changes = changesOf(oldRaw, next);
+    if (changes.length === 0) return { status: 200, body: { bot, changes: [], restart_required: false, ...(render ? render(next) : {}) } };
+    const risk = ctx.riskSnapshot();
+    const reached: [string, number][] = [["risk.max_daily_loss_pct", risk.daily_loss_pct], ["risk.max_total_drawdown_pct", risk.drawdown_pct]];
+    const hits = reached.filter(([k, current]) => changes.some((c) => c.key === k) && current > 0 && (lookup(next, k) as number) <= current);
+    if (hits.length) {
+      auditRow("rejected", { error: "risk_limit_breached" });
+      return err(409, "risk_limit_breached", hits.map(([k, c]) => k + " " + String(lookup(next, k)) + " is not above the loss already reached (" + c + ")").join("; "));
+    }
+    const raising = RAISING.filter((k) => typeof lookup(next, k) === "number" && (lookup(next, k) as number) > (lookup(oldRaw, k) as number));
+    if (raising.length) {
+      if (typeof confirm !== "string") {
+        const id = "cf_" + randomBytes(8).toString("hex").toUpperCase();
+        const expires = Date.now() + 60000;
+        confirmations.set(id, { request, session, expires });
+        auditRow("confirmation_required", { keys: raising });
+        const summary = "Raise " + raising.map((k) => k + " " + String(lookup(oldRaw, k)) + " -> " + String(lookup(next, k))).join("; ");
+        return err(409, "confirmation_required", "raising risk limits needs a second step", { confirmation: { id, action, targets: [bot], summary, expires_at: iso(expires) } });
+      }
+      const pending = confirmations.get(confirm);
+      if (!pending || pending.request !== request || pending.session !== session) {
+        auditRow("rejected", { error: "confirmation_invalid", keys: raising });
+        return err(409, "confirmation_invalid", "confirmation is unknown, used, or for another change");
+      }
+      confirmations.delete(confirm);
+      if (pending.expires < Date.now()) {
+        auditRow("rejected", { error: "confirmation_expired", keys: raising });
+        return err(409, "confirmation_expired", "confirmation expired; ask for a new one");
+      }
+    }
+    configs[bot] = next;
+    const row = auditRow("ok", { changes, confirmed: raising.length > 0, restart_required: true });
+    const reply = { status: 200, body: { bot, changes, restart_required: true, audit_id: row.id, ...(render ? render(next) : {}) } };
+    replies.set(key, { request, reply });
+    return reply;
+  }
+
+  const providersOf = (bot: string) => configs[bot].providers as StoredProvider[];
+  const swarmOf = (bot: string) => configs[bot].swarm as Settings["swarm"];
+
+  function keyState(p: StoredProvider) {
+    if (p.api_key) return { source: "config", configured: true, last4: last4(p.api_key), env_name: null, env_set: null };
+    if (p.api_key_env) {
+      const present = ENV_SET.has(p.api_key_env);
+      return { source: "env", configured: present, last4: null, env_name: p.api_key_env, env_set: present };
+    }
+    return { source: "none", configured: false, last4: null, env_name: null, env_set: null };
+  }
+
+  function providerView(bot: string, p: StoredProvider) {
+    const used = new Set(swarmOf(bot).voters.filter((v) => v.enabled && v.provider === p.id).map((v) => v.model));
+    const [ap, am] = String((configs[bot].llm as Raw).analyst_model).split(":");
+    if (ap === p.id) used.add(am);
+    return { id: p.id, type: p.type, base_url: p.base_url, host: p.base_url === "from_import" ? null : new URL(p.base_url).host, models: p.models, active_models: [...used].sort(), key: keyState(p), last_test: tests.get(bot + ":" + p.id) ?? null };
+  }
+
+  function redacted(bot: string) {
+    const raw = structuredClone(configs[bot]);
+    raw.providers = providersOf(bot).map((p) => ({ ...p, api_key: null, api_key_configured: p.api_key !== null, api_key_last4: last4(p.api_key) }));
+    return raw;
+  }
+
+  const voterList = (bot: string) => swarmOf(bot).voters.map((v) => ({ ...v, last_test: tests.get(bot + ":" + v.provider) ?? null }));
 
   function closeTrade(t: MockTrade, reason: string, bot: string) {
     const rate = ctx.prices.get(t.pair)!;
@@ -225,54 +356,6 @@ export function createStage2(ctx: Ctx) {
     t.exit_reason = reason;
     const profit = ctx.profitOf(t, rate);
     ctx.emit("exit_fill", { ...exit, close_rate: Math.round(rate), profit_amount: Number(profit.toFixed(4)), profit_ratio: Number((profit / t.stake_amount).toFixed(6)), is_final_exit: true }, bot);
-  }
-
-  function redacted(bot: string) {
-    const s = structuredClone(settings[bot]);
-    s.providers = s.providers.map((p) => ({ ...p, api_key: null }));
-    return { ...s, revision: sha(settings[bot]) };
-  }
-
-  function providerHealth(id: string) {
-    const lat: number[] = [];
-    let calls = 0;
-    let ok = 0;
-    let last: string | null = null;
-    for (const d of ctx.decisions.slice(0, 20)) {
-      for (const v of d.voters) {
-        if (v.provider !== id) continue;
-        calls++;
-        last = last ?? v.status;
-        if (v.status === "ok") {
-          ok++;
-          lat.push(v.latency_s);
-        }
-      }
-    }
-    if (calls === 0) return null;
-    lat.sort((a, b) => a - b);
-    return { calls, ok, last_status: last, latency_p50_s: lat.length ? lat[Math.floor(lat.length / 2)] : null, latency_max_s: lat.length ? lat.at(-1)! : null };
-  }
-
-  function provider(id: string, session: Session): Provider {
-    const s = settings.A.providers.find((p) => p.id === id)!;
-    const x = extra[id] ?? { enabled: true, last_test: null, last4: null, source: null };
-    const users = settings.A.swarm.voters.filter((v) => v.provider === id).map((v) => v.id);
-    return {
-      id,
-      type: s.type,
-      base_url: s.base_url,
-      host: s.base_url === "from_import" ? null : new URL(s.base_url).host,
-      models: s.models,
-      enabled: x.enabled,
-      api_key_configured: s.api_key_configured,
-      api_key_source: x.source,
-      api_key_env: s.api_key_env,
-      api_key_last4: session.scope === "control" ? x.last4 : null,
-      used_by: { analyst: settings.A.llm.analyst_model.startsWith(id + ":"), voters: users },
-      last_test: x.last_test,
-      health: providerHealth(id),
-    };
   }
 
   function outcome(d: Decision): DecisionOutcome {
@@ -371,11 +454,12 @@ export function createStage2(ctx: Ctx) {
     const bot = url.searchParams.get("bot") ?? "A";
     if (!(bot in state)) return err(404, "not_found", "unknown bot " + bot);
     const key = (req.headers["idempotency-key"] as string | undefined) ?? undefined;
-    const owner = session.scope === "control";
+    const local = session.scope === "control";
+    const settingsOf = () => configs[bot] as unknown as Settings;
 
     if (method === "GET") {
-      if (path === "/gw/v1/overview") return { status: 200, body: { ...ctx.overview(), state: state[bot], pairs: { whitelist: settings[bot].exchange.pairs, blacklist: blacklist[bot], locks: locks[bot].filter((l) => l.active).length } } };
-      if (path === "/gw/v1/pairs") return { status: 200, body: { whitelist: { pairs: settings[bot].exchange.pairs, length: settings[bot].exchange.pairs.length, method: ["StaticPairList"] }, blacklist: { pairs: blacklist[bot], length: blacklist[bot].length, method: ["StaticPairList"] }, locks: { lock_count: locks[bot].length, locks: locks[bot] } } };
+      if (path === "/gw/v1/overview") return { status: 200, body: { ...ctx.overview(), state: state[bot], pairs: { whitelist: settingsOf().exchange.pairs, blacklist: blacklist[bot], locks: locks[bot].filter((l) => l.active).length } } };
+      if (path === "/gw/v1/pairs") return { status: 200, body: { whitelist: { pairs: settingsOf().exchange.pairs, length: settingsOf().exchange.pairs.length, method: ["StaticPairList"] }, blacklist: { pairs: blacklist[bot], length: blacklist[bot].length, method: ["StaticPairList"] }, locks: { lock_count: locks[bot].length, locks: locks[bot] } } };
       if (path === "/gw/v1/trades" && (url.searchParams.has("offset") || url.searchParams.get("state") === "closed")) {
         const limit = Number(url.searchParams.get("limit") ?? 50);
         const offset = Number(url.searchParams.get("offset") ?? 0);
@@ -383,10 +467,11 @@ export function createStage2(ctx: Ctx) {
         return { status: 200, body: rows.slice(offset, offset + limit).map(ctx.tradeJson) };
       }
       if (path === "/gw/v1/decisions") {
-        const limit = Number(url.searchParams.get("limit") ?? 20);
+        const limit = Math.min(500, Math.max(1, Number(url.searchParams.get("limit") ?? 20)));
         const before = url.searchParams.get("before");
         const status = url.searchParams.get("status");
-        const rows = ctx.decisions.filter((d) => (!before || d.ts < before) && (!status || d.status === status) && (!url.searchParams.get("bot") || (d.bot ?? "B") === bot));
+        const pair = url.searchParams.get("pair");
+        const rows = ctx.decisions.filter((d) => (!pair || d.pair === pair) && (!before || Date.parse(d.candle) < Date.parse(before)) && (!status || d.status === status) && (!url.searchParams.get("bot") || (d.bot ?? "B") === bot));
         return { status: 200, body: rows.slice(0, limit).map(decorate) };
       }
       const decisionMatch = path.match(/^\/gw\/v1\/decisions\/([^/]+)$/);
@@ -421,18 +506,17 @@ export function createStage2(ctx: Ctx) {
         return { status: 200, body: { per_pair: group(bot, (t) => t.pair, "pair"), by_enter_tag: group(bot, (t) => t.enter_tag, "enter_tag"), by_exit_reason: group(bot, (t) => t.exit_reason!, "exit_reason") } };
       }
       if (path === "/gw/v1/settings") return { status: 200, body: redacted(bot) };
-      if (path === "/gw/v1/providers") return { status: 200, body: settings.A.providers.map((p) => provider(p.id, session)) };
-      if (path === "/gw/v1/providers/import") {
-        if (!owner) return err(403, "forbidden_local_only", "import only from loopback");
-        const have = new Set(settings.A.providers.map((p) => p.id));
-        return { status: 200, body: { source: "~/.omp/agent/models.yml", candidates: [
-          { id: "nutaraline", type: "openai-completions", base_url: "https://api.contoh.invalid/v1", models: ["deepseek-v4.1-flash-1017"], has_key: true, exists: have.has("nutaraline") },
-          { id: "modelrouter", type: "openai-completions", base_url: "https://router.contoh.invalid/v1", models: ["jev-contoh", "clef-contoh"], has_key: true, exists: have.has("modelrouter") },
-          { id: "omniroute", type: "openai-completions", base_url: "http://127.0.0.1:20128/v1", models: ["contoh-model-lokal"], has_key: false, exists: have.has("omniroute") },
-        ] } };
+      if (path === "/gw/v1/settings/changes") {
+        const limit = Math.min(500, Math.max(1, Number(url.searchParams.get("limit") ?? 50)));
+        const wanted = url.searchParams.get("bot");
+        const out: Raw[] = [];
+        for (const row of audit.filter((r) => r.action.startsWith("config.") && (!wanted || r.targets.includes(wanted)))) {
+          for (const c of (row.detail?.changes as { key: string; old: unknown; new: unknown }[] | undefined) ?? []) out.push({ audit_id: row.id, ts: row.ts, actor: row.actor, ip: row.ip, action: row.action, bot: row.targets[0] ?? null, ...c });
+        }
+        return { status: 200, body: out.slice(0, limit) };
       }
       if (path === "/gw/v1/audit") {
-        const limit = Number(url.searchParams.get("limit") ?? 50);
+        const limit = Math.min(500, Math.max(1, Number(url.searchParams.get("limit") ?? 50)));
         const before = url.searchParams.get("before_id");
         const action = url.searchParams.get("action") ?? "";
         const result = url.searchParams.get("result") ?? "";
@@ -443,13 +527,32 @@ export function createStage2(ctx: Ctx) {
         const rows = audit.filter((r) => (!before || r.id < Number(before)) && r.action.startsWith(action) && (!result || r.result === result) && (!target || r.targets.includes(target)) && (!actor || r.actor === actor) && (!since || Date.parse(r.ts) >= Date.parse(since)) && (!until || Date.parse(r.ts) < Date.parse(until)));
         return { status: 200, body: rows.slice(0, limit) };
       }
+      if (path === "/gw/v1/providers") return { status: 200, body: { bot, providers: providersOf(bot).map((p) => providerView(bot, p)) } };
+      if (path === "/gw/v1/providers/import") {
+        if (!local) return adminDenied(session, bot, method, path);
+        const have = new Set(providersOf(bot).map((p) => p.id));
+        const providers = MODELS_YML.map((m) => {
+          const id = m.name.toLowerCase();
+          const blocker = /^[a-z0-9][a-z0-9_-]*$/.test(id) ? null : "name cannot be used as a provider id";
+          return { name: m.name, id, type: m.type, base_url: m.base_url, host: new URL(m.base_url).host, models: m.models, key_source: m.key_source, exists: have.has(id), blocker };
+        });
+        return { status: 200, body: { bot, providers } };
+      }
+      if (path === "/gw/v1/voters") {
+        const s = swarmOf(bot);
+        return { status: 200, body: { bot, swarm: { enabled: s.enabled, mode: s.mode, min_voters_answered: s.min_voters_answered, enabled_voters: s.voters.filter((v) => v.enabled).length }, voters: voterList(bot) } };
+      }
+      if (path === "/gw/v1/roles") {
+        const [provider, model] = String((configs[bot].llm as Raw).analyst_model).split(":");
+        return { status: 200, body: { bot, analyst: { provider, model }, voters: swarmOf(bot).voters.map((v) => ({ id: v.id, provider: v.provider, model: v.model, enabled: v.enabled })) } };
+      }
       return null;
     }
 
     const b = await readBody();
     const { confirm, ...params } = b;
     const request = method + " " + path + "?" + [...url.searchParams].sort().map(([k, v]) => k + "=" + v).join("&") + " " + JSON.stringify(params);
-    const act = (a: Omit<Action, "bot" | "params">) => execute(session, key, request, { ...a, bot, params }, confirm);
+    const act = (a: Omit<Action, "bot" | "params">) => execute(session, key, request, path, { ...a, bot, params }, confirm);
     const ft = (status: string) => ({ status });
     const pairsOf = () => ({ blacklist: blacklist[bot], blacklist_expanded: blacklist[bot], errors: {}, length: blacklist[bot].length, method: ["StaticPairList"] });
     const locksOf = () => ({ lock_count: locks[bot].length, locks: locks[bot] });
@@ -501,7 +604,7 @@ export function createStage2(ctx: Ctx) {
         targets: [pair],
         summary: "Lock " + pair + " on Bot " + bot + " until " + String(b.until),
         risky: false,
-        precheck: () => (!settings[bot].exchange.pairs.includes(pair) ? err(422, "invalid_request", "pair not in whitelist") : Number.isNaN(Date.parse(String(b.until))) || Date.parse(String(b.until)) <= Date.now() ? err(400, "invalid_request", "until must be in the future") : null),
+        precheck: () => (!settingsOf().exchange.pairs.includes(pair) ? err(422, "invalid_request", "pair not in whitelist") : Number.isNaN(Date.parse(String(b.until))) || Date.parse(String(b.until)) <= Date.now() ? err(400, "invalid_request", "until must be in the future") : null),
         run: () => {
           locks[bot].push({ id: ++lockId, pair, side: String(b.side ?? "*"), active: true, reason: (b.reason as string) ?? null, lock_time: ftDate(Date.now()), lock_end_time: ftDate(Date.parse(String(b.until))) });
           return locksOf();
@@ -550,85 +653,169 @@ export function createStage2(ctx: Ctx) {
         },
       });
     }
-    if (method === "PATCH" && path === "/gw/v1/settings") {
-      const changes = (b.changes as { key: string; value: unknown }[]) ?? [];
-      const note = String(b.note ?? "").trim();
-      const next = structuredClone(settings[bot]) as unknown as Record<string, unknown>;
-      for (const c of changes) setPath(next, c.key, c.value);
-      const candidate = prune(next) as Settings;
-      const applied = diff(settings[bot], candidate);
-      const masked = applied.map((c) => (c.key.endsWith(".api_key") ? { ...c, old: c.old ? "<set>" : null, new: c.new ? "<set>" : null } : c));
-      const old = sha(settings[bot]);
-      return act({
-        name: "config.changed",
-        targets: [],
-        summary: applied.filter(needsConfirmation).map((c) => c.key + " " + String(c.old) + " -> " + String(c.new)).join("; "),
-        risky: anyNeedsConfirmation(applied),
-        precheck: () => {
-          if (!note || note.length > 500) return err(400, "invalid_request", "note is required", { fields: [{ key: "note", message: "Catatan wajib, 1 sampai 500 karakter" }] });
-          if (b.revision !== old) return err(409, "stale_revision", "config changed since it was read");
-          const fields = validate(candidate);
-          if (fields.length > 0) return err(400, "invalid_request", "settings failed schema validation", { fields });
-          const risk = ctx.riskSnapshot();
-          if (candidate.risk.max_daily_loss_pct <= risk.daily_loss_pct || candidate.risk.max_total_drawdown_pct <= risk.drawdown_pct) return err(409, "risk_limit_breached", "new limit is below the loss already running");
-          return null;
-        },
-        run: () => {
-          settings[bot] = candidate;
-          return { revision: sha(candidate), applied: masked, restart_required: false };
-        },
-        detail: () => ({ params: undefined, note, changes: masked, old_sha256: old, new_sha256: sha(candidate), valid: true }),
-      });
-    }
-    const test = path.match(/^\/gw\/v1\/providers\/([^/]+)\/(test|state)$/);
+    const test = path.match(/^\/gw\/v1\/providers\/([^/]+)\/test$/);
     if (method === "POST" && test) {
-      const id = test[1];
-      const p = settings.A.providers.find((x) => x.id === id);
-      if (!p) return err(404, "not_found", "no provider " + id);
-      extra[id] ??= { enabled: true, last_test: null, last4: null, source: null };
-      if (test[2] === "state") {
-        extra[id].enabled = Boolean(b.enabled);
-        record({ actor: "owner", ip: ipOf(session), action: "provider.state", targets: [id], idempotency_key: key ?? null, result: "ok", detail: { changes: [{ key: "providers[" + id + "].enabled", old: !b.enabled, new: Boolean(b.enabled) }] } });
-        return { status: 200, body: provider(id, session) };
-      }
-      await new Promise((r) => setTimeout(r, 700));
-      const t: ProviderTest = p.api_key_configured
-        ? { at: iso(Date.now()), ok: true, latency_ms: 900 + Math.round(Math.random() * 1600), model: String(b.model ?? p.models[0]), error_kind: null }
-        : { at: iso(Date.now()), ok: false, latency_ms: null, model: null, error_kind: "auth" };
-      extra[id].last_test = t;
-      record({ actor: "owner", ip: ipOf(session), action: "provider.test", targets: [id], idempotency_key: key ?? null, result: t.ok ? "ok" : "failed", detail: { summary: t.ok ? "OK " + t.latency_ms + " ms" : "gagal: " + t.error_kind } });
-      return { status: 200, body: t };
+      const id = decodeURIComponent(test[1]);
+      const p = providersOf(bot).find((x) => x.id === id);
+      if (!p) return err(404, "not_found", "unknown provider " + id);
+      const model = typeof b.model === "string" ? b.model : p.models[0];
+      if (!p.models.includes(model)) return err(400, "invalid_request", "model " + model + " is not listed by provider " + id);
+      const slot = bot + ":" + id;
+      const since = Date.now() - (lastTestAt.get(slot) ?? 0);
+      if (since < 5000) return err(429, "rate_limited", "one test per provider every 5 s", { retry_after_ms: 5000 - since });
+      lastTestAt.set(slot, Date.now());
+      await new Promise((r) => setTimeout(r, 400));
+      const k = keyState(p);
+      const at = isoMs(Date.now());
+      const result: ProviderTest =
+        p.base_url === "from_import"
+          ? { tested_at: at, model, ok: false, status: null, latency_ms: null, error: "base_url_unresolved", detail: null }
+          : !k.configured
+            ? { tested_at: at, model, ok: false, status: null, latency_ms: null, error: "no_key", detail: null }
+            : { tested_at: at, model, ok: true, status: 200, latency_ms: 700 + Math.round(Math.random() * 1500), error: null, detail: null };
+      tests.set(slot, result);
+      record({ actor: local ? "owner" : "remote", ip: ipOf(session), action: "provider.test", targets: [bot, id], idempotency_key: loggable(key), result: result.ok ? "ok" : "failed", detail: { ...result } }, bot);
+      return { status: 200, body: { bot, provider: id, ...result } };
     }
-    const write = method === "POST" && path === "/gw/v1/providers" ? "create" : method === "PUT" && path.match(/^\/gw\/v1\/providers\/[^/]+$/) ? "update" : method === "POST" && path === "/gw/v1/providers/import" ? "import" : null;
-    if (write) {
-      if (!owner) return err(403, "forbidden_local_only", "provider keys are managed from loopback only");
-      if (write === "import") {
-        const items = (b.items as { id: string; include_key: boolean }[]) ?? [];
-        const imported: Provider[] = [];
-        for (const item of items) {
-          const known = { nutaraline: ["deepseek-v4.1-flash-1017"], modelrouter: ["jev-contoh", "clef-contoh"], omniroute: ["contoh-model-lokal"] }[item.id];
-          if (!known) continue;
-          const existing = settings.A.providers.find((p) => p.id === item.id);
-          const entry = { id: item.id, type: "openai-completions" as const, base_url: "from_import", api_key_env: existing?.api_key_env ?? null, api_key: null, api_key_configured: Boolean(existing?.api_key_configured) || item.include_key, models: known };
-          for (const bot of Object.keys(settings)) settings[bot].providers = [...settings[bot].providers.filter((p) => p.id !== item.id), entry];
-          extra[item.id] = { ...(extra[item.id] ?? { enabled: true, last_test: null }), enabled: extra[item.id]?.enabled ?? true, last_test: extra[item.id]?.last_test ?? null, last4: item.include_key ? "x9Qa" : (extra[item.id]?.last4 ?? null), source: item.include_key ? "config" : (extra[item.id]?.source ?? null) };
-          imported.push(provider(item.id, session));
-        }
-        record({ actor: "owner", ip: "127.0.0.1", action: "provider.import", targets: items.map((i) => i.id), idempotency_key: key ?? null, result: "ok", detail: { changes: items.map((i) => ({ key: "providers[" + i.id + "].api_key", old: null, new: i.include_key ? "<set>" : null })) } });
-        return { status: 200, body: { imported } };
+
+    const adminPath = path === "/gw/v1/settings" || path.startsWith("/gw/v1/providers") || path.startsWith("/gw/v1/voters") || path === "/gw/v1/roles";
+    if (!adminPath) return null;
+    if (!local) return adminDenied(session, bot, method, path);
+    const providerRender = (id: string) => (raw: Raw) => {
+      const p = (raw.providers as StoredProvider[]).find((x) => x.id === id);
+      return p ? { provider: providerView(bot, p) } : {};
+    };
+    const votersRender = () => ({ voters: voterList(bot) });
+
+    if (method === "PATCH" && path === "/gw/v1/settings") {
+      const changes = b.changes;
+      if (!isPlain(changes)) return err(400, "invalid_request", "body.changes: Input should be a valid dictionary");
+      const frozen = FROZEN.find((k) => k in changes);
+      if (frozen) return err(400, "invalid_request", frozen + " cannot be changed through settings");
+      if (isPlain(changes.swarm) && "voters" in changes.swarm) return err(400, "invalid_request", "swarm.voters cannot be changed through settings (use the voters endpoints)");
+      return write(session, key, request, bot, "config.update", { changes }, (raw) => {
+        merge(raw, changes);
+        return null;
+      }, confirm);
+    }
+    const prov = path.match(/^\/gw\/v1\/providers\/([^/]+)(\/key)?$/);
+    if (prov && prov[1] !== "import") {
+      const id = decodeURIComponent(prov[1]);
+      if (!prov[2] && method === "PUT") {
+        if ("api_key" in b) return err(400, "invalid_request", "api_key is not accepted here; use the key endpoint");
+        if (!/^[a-z0-9][a-z0-9_-]*$/.test(id)) return err(400, "invalid_request", "invalid provider id " + id);
+        if (!/^https?:\/\/\S+$/.test(String(b.base_url)) || /^https?:\/\/[^/]*@/.test(String(b.base_url))) return err(400, "invalid_request", "base_url: must be http(s) without user or password");
+        if (!Array.isArray(b.models) || b.models.length === 0) return err(400, "invalid_request", "models: List should have at least 1 item after validation");
+        return write(session, key, request, bot, "config.provider.upsert", { provider: id, type: b.type, base_url: b.base_url, models: b.models }, (raw) => {
+          const list = raw.providers as StoredProvider[];
+          const found = list.find((x) => x.id === id);
+          if (found) Object.assign(found, { type: b.type, base_url: b.base_url, models: b.models });
+          else list.push({ id, type: String(b.type), base_url: String(b.base_url), api_key_env: id.toUpperCase().replace(/-/g, "_") + "_API_KEY", api_key: null, models: b.models as string[] });
+          return null;
+        }, undefined, providerRender(id));
       }
-      const id = write === "create" ? String(b.id) : decodeURIComponent(path.split("/").at(-1)!);
-      const existing = settings.A.providers.find((p) => p.id === id);
-      if (write === "create" && existing) return err(400, "invalid_request", "provider exists", { fields: [{ key: "id", message: "Id sudah dipakai" }] });
-      if (write === "update" && !existing) return err(404, "not_found", "no provider " + id);
-      const hadKey = Boolean(existing?.api_key_configured);
-      const key4 = typeof b.api_key === "string" && b.api_key ? b.api_key.slice(-4) : null;
-      const hasKey = b.api_key_clear ? Boolean(b.api_key_env) : Boolean(key4) || hadKey || Boolean(b.api_key_env);
-      const entry = { id, type: b.type as Settings["providers"][number]["type"], base_url: String(b.base_url), api_key_env: (b.api_key_env as string | null) ?? null, api_key: null, api_key_configured: hasKey, models: (b.models as string[]) ?? [] };
-      for (const bot of Object.keys(settings)) settings[bot].providers = [...settings[bot].providers.filter((p) => p.id !== id), entry];
-      extra[id] = { enabled: extra[id]?.enabled ?? true, last_test: extra[id]?.last_test ?? null, last4: b.api_key_clear ? null : (key4 ?? extra[id]?.last4 ?? null), source: key4 ? "config" : entry.api_key_env ? "env" : b.api_key_clear ? null : (extra[id]?.source ?? null) };
-      record({ actor: "owner", ip: "127.0.0.1", action: "provider." + write, targets: [id], idempotency_key: key ?? null, result: "ok", detail: { changes: [{ key: "providers[" + id + "].api_key", old: hadKey ? "<set>" : null, new: hasKey ? "<set>" : null }] } });
-      return { status: 200, body: provider(id, session) };
+      if (!prov[2] && method === "DELETE") {
+        return write(session, key, request, bot, "config.provider.delete", { provider: id }, (raw) => {
+          const list = raw.providers as StoredProvider[];
+          if (!list.some((x) => x.id === id)) return err(404, "not_found", "unknown provider " + id);
+          raw.providers = list.filter((x) => x.id !== id);
+          return null;
+        }, undefined);
+      }
+      if (prov[2] && method === "PUT") {
+        const hasKey = typeof b.api_key === "string";
+        const hasEnv = typeof b.api_key_env === "string";
+        if (hasKey === hasEnv) return err(400, "invalid_request", "send exactly one of api_key or api_key_env");
+        if (hasKey && !/^\S{8,1024}$/.test(String(b.api_key))) return err(400, "invalid_request", "api_key: 8 to 1024 characters without spaces");
+        if (hasEnv && !/^[A-Z][A-Z0-9_]*$/.test(String(b.api_key_env))) return err(400, "invalid_request", "api_key_env: upper case letters, digits, _");
+        const shown = hasKey ? { provider: id, api_key: "<set>" } : { provider: id, api_key_env: b.api_key_env };
+        return write(session, key, request, bot, "config.provider.key", shown, (raw) => {
+          const p = (raw.providers as StoredProvider[]).find((x) => x.id === id);
+          if (!p) return err(404, "not_found", "unknown provider " + id);
+          p.api_key = hasKey ? String(b.api_key) : null;
+          p.api_key_env = hasEnv ? String(b.api_key_env) : null;
+          return null;
+        }, undefined, providerRender(id));
+      }
+      if (prov[2] && method === "DELETE") {
+        return write(session, key, request, bot, "config.provider.key", { provider: id, clear: true }, (raw) => {
+          const p = (raw.providers as StoredProvider[]).find((x) => x.id === id);
+          if (!p) return err(404, "not_found", "unknown provider " + id);
+          p.api_key = null;
+          p.api_key_env = null;
+          return null;
+        }, undefined, providerRender(id));
+      }
+    }
+    if (method === "POST" && path === "/gw/v1/providers/import") {
+      const items = Array.isArray(b.providers) ? (b.providers as { name: string; with_key?: boolean; models?: string[] | null; replace?: boolean }[]) : [];
+      if (items.length === 0) return err(400, "invalid_request", "providers: List should have at least 1 item after validation");
+      const results: Raw[] = [];
+      const reply = write(session, key, request, bot, "config.provider.import", { providers: items }, (raw) => {
+        const list = raw.providers as StoredProvider[];
+        for (const item of items) {
+          const m = MODELS_YML.find((x) => x.name === item.name);
+          if (!m) return err(400, "invalid_request", "unknown provider " + item.name + " in models.yml");
+          const id = m.name.toLowerCase();
+          if (!/^[a-z0-9][a-z0-9_-]*$/.test(id)) return err(400, "invalid_request", "name cannot be used as a provider id: " + m.name);
+          if (item.with_key && (m.key_source === "command" || m.key_source === "none")) return err(400, "invalid_request", m.name + ": key source " + m.key_source + " cannot be imported");
+          const models = item.models ?? m.models;
+          const found = list.find((x) => x.id === id);
+          if (found && !item.replace) {
+            results.push({ name: m.name, id, result: "skipped", reason: "exists", with_key: false });
+            continue;
+          }
+          const entry: StoredProvider = found ?? { id, type: m.type, base_url: m.base_url, api_key_env: id.toUpperCase() + "_API_KEY", api_key: null, models };
+          Object.assign(entry, { type: m.type, base_url: m.base_url, models });
+          if (item.with_key) {
+            entry.api_key = m.key_source === "literal" ? "sk-contoh-impor-" + id + "-x9Qa" : null;
+            entry.api_key_env = m.key_source === "env" ? id.toUpperCase() + "_API_KEY" : null;
+          }
+          if (!found) list.push(entry);
+          results.push({ name: m.name, id, result: found ? "updated" : "created", with_key: Boolean(item.with_key) });
+        }
+        return null;
+      }, undefined);
+      if (reply.status !== 200) return reply;
+      return { status: 200, body: { ...(reply.body as Raw), results } };
+    }
+    const voter = path.match(/^\/gw\/v1\/voters\/([^/]+)$/);
+    if (voter) {
+      const id = decodeURIComponent(voter[1]);
+      if (!/^[a-z0-9][a-z0-9_-]*$/.test(id)) return err(400, "invalid_request", "invalid voter id " + id);
+      if (method === "PUT") {
+        const fields = { adapter: b.adapter, provider: b.provider, model: b.model, variation: b.variation, timeout_s: b.timeout_s, weight: b.weight, enabled: b.enabled };
+        return write(session, key, request, bot, "config.voter.upsert", { voter: id, ...fields }, (raw) => {
+          const list = (raw.swarm as Raw).voters as Raw[];
+          const at = list.findIndex((v) => v.id === id);
+          if (at >= 0) list[at] = { id, ...fields };
+          else list.push({ id, ...fields });
+          return null;
+        }, undefined, votersRender);
+      }
+      if (method === "DELETE") {
+        return write(session, key, request, bot, "config.voter.delete", { voter: id }, (raw) => {
+          const s = raw.swarm as Raw;
+          const list = s.voters as Raw[];
+          if (!list.some((v) => v.id === id)) return err(404, "not_found", "unknown voter " + id);
+          s.voters = list.filter((v) => v.id !== id);
+          return null;
+        }, undefined, votersRender);
+      }
+    }
+    if (method === "PUT" && path === "/gw/v1/roles") {
+      const analyst = b.analyst as { provider: string; model: string } | undefined;
+      const roleVoters = (b.voters ?? {}) as Record<string, { provider: string; model: string }>;
+      return write(session, key, request, bot, "config.roles", { analyst: analyst ?? null, voters: roleVoters }, (raw) => {
+        if (analyst) (raw.llm as Raw).analyst_model = analyst.provider + ":" + analyst.model;
+        const list = (raw.swarm as Raw).voters as Raw[];
+        for (const [vid, role] of Object.entries(roleVoters)) {
+          const v = list.find((x) => x.id === vid);
+          if (!v) return err(404, "not_found", "unknown voter " + vid);
+          Object.assign(v, role);
+        }
+        return null;
+      }, undefined, votersRender);
     }
     return null;
   }
