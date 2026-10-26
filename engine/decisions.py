@@ -302,7 +302,7 @@ class DecisionStore:
 def linked_trades(trades_db: str | Path, timeout: float = 5.0) -> dict[str, sqlite3.Row]:
     """Trades keyed by the shadow decision id in their custom data; empty when the database is absent.
 
-    The database belongs to another process, so the busy timeout is short and a lock surfaces as sqlite3.Error.
+    The database belongs to another process, so a lock surfaces as sqlite3.Error after timeout seconds.
     """
     path = Path(trades_db)
     if not path.exists():
