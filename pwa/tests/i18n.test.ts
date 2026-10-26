@@ -1,4 +1,3 @@
-import { render } from "svelte/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { pickLanguage, translate, withFallback } from "../src/lib/i18n";
 import { en, type Messages } from "../src/lib/locales/en";
@@ -21,7 +20,12 @@ const withFakeRow = () =>
     return { ...actual, LANGUAGES: [...actual.LANGUAGES, FAKE] };
   });
 
-const loadAll = async () => ({ i18n: await import("../src/lib/i18n"), format: await import("../src/lib/format"), Switch: (await import("../src/components/LangSwitch.svelte")).default });
+const loadAll = async () => ({
+  i18n: await import("../src/lib/i18n"),
+  format: await import("../src/lib/format"),
+  Switch: (await import("../src/components/LangSwitch.svelte")).default,
+  render: (await import("svelte/server")).render,
+});
 
 afterEach(() => {
   vi.doUnmock("../src/lib/locales/index");
@@ -90,7 +94,7 @@ describe("catalogues", () => {
 describe("adding a language through the registry only", () => {
   it("offers, selects, and formats with a third language from one registry row", async () => {
     withFakeRow();
-    const { i18n, format, Switch } = await inLang("xx", loadAll);
+    const { i18n, format, Switch, render } = await inLang("xx", loadAll);
     expect(i18n.language).toMatchObject({ code: "xx", htmlLang: "x-fake", intlLocale: "de-DE" });
     expect(i18n.t("app.name")).toBe("Fakebot");
     expect(i18n.t("lang.label")).toBe(en["lang.label"]);
@@ -103,7 +107,7 @@ describe("adding a language through the registry only", () => {
   });
 
   it("neither offers nor selects that language without the registry row", async () => {
-    const { i18n, format, Switch } = await inLang("xx", loadAll);
+    const { i18n, format, Switch, render } = await inLang("xx", loadAll);
     expect(i18n.lang).toBe("en");
     expect(i18n.t("app.name")).toBe("Trading Bot");
     expect(format.decimal(1234.5)).toBe("1,234.50");
