@@ -14,7 +14,7 @@ import talib.abstract as ta
 from freqtrade.enums import RunMode
 from freqtrade.persistence import Order, Trade
 from freqtrade.strategy import IStrategy
-from pandas import DataFrame
+from pandas import DataFrame, Series
 
 from engine.decisions import SHADOW_KEY
 from engine.heartbeat import record_start, write_heartbeat
@@ -34,6 +34,27 @@ SHADOW_COLUMNS = ("open", "high", "low", "close", "volume", "ema_fast", "ema_slo
 def _number(value: object) -> float | None:
     number = float(value)
     return number if math.isfinite(number) else None
+
+
+def swing_indicators(dataframe: DataFrame) -> DataFrame:
+    dataframe["ema_fast"] = ta.EMA(dataframe, timeperiod=20)
+    dataframe["ema_slow"] = ta.EMA(dataframe, timeperiod=50)
+    dataframe["rsi"] = ta.RSI(dataframe, timeperiod=14)
+    return dataframe
+
+
+def swing_entry(dataframe: DataFrame) -> Series:
+    crossed_up = (dataframe["ema_fast"] > dataframe["ema_slow"]) & (
+        dataframe["ema_fast"].shift(1) <= dataframe["ema_slow"].shift(1)
+    )
+    return crossed_up & dataframe["rsi"].between(45, 70) & (dataframe["volume"] > 0)
+
+
+def swing_exit(dataframe: DataFrame) -> Series:
+    crossed_down = (dataframe["ema_fast"] < dataframe["ema_slow"]) & (
+        dataframe["ema_fast"].shift(1) >= dataframe["ema_slow"].shift(1)
+    )
+    return crossed_down | (dataframe["rsi"] > 78)
 
 
 class RiskDataUnavailable(Exception):
@@ -132,26 +153,14 @@ class SwingEmaRsi(IStrategy):
         )
 
     def populate_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
-        dataframe["ema_fast"] = ta.EMA(dataframe, timeperiod=20)
-        dataframe["ema_slow"] = ta.EMA(dataframe, timeperiod=50)
-        dataframe["rsi"] = ta.RSI(dataframe, timeperiod=14)
-        return dataframe
+        return swing_indicators(dataframe)
 
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
-        crossed_up = (dataframe["ema_fast"] > dataframe["ema_slow"]) & (
-            dataframe["ema_fast"].shift(1) <= dataframe["ema_slow"].shift(1)
-        )
-        dataframe.loc[
-            crossed_up & dataframe["rsi"].between(45, 70) & (dataframe["volume"] > 0),
-            ["enter_long", "enter_tag"],
-        ] = (1, "ema_cross_up")
+        dataframe.loc[swing_entry(dataframe), ["enter_long", "enter_tag"]] = (1, "ema_cross_up")
         return dataframe
 
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
-        crossed_down = (dataframe["ema_fast"] < dataframe["ema_slow"]) & (
-            dataframe["ema_fast"].shift(1) >= dataframe["ema_slow"].shift(1)
-        )
-        dataframe.loc[crossed_down | (dataframe["rsi"] > 78), ["exit_long", "exit_tag"]] = (1, "ema_cross_down_or_rsi")
+        dataframe.loc[swing_exit(dataframe), ["exit_long", "exit_tag"]] = (1, "ema_cross_down_or_rsi")
         return dataframe
 
     def risk_state(self, current_time: datetime, pair: str | None = None, rate: float | None = None) -> RiskState:
