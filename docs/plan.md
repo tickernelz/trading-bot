@@ -85,9 +85,9 @@ capital:
   initial_idr: 2000000
   compounding: true               # stake_amount unlimited, tradable_balance_ratio 0.99
 risk:
-  max_daily_loss_pct: 1.0         # Rp 20.000 on capital of Rp 2 million
-  max_total_drawdown_pct: 10.0    # Rp 200.000
-  risk_per_trade_pct: 0.5         # Rp 10.000
+  max_daily_loss_pct: 1.0         # Rp 20,000 on capital of Rp 2 million
+  max_total_drawdown_pct: 10.0    # Rp 200,000
+  risk_per_trade_pct: 0.5         # Rp 10,000
   max_open_trades: 3
   leverage: none                  # spot only
   on_breach: stop_new_entries     # kill switch
