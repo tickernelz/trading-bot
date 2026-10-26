@@ -95,7 +95,7 @@ Direktori jalan (di luar repo), contoh `~/Projects/trading-bot-runs/stage1`:
     secrets/gateway.env   GW_PASSWORD (minimal 12 karakter), FT_API_USERNAME, FT_API_PASSWORD, ANALYST_TOKEN (gateway)
     secrets/analyst.env   key provider analis, ANALYST_TOKEN minimal 32 karakter (analyst-b)
 
-Tiap proses hanya menerima berkas rahasia yang dipakainya: gateway tidak memegang JWT secret Freqtrade, bot tidak memegang kunci provider, layanan bayangan tidak memegang kredensial Freqtrade.
+Tiap proses hanya menerima berkas rahasia yang dipakainya: gateway tidak memegang JWT secret Freqtrade, bot tidak memegang kunci provider, layanan bayangan tidak memegang kredensial Freqtrade. Kontainer hanya memasang `config/` (baca saja) dan direktori data komponennya; `secrets/` tidak pernah masuk kontainer (`--env-file` dibaca di host).
     bot-a/ bot-b/ gateway/
 
 `config/bot-*.yaml` berasal dari `config/config.example.yaml` dengan `bot_id`, `api.port`, dan `swarm.enabled` berbeda; `config/gateway.yaml` dari `config/gateway.example.yaml` dengan path di bawah `/opt/trading-bot/run`. Lalu:
