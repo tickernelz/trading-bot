@@ -5,6 +5,7 @@
   import { gateway } from "../lib/gateway.svelte";
   import { t } from "../lib/i18n";
   import { Resource } from "../lib/resource.svelte";
+  import { PROVIDER_TYPES } from "../lib/providerTypes";
   import type { ImportCandidate, ImportResult, Provider, ProviderList, ProviderTest, ProviderType, Roles, WriteResult } from "../lib/types";
 
   const g = gateway;
@@ -41,7 +42,7 @@
     if (roles.data) analyst = roles.data.analyst.provider + ":" + roles.data.analyst.model;
   });
 
-  const TYPES: ProviderType[] = ["openai-completions", "openai-responses", "anthropic-messages"];
+  const TYPES = PROVIDER_TYPES;
   const ERROR: Record<string, string> = {
     unauthorized: t("prov.err_unauthorized"),
     not_found: t("prov.err_not_found"),

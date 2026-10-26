@@ -107,7 +107,9 @@ class Rig:
             return await asgi.handle_async_request(request)
 
         self.gateway.analyst.http = httpx.AsyncClient(transport=httpx.MockTransport(route), timeout=30)
-        self.client = TestClient(create_app(self.gateway), client=("127.0.0.1", 50000))
+        self.client = TestClient(
+            create_app(self.gateway), base_url="http://127.0.0.1:8090", client=("127.0.0.1", 50000)
+        )
         response = self.client.post("/gw/v1/session", json={"password": PASSWORD})
         self.headers = {"Authorization": f"Bearer {response.json()['token']}"}
 

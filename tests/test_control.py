@@ -93,7 +93,7 @@ def setup(tmp_path):
     upstream.client = httpx.AsyncClient(base_url=upstream.bot.api_url + "/api/v1", transport=httpx.MockTransport(fake))
     clock = Clock()
     gateway.confirmations = Confirmations(clock=clock)
-    client = TestClient(create_app(gateway), client=LOCAL)
+    client = TestClient(create_app(gateway), base_url="http://127.0.0.1:8090", client=LOCAL)
     yield gateway, fake, client, clock, config
     gateway.ledger.close()
 
@@ -109,6 +109,18 @@ def post(client: TestClient, path: str, token: str, key: str | None, body: dict 
     if key is not None:
         headers["Idempotency-Key"] = key
     return client.post(path, json=body, headers=headers)
+
+
+def test_a_control_session_with_a_foreign_host_header_cannot_control(setup):
+    gateway, fake, client, _, _ = setup
+    token = login(client)["token"]
+    response = client.post(
+        "/gw/v1/control/stop-entry",
+        headers={"Authorization": f"Bearer {token}", "Idempotency-Key": "key-foreign-host", "Host": "bot.example.test"},
+    )
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "forbidden_local_only"
+    assert fake.calls == []
 
 
 def test_only_a_direct_loopback_login_may_control(setup):

@@ -38,6 +38,7 @@ class GatewaySettings(Strict):
     session_days: Annotated[int, Field(ge=1, le=90)] = 30
     heartbeat_lost_s: Annotated[int, Field(ge=30)] = 180
     exchange_probe_url: str | None = "https://indodax.com/api/server_time"
+    models_yml: str = "~/.omp/agent/models.yml"
     analysis_url: LoopbackUrl | None = None
     bots: Annotated[list[BotRef], Field(min_length=1)]
 

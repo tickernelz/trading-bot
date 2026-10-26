@@ -32,19 +32,20 @@ from analytics.routes import install as install_analytics
 from engine.decisions import DecisionStore, linked_trades
 from engine.heartbeat import read_heartbeat
 from engine.launch import DRY_RUN_DB, TRADABLE_BALANCE_RATIO
-from engine.logredact import redact
 from engine.risk import day_start
 from engine.settings import ConfigError, Settings, load_settings
 from gateway import VERSION
+from gateway.admin import Admin
 from gateway.analyst import AnalystLink, install_analyst
 from gateway.analytics_context import AnalyticsContext
-from gateway.control import IDEMPOTENCY_KEY, Confirmations, digest, idempotency_key, is_local, sanitize
+from gateway.control import Confirmations, digest, idempotency_key, is_local, loggable_key, sanitize
 from gateway.events import FILL_SIDES, translate
 from gateway.feed import Client, Hub, now_iso
 from gateway.history import periods
 from gateway.ledger import Ledger, LoginThrottle, iso
 from gateway.modeapi import ModeDesk, install_mode
 from gateway.outcomes import Candle, by_open_time, explain
+from gateway.redact import redact
 from gateway.settings import BotRef, GatewaySettings
 from gateway.upstream import ApiError, Upstream
 from gateway.views import (
@@ -592,8 +593,7 @@ class Gateway:
         raw_key = request.headers.get("idempotency-key")
         scope = self.ledger.session_scope(token)
         if not is_local(request) or scope != "control":
-            stored_key = raw_key if raw_key is not None and IDEMPOTENCY_KEY.match(raw_key) else None
-            self.audit_control(action, "forbidden", actor=f"{scope}_session", ip=ip, key=stored_key)
+            self.audit_control(action, "forbidden", actor=f"{scope}_session", ip=ip, key=loggable_key(raw_key))
             raise ApiError(403, "forbidden_local_only", "control actions are accepted only on the bot machine itself")
         try:
             key = idempotency_key(raw_key)
@@ -910,7 +910,7 @@ class Gateway:
         return request.query_params.get("token") if isinstance(request, WebSocket) else None
 
 
-def create_app(gateway: Gateway) -> FastAPI:
+def create_app(gateway: Gateway, admin: Admin | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_: FastAPI):
         await gateway.start()
@@ -945,6 +945,7 @@ def create_app(gateway: Gateway) -> FastAPI:
         return token
 
     install_analytics(app, gateway.analytics, reader)
+    app.include_router((admin or Admin(gateway)).router(reader))
 
     @app.post("/gw/v1/session")
     async def login(body: Login, request: Request) -> dict[str, str]:

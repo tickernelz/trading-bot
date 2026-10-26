@@ -72,16 +72,19 @@ class Exchange(Strict):
         return "IDR"
 
 
+ProviderType = Literal[
+    "openai-completions",
+    "openai-responses",
+    "anthropic-messages",
+    "systemone",
+    "openai-decisions",
+    "openrouter-decisions",
+]
+
+
 class Provider(Strict):
     id: Annotated[str, Field(pattern=r"^[a-z0-9][a-z0-9_-]*$")]
-    type: Literal[
-        "openai-completions",
-        "openai-responses",
-        "anthropic-messages",
-        "systemone",
-        "openai-decisions",
-        "openrouter-decisions",
-    ]
+    type: ProviderType
     base_url: Annotated[str, Field(pattern=r"^(from_import|https?://\S+)$")]
     api_key_env: EnvName | None = None
     api_key: SecretStr | None = None

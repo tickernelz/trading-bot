@@ -256,7 +256,8 @@ def test_open_trades_carry_derived_fields(setup):
     _, _, client, _ = setup
     [trade] = _get(client, "/gw/v1/trades/open", _token(client)).json()
     assert trade["profit_pct_now"] == -1.0
-    assert 59 <= trade["age_s"] <= 120
+    elapsed_s = (time.time() * 1000 - NOW_MS) / 1000
+    assert 59 <= trade["age_s"] <= 61 + elapsed_s
 
 
 def test_candles_follow_contract_columns_and_reject_other_timeframes(setup):
@@ -452,7 +453,7 @@ def test_short_trade_page_fails_closed(setup):
 def test_logs_never_carry_websocket_tokens(setup):
     _, _, client, _ = setup
     [line] = _get(client, "/gw/v1/logs?limit=5", _token(client)).json()["logs"]
-    assert line[4] == '127.0.0.1:41506 - "WebSocket /api/v1/message/ws?token=<redacted>" [accepted]'
+    assert line[4] == '127.0.0.1:41506 - "WebSocket /api/v1/message/ws?token=[redacted]" [accepted]'
 
 
 def test_feed_survives_binary_frames_and_bad_limits(setup):

@@ -5,6 +5,7 @@ password_env: GW_PASSWORD
 ft_username_env: FT_API_USERNAME
 ft_password_env: FT_API_PASSWORD
 session_days: 30
+models_yml: ~/.omp/agent/models.yml
 heartbeat_lost_s: 180
 exchange_probe_url: https://indodax.com/api/server_time
 analysis_url: http://127.0.0.1:8092
