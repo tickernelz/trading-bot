@@ -130,20 +130,20 @@ Points 2, 3 and 5 loosened the task's rule, which accepts only the holdout or fo
 
 # Round 3 and later: research mode and cross-asset validation (ZHA-3876, direction of 2026-10-26 12:28 UTC)
 
-Zhafron's direction replaces the decision to pause rounds 3 to 5 until forward data exists. Everything above stays in force unless this section says otherwise. Locked in the commit that adds this section, before any cross-asset run.
+Zhafron's direction replaces the decision to pause rounds 3 to 5 until forward data exists, and for rounds 3 and later it replaces the forward-only final evaluation of "Correction after review" with the cross-asset tier below; the default comparator is the provisional tier of `Q-J-rsi14-1h-tp3-sl10` from the same protocol (T4). Everything else above stays in force unless this section says otherwise. Locked in the commit that adds this section, before any cross-asset run.
 
 ## Research mode
 
-- The simulator has never modelled the risk layer's loss limits: every number in rounds 1 and 2 is a per-pair trade list with no daily-loss or drawdown stop, and drawdowns come from an account model that only applied the 0.5% risk per trade and the 3-slot cap. Ledger lines of every command except \`cross-asset\` record \`research_mode: true\` for that reason.
-- \`cross-asset\` runs an account model in two modes on the same trades and reports both: research mode (no loss limits) and loss limits (\`risk.max_daily_loss_pct\` 1% from the Asia/Jakarta day-start equity and \`risk.max_total_drawdown_pct\` 10% from the realised peak, open trades marked at the signal candle's close, entries refused on a breach, as the bot does). The tier uses the mode named by \`--research-mode\`; the ledger records it. Bot, dry-run and live configuration do not change.
+- The simulator has never modelled the risk layer's loss limits: every number in rounds 1 and 2 is a per-pair trade list with no daily-loss or drawdown stop, and drawdowns come from an account model that only applied the 0.5% risk per trade and the 3-slot cap. Ledger lines of every command except `cross-asset` record `research_mode: true` for that reason.
+- `cross-asset` runs an account model in two modes on the same trades and reports both: research mode (no loss limits) and loss limits (`risk.max_daily_loss_pct` 1% from the Asia/Jakarta day-start equity and `risk.max_total_drawdown_pct` 10% from the realised peak, open trades marked at the signal candle's close, entries refused on a breach, as the bot does). The tier always uses research mode, so the trades, the bootstrap CI and the random-entry null come from the same unfiltered population; the loss-limit account is reported next to it (correction after review ZHA-3896: a tier on filtered trades against an unfiltered null compared different populations). The ledger records `research_mode: true` for every command. Bot, dry-run and live configuration do not change.
 
 ## Cross-asset validation
 
 - Selection and every parameter choice stay on the five walk-forward pairs (BTC, ETH, SOL, XRP, DOGE against IDR).
 - Cross-asset pairs: from 20 established coins checked on 2026-10-26 (BNB, NEAR, HBAR, LSK, ADA, LTC, TRX, LINK, DOT, BCH, XLM, ETC, ATOM, POL, UNI, AVAX, SHIB, VET, EOS, XAUT; not a scan of all 420 IDR pairs, which Indodax rate-limited), the IDR pairs with 1h candles on 2021-12-01, 24 h volume at least 0.05 bn IDR, a bid-ask spread at most 100 bps (ticker snapshot about 11:40 UTC) and no gold token: BNB, NEAR, HBAR, ADA, LTC, TRX, LINK, DOT, BCH. A pair whose candles have a gap longer than 24 hours inside the period is dropped before the first run and the drop is written here.
 - Dropped before the first run: BCH/IDR. Its 46,584 candles from 2021-01-01 to 2026-04-26 all have zero volume, so no entry can fire (rules require volume above zero). The other eight have no gaps; zero-volume candles: BNB 204, NEAR 7,475 (listed 2021-10-07), HBAR 1,560 (listed 2021-02-10), ADA 211, LTC 255, TRX 208, LINK 4,350, DOT 1,016. Cross-asset pairs: BNB, NEAR, HBAR, ADA, LTC, TRX, LINK, DOT. Period: the walk-forward period 2022-07-01 to 2026-04-26 (warm-up from 2021-01-01 or the listing).
-- The cost model is the same taker cost; a sensitivity adds half the snapshot spread per side for each pair (\`CROSS_SPREAD_BPS\`).
-- Only configurations named before the run are evaluated: in each round the walk-forward selection, plus in this first run the round 1 and 2 near misses \`Q-F-don1d20-tp5-lock3\`, \`Q-G-rsi2-1d-10-sl25\`, \`S-don1d20-sma50-tp5-lock3\` and the current default \`Q-J-rsi14-1h-tp3-sl10\` as a comparator. Nothing is tuned on cross-asset results; every run is in the ledger.
+- The cost model is the same taker cost; a sensitivity adds half the snapshot spread per side for each pair (`CROSS_SPREAD_BPS`).
+- Only configurations named before the run are evaluated: in each round the walk-forward selection, plus in this first run the round 1 and 2 near misses `Q-F-don1d20-tp5-lock3`, `Q-G-rsi2-1d-10-sl25`, `S-don1d20-sma50-tp5-lock3` and the current default `Q-J-rsi14-1h-tp3-sl10` as a comparator. Nothing is tuned on cross-asset results; every run is in the ledger.
 - Tier: (a) on the cross-asset trades, (b) on the walk-forward folds, (c) and (d) on both; expectancy, bootstrap CI, null p95 (1,000 random-entry series on the cross-asset pairs) and the Bonferroni bound over the cumulative trial count on the cross-asset trades. T1 needs both lower bounds above zero and the null beaten. Every tier from this protocol is written "provisional until forward data": the cross-asset pairs move with BTC and the selection pairs over the same years, so they are correlated with the selection data and are not forward evidence. Monthly forward monitoring stays the final gate before any decision about live trading.
 - Ranking (Zhafron): tier, then higher net win rate, then lower drawdown. Reported next to the win rate: largest loss, mean of the 5 worst trades, max drawdown, and the worst calendar-month realised loss in rupiah on Rp 2,000,000 capital with the 0.5% risk sizing.
 - The default changes to the best-ranked configuration when its provisional tier is higher than the current default's.
@@ -166,21 +166,27 @@ Locked in the commit that adds this section, before the first round 3 run. The Z
 | L Donchian 1d breakout, lookback 30, 55, 90, filter SMA100 or none, exit on a close 3 or 4 ATR(1d) below the highest close, 20% stop | 12 |
 | M time-series momentum 1d, 30, 60, 90 days, filter SMA100 or none, exit when the return turns negative, 20% stop | 6 |
 | E EMA trend 1d, 20/100 and 50/200, exit on the cross or a 3 ATR trail, 20% stop | 2 |
-| R random entries with the exits of \`L-don1d-55-nofilter-trail4atr\` (control, not deployable) | 1 |
+| R random entries with the exits of `L-don1d-55-nofilter-trail4atr` (control, not deployable) | 1 |
 | K benchmarks: SwingEmaRsi, buy-and-hold | 2 |
 
-Runs: walk-forward on the five pairs, controls, then \`cross-asset\` in research mode for the first three configurations of the walk-forward ranking (named by the ranking, not by hand). Tiers from cross-asset are provisional until forward data.
+Runs: walk-forward on the five pairs, controls, then `cross-asset` in research mode for the first three configurations of the walk-forward ranking (named by the ranking, not by hand). Tiers from cross-asset are provisional until forward data.
 
-### Round 3, batch B: the ZHA-3913 shortlist (locked after the batch A runs, before its own first run)
+# Round 4: F3 variants behind the BTC regime gate (ZHA-3913 shortlist)
 
-Agent Laras's shortlist (ZHA-3913 documents `profit-search` and `protocol`) names five families that survived her out-of-sample test; two are expressible in this runner. Batch B adds six configurations, locked in the commit that adds this section.
+This matrix was first written as "round 3, batch B" and locked in `9b0741c` after the round 3 runs, before its own first run. Review ZHA-3896 ruled that a second matrix locked after a round has run is a new round, so it is round 4. The ledger cannot be edited: its lines from `9b0741c` and `5556612` say `round: 3` and are round 4 runs. One round is left (round 5).
+
+Agent Laras's shortlist (ZHA-3913 documents `profit-search` and `protocol`) names five families that survived her out-of-sample test; two are expressible in this runner. Round 4 holds six configurations. Only `F3-don1d55-exit20-btc_above_sma100-sl20` is close to her F3 grid, and it differs from it (a 20% stop instead of 2 x ATR20, taker instead of maker entries); the other five are variants of this runner (exit 55, 20/20, 90/20, the BTC SMA200 gate, and time-series momentum behind the gate), not configurations from her report.
 
 | Config | Family |
 | --- | --- |
-| `F3-don1d55-exit20-btcabovesma100-sl20`, `F3-don1d55-exit55-btcabovesma100-sl20`, `F3-don1d20-exit20-btcabovesma100-sl20`, `F3-don1d90-exit20-btcabovesma100-sl20` | F3: Donchian entry and exit behind the BTC/IDR daily regime gate (`btc_above_sma100_1d`), 20% stop |
-| `F3-don1d55-exit20-btcabovesma200-sl20` | the same gate on the BTC SMA200 |
+| `F3-don1d55-exit20-btc_above_sma100-sl20`, `F3-don1d55-exit55-btc_above_sma100-sl20`, `F3-don1d20-exit20-btc_above_sma100-sl20`, `F3-don1d90-exit20-btc_above_sma100-sl20` | F3: Donchian entry and exit behind the BTC/IDR daily regime gate (`btc_above_sma100_1d`), 20% stop |
+| `F3-don1d55-exit20-btc_above_sma200-sl20` | the same gate on the BTC SMA200 |
 | `F3-tsmom-55-btcabove-sma100-sl20` | the gate with time-series momentum instead of the Donchian high |
 
-Her F1 (equal-weight portfolio of four pairs held while BTC is above its SMA100), F2 (56-day rotation) and F4 (Donchian ensemble) are portfolio strategies, not per-pair rules; the runner evaluates one rule per pair, so they are not in batch B and need a portfolio engine of their own. Her report measures F1 at 3.29% a month with a 61% drawdown and F3 at 2.45% a month with 46.5%, both far above every per-pair rule in batch A, which makes the portfolio engine the obvious round 4 subject.
+Her F1 (equal-weight portfolio of four pairs held while BTC is above its SMA100), F2 (56-day rotation) and F4 (Donchian ensemble) are portfolio strategies, not per-pair rules; the runner evaluates one rule per pair, so they are not in round 4 and need a portfolio engine of their own. Her report measures F1 at 3.29% a month with a 61% drawdown and F3 at 2.45% a month with 46.5%, both far above every per-pair rule in round 3, which makes a portfolio engine the obvious subject of the last round.
 
-Because ZHA-3913 used LINK, DOT, UNI and AVAX for its own out-of-sample test, they are no longer unseen: the cross-asset pairs drop to BNB, NEAR, HBAR, ADA, LTC and TRX. The 8-pair cross-asset run of batch A (commit `8081f68`) stays in the ledger as a superseded comparison.
+Because ZHA-3913 used LINK, DOT, UNI and AVAX for its own out-of-sample test, they are no longer unseen: the cross-asset pairs drop to BNB, NEAR, HBAR, ADA, LTC and TRX. The 8-pair cross-asset run of round 3 (commit `8081f68`) was overwritten on disk and replayed at `8081f68` with the same inputs into `cross/cross-asset-r3.json`, reported as a superseded comparison.
+
+Cross-asset choice in round 4: the three configurations ranked first among the round 4 walk-forward results by the ranking key, eligible or not (round 3 used the first three eligible ones). This rule was not written before the run; it is recorded here as it was applied.
+
+Sizing note: the "2% risk" columns are research sizing only. The bot refuses `risk.risk_per_trade_pct` above `risk.max_daily_loss_pct` (1% in the example config), so 2% per trade needs a daily limit of at least 2% or research mode.
