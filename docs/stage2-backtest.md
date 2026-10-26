@@ -1,6 +1,6 @@
 # Stage 2e findings: 3-year rule-based strategy backtest
 
-This document records the backtest of bot A's rule-based strategy (`SwingEmaRsi`, 1-hour candles) on public Indodax data, with fees and tax. The source of truth remains `docs/plan.md` revision 11 (sections 1 and 8). All numbers below are copied from the raw reports `report.json` and `report.md` attached to the backtest run; no number was typed by hand. This document does not conclude anything about future profit or loss.
+This document records the backtest of bot A's rule-based strategy (`SwingEmaRsi`, 1-hour candles) on public Indodax data, with fees and tax. The source of truth remains `docs/plan.md` revision 11 (sections 1 and 8). All numbers below are copied from the raw reports `report.json` and `report.md` kept outside the repository; no number was typed by hand. This document does not conclude anything about future profit or loss.
 
 ## Summary
 
@@ -9,7 +9,7 @@ This document records the backtest of bot A's rule-based strategy (`SwingEmaRsi`
 | 3 years of 1h history from Indodax via CCXT | Proven | `history.json`: 26,904 candles per pair, 2023-10-01 00:00 to 2026-10-25 23:00 UTC, 0 missing candles |
 | Fee 0.2% and tax 0.21% per side | Applied | `--fee 0.0041` in Freqtrade, recorded in the log and in every trade (`fee_open`, `fee_close`) |
 | Expectancy per trade, trade count, drawdown, distribution, in-sample and out-of-sample separated | Measured | Tables below |
-| Stage 2 pass condition in plan section 8 (positive expectancy after fee and tax on out-of-sample) | Not met | Out-of-sample -0,832% per trade (limits_off) and -1,388% (as_configured), 95% CI entirely below zero |
+| Stage 2 pass condition in plan section 8 (positive expectancy after fee and tax on out-of-sample) | Not met | Out-of-sample -0.832% per trade (limits_off) and -1.388% (as_configured), 95% CI entirely below zero |
 | Parameters tuned | No | 1 strategy parameter set, matrix locked in commit `3d7a371` before the first result existed |
 
 ## Indodax history: correction to the stage 0a finding
@@ -30,7 +30,7 @@ History older than 2023-10-01 was not requested. A separate probe with a 500-can
 
 ## Design (locked before the run)
 
-- Strategy: `engine/strategies/swing_ema_rsi.py` as is on main, including the risk layer (position size 0.5% risk per trade, daily loss limit 1%, total drawdown limit 10%, maximum 3 positions). Configuration `config/config.example.yaml`: capital Rp 2.000.000, compounding on, BTC/IDR, ETH/IDR, SOL/IDR.
+- Strategy: `engine/strategies/swing_ema_rsi.py` as is on main, including the risk layer (position size 0.5% risk per trade, daily loss limit 1%, total drawdown limit 10%, maximum 3 positions). Configuration `config/config.example.yaml`: capital Rp 2,000,000, compounding on, BTC/IDR, ETH/IDR, SOL/IDR.
 - Strategy parameters: 13 (EMA 20 and 50, RSI 14, RSI entry 45-70, RSI exit 78, stoploss -3%, three-step ROI table 0 minutes 5%, 480 minutes 2.5%, 1440 minutes 1.2%). Risk parameters: 4 (0.5%, 1%, 10%, 3 positions). All were chosen in stage 0a before this data was downloaded; none was changed in this stage.
 - Variations tried: 1 strategy parameter set. Matrix: 2 periods × (as_configured with fee and tax, limits_off with three cost levels) = 8 backtests. The matrix, periods, and bootstrap seed are in `engine/backtest_suite.py` at commit `3d7a371`, before the first backtest.
 - Periods: in-sample 2023-10-26 to 2025-10-26 (2 years), out-of-sample 2025-10-26 to 2026-10-26 (1 year). Since there is no tuning, the in-sample here is the part that may be used if tuning ever happens; out-of-sample must not be touched for that.
@@ -106,8 +106,8 @@ Expectancy per trade is the mean Freqtrade `profit_ratio`, which already has the
 
 ## Reading
 
-- After fees and tax, expectancy per trade is negative in both periods: in-sample -0,818% (447 trades) and out-of-sample -0,832% (221 trades) under limits_off; the 95% CI upper bounds are -0,594% and -0,561% respectively.
-- Without costs (no_cost) expectancy is -0,058% in-sample and -0,077% out-of-sample, with 95% CIs that include zero: this data shows no edge in the rules before costs. The 0.41% per-side cost lowers expectancy by about 0.76 percentage points per trade (in-sample -0,818 versus -0,058; out-of-sample -0,832 versus -0,077); median holding time is 13 to 18 hours.
+- After fees and tax, expectancy per trade is negative in both periods: in-sample -0.818% (447 trades) and out-of-sample -0.832% (221 trades) under limits_off; the 95% CI upper bounds are -0.594% and -0.561% respectively.
+- Without costs (no_cost) expectancy is -0.058% in-sample and -0.077% out-of-sample, with 95% CIs that include zero: this data shows no edge in the rules before costs. The 0.41% per-side cost lowers expectancy by about 0.76 percentage points per trade (in-sample -0.818 versus -0.058; out-of-sample -0.832 versus -0.077); median holding time is 13 to 18 hours.
 - With the configuration as is, the 10% total drawdown limit is reached and halts entries: last entry 2024-04-28 in-sample (545.6 days without entries, 341 total_drawdown rejections) and 2026-02-17 out-of-sample (250.8 days, 162 rejections). The risk gate works as designed and caps losses at around 10%, but it also means bot A with this strategy stops opening positions for several months.
 - The stage 2 pass criteria in plan section 8 are not met by this strategy. No tuning was done to change that.
 

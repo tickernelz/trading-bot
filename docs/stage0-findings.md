@@ -1,6 +1,6 @@
 # Stage 0b and 0c Findings
 
-This document records what has been proven in Stage 0b and 0c, the measured numbers, and what remains unproven. The source of truth remains `docs/plan.md` revision 10 on the plan tracker.
+This document records what has been proven in Stage 0b and 0c, the measured numbers, and what remains unproven. The source of truth remains `docs/plan.md` revision 10.
 
 The code is in `swarm/` (Python package `tb_swarm`, with its own `pyproject.toml` so it does not collide with the root `pyproject.toml` while Stage 0a work is in progress). The `vendor/freqtrade` vendor directory is untouched.
 
@@ -100,7 +100,7 @@ Stub results are not evidence of model quality, only evidence of wire shape, par
 
 ## Item 4: live test of nutaraline
 
-Run on 2026-10-26 against `https://nutaraline.co.uk/v1`, model `deepseek-v4.1-flash-1017`, API type `openai-completions`. The key was taken from `NUTARALINE_API_KEY` in the worktree's gitignored `.env` (permission from the owner via the operator's comment on the live-test task); the `apiKey` value in `~/.omp/agent/models.yml` was not read. Checks: the key value is not in any git-tracked file, not in git history, and not in any output file.
+Run on 2026-10-26 against `https://nutaraline.co.uk/v1`, model `deepseek-v4.1-flash-1017`, API type `openai-completions`. The key was taken from `NUTARALINE_API_KEY` in the worktree's gitignored `.env` (permission from the owner via the operator's approval); the `apiKey` value in `~/.omp/agent/models.yml` was not read. Checks: the key value is not in any git-tracked file, not in git history, and not in any output file.
 
 `swarm/bench/live_nutaraline.py` sends 20 trading decision samples (one `choice` question, one `noul`, one `score` per sample), one provider per cell with one warm-up call that is not counted. Cells: `direct` backend x three modes (`prompt`, `json_object`, `json_schema`) and `deepagents` backend x `prompt`.
 
@@ -110,11 +110,11 @@ All three modes are accepted by the server and produce valid answers 20/20. `jso
 
 ### Reasoning
 
-Without extra parameters the model answers without reasoning (`reasoning_tokens` = 0 on all 80 calls). Reasoning only activates with `reasoning_effort: "high"` via `extra_body`: the response carries `reasoning_content` and `completion_tokens_details.reasoning_tokens`. For this task, "reasoning enabled" in the item 4 description means it must be selected through voter configuration (`extra_body`), not a model default.
+Without extra parameters the model answers without reasoning (`reasoning_tokens` = 0 on all 80 calls). Reasoning only activates with `reasoning_effort: "high"` via `extra_body`: the response carries `reasoning_content` and `completion_tokens_details.reasoning_tokens`. For the stage 0 test, "reasoning enabled" means it must be selected through voter configuration (`extra_body`), not a model default.
 
 ### Results of 20 samples per cell
 
-The raw report (JSON per cell and per case, including answers and tokens) is attached to the live-test task as `live_default.json`, `live_high.json` and `live_nopace.json`; the tables below are computed from those files. The round reported here is the second re-run (2026-10-26) with `--interval 3`; the first round (similar numbers, file not saved) is not used as evidence.
+The raw report (JSON per cell and per case, including answers and tokens) is kept outside the repository as `live_default.json`, `live_high.json` and `live_nopace.json`; the tables below are computed from those files. The round reported here is the second re-run (2026-10-26) with `--interval 3`; the first round (similar numbers, file not saved) is not used as evidence.
 
 Default effort (`live_default.json`, 0 retries on 429):
 
@@ -246,7 +246,7 @@ The median across paths can therefore be produced and makes sense as a shadow vo
 
 ## Stage 0c: live test of decision and voters across providers
 
-Run on 2026-10-26 from the host with `swarm/bench/live_voters.py` and `swarm/bench/probe_decision_wires.py`. Keys were read from `NUTARALINE_API_KEY` and its siblings in the git-ignored worktree `.env`; `~/.omp/agent/models.yml` was only read for the provider list, base URLs, and API types, not keys. Model ids were taken from `GET {base_url}/models` of each provider, not guessed. The client uses httpx and the header `User-Agent: curl/8.5.0` on raw probes. The raw reports (JSON per cell and per case, including answers, tokens, and latency) are attached to the tracker item: `wire_probe.json`, `single_1.json`, `single_2.json`, `cand.json`, `cand2.json`, `quorum_1.json`, `quorum_1.voters.jsonl`, `quorum_2.json`, `quorum_2.voters.jsonl`, `burst_1.json`, `local_host.json`, `local_container_hostnet.json`, `local_container_bridge.json`. All tables in this section are computed from those files. The same twenty cases as Item 4 (`CASES`, three questions `choice`, `noul`, `score` per case), one warm-up call not counted, 3-second pause after each call.
+Run on 2026-10-26 from the host with `swarm/bench/live_voters.py` and `swarm/bench/probe_decision_wires.py`. Keys were read from `NUTARALINE_API_KEY` and its siblings in the git-ignored worktree `.env`; `~/.omp/agent/models.yml` was only read for the provider list, base URLs, and API types, not keys. Model ids were taken from `GET {base_url}/models` of each provider, not guessed. The client uses httpx and the header `User-Agent: curl/8.5.0` on raw probes. The raw reports (JSON per cell and per case, including answers, tokens, and latency) are kept outside the repository: `wire_probe.json`, `single_1.json`, `single_2.json`, `cand.json`, `cand2.json`, `quorum_1.json`, `quorum_1.voters.jsonl`, `quorum_2.json`, `quorum_2.voters.jsonl`, `burst_1.json`, `local_host.json`, `local_container_hostnet.json`, `local_container_bridge.json`. All tables in this section are computed from those files. The same twenty cases as Item 4 (`CASES`, three questions `choice`, `noul`, `score` per case), one warm-up call not counted, 3-second pause after each call.
 
 ### Item 1: Experiential Labs decision adapter
 

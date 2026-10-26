@@ -367,4 +367,4 @@ Stage 1 (demo): all stage 1 features, read-only. Stage 2: controls, configuratio
 
 ## Sources
 
-Full evidence and links are in the research-swarm-pwa document on this issue. The sources of revisions 1 and 2 (AI-Trader, Hummingbot, NautilusTrader, TradingAgents, claude-trading-skills, Freqtrade, Indodax API, alternative.me, OpenRouter Jev) remain valid.
+Full evidence and links are in the research-swarm-pwa document (docs/research-swarm-pwa.md). The sources of revisions 1 and 2 (AI-Trader, Hummingbot, NautilusTrader, TradingAgents, claude-trading-skills, Freqtrade, Indodax API, alternative.me, OpenRouter Jev) remain valid.

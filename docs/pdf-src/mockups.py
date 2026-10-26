@@ -13,13 +13,13 @@ def dash_inner(hold):
     if hold:
         board = '<div class="board sig"><div class="w">Held</div><div class="s">Today&#39;s loss of 1.0% has reached the 1.0% limit. New entries are on hold; open positions stay protected by stop loss.</div></div>'
         tr = trace_svg(EQ_HOLD, 272, 84, -1.2, 0.2, -1.0, "daily limit " + M + "1.0%", HOURS)
-        profit = row("Profit today", loss(M + "Rp 20.000 (" + M + "1.0%) loss"))
+        profit = row("Profit today", loss(M + "Rp 20,000 (" + M + "1.0%) loss"))
         meters = meter("Daily loss", "1.0%", "1.0%", 100, True) + meter("Total loss", "1.0%", "10.0%", 10)
         pos = row("BTC/IDR &middot; 1h", loss(M + "0.3% loss")) + row("ETH/IDR &middot; 1h", loss(M + "0.5% loss"))
     else:
         board = '<div class="board"><div class="w">Safe</div><div class="s">Today&#39;s loss is 0.3% of the 1.0% limit. New entries may be opened.</div></div>'
         tr = trace_svg(EQ_OK, 272, 84, -1.2, 0.2, -1.0, "daily limit " + M + "1.0%", HOURS)
-        profit = row("Profit today", loss(M + "Rp 6.000 (" + M + "0.3%) loss"))
+        profit = row("Profit today", loss(M + "Rp 6,000 (" + M + "0.3%) loss"))
         meters = meter("Daily loss", "0.3%", "1.0%", 30) + meter("Total loss", "0.3%", "10.0%", 3)
         pos = row("BTC/IDR &middot; 1h", gain("+0.4% profit")) + row("ETH/IDR &middot; 1h", loss(M + "0.2% loss"))
     return (
@@ -144,9 +144,9 @@ def g4_conf():
     inner = (
         chips(["Configuration", "Provider", "Controls"], 0)
         + sec("Loss limits", "decrease immediately, increase in two steps")
-        + row("Daily", stp("1.0%") + ' <span class="k">Rp 20.000</span>', "sm")
-        + row("Total", stp("10.0%") + ' <span class="k">Rp 200.000</span>', "sm")
-        + row("Risk per trade", stp("0.5%") + ' <span class="k">Rp 10.000</span>', "sm")
+        + row("Daily", stp("1.0%") + ' <span class="k">Rp 20,000</span>', "sm")
+        + row("Total", stp("10.0%") + ' <span class="k">Rp 200,000</span>', "sm")
+        + row("Risk per trade", stp("0.5%") + ' <span class="k">Rp 10,000</span>', "sm")
         + sec("Swarm voters", "model, adapter, active")
         + '<div class="r sm"><span class="k"><b>v1</b> modelrouter &middot; jev-1.13<br>systemone</span>' + switch(True, "On") + "</div>"
         + '<div class="r sm"><span class="k"><b>v2</b> experientiallabs &middot; clef<br>systemone</span>' + switch(True, "On") + "</div>"
@@ -263,9 +263,9 @@ def g6_raise():
     inner = (
         chips(["Configuration", "Provider", "Controls"], 2)
         + sec("Raise daily loss limit", "step 2 of 2")
-        + row("Current limit", "1.0% (Rp 20.000)", "sm")
-        + row("New limit", "1.5% (Rp 30.000)", "sm")
-        + row("Added risk", loss("Rp 10.000 per day"), "sm")
+        + row("Current limit", "1.0% (Rp 20,000)", "sm")
+        + row("New limit", "1.5% (Rp 30,000)", "sm")
+        + row("Added risk", loss("Rp 10,000 per day"), "sm")
         + '<div class="note">Raising the limit adds risk. The decision is up to the owner.</div>'
         + '<div class="fld"><div class="l">Type RAISE to continue</div><div class="in">RAI</div></div>'
         + '<span class="btn dis">Apply new limit</span>'
@@ -286,7 +286,7 @@ def g6_live():
         + sec("Switch to live mode", "step 2 of 2")
         + row("Current mode", "Dry-run", "sm")
         + row("New mode", loss("Live, real funds"), "sm")
-        + row("Initial portion (stage 3 proposal)", "Rp 500.000", "sm")
+        + row("Initial portion (stage 3 proposal)", "Rp 500,000", "sm")
         + sec("Before live")
         + chk("Positive expectancy after fees and tax on out-of-sample data", "not yet")
         + chk("PC without sleep and without automatic restart", "not yet")
@@ -316,7 +316,7 @@ def g6b():
 def g7():
     left = (
         '<div class="board" style="display:flex;justify-content:space-between;align-items:flex-end"><div><div class="w">Safe</div><div class="s">Today&#39;s loss 0.3% of the 1.0% limit. New entries may be opened.</div></div>'
-        '<div class="s" style="text-align:right">Example balance Rp 1.994.000<br>of capital Rp 2.000.000</div></div>'
+        '<div class="s" style="text-align:right">Example balance Rp 1,994,000<br>of capital Rp 2,000,000</div></div>'
     )
     eq = (
         sec("Equity today", "solid line Bot B (shadow swarm), dashed Bot A (rules only)")
