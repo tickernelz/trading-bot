@@ -12,6 +12,7 @@ from zoneinfo import ZoneInfo
 
 import httpx
 from fastapi import Depends, FastAPI, Request
+from fastapi import Path as PathParam
 from pydantic import BaseModel, ConfigDict, Field
 from tb_swarm.analyst import ChatTurn
 from tb_swarm.snapshot import write_snapshot
@@ -217,7 +218,9 @@ def install_analyst(app: FastAPI, gateway: Any, reader: Any, control: Any) -> No
         return {"bot": ref.id, "report_at": analyst.report_at, "days": listing["days"]}
 
     @app.get("/gw/v1/analyst/reports/{day}", dependencies=[Depends(reader)])
-    async def report(day: str, bot: str | None = None) -> dict[str, Any]:
+    async def report(
+        day: Annotated[str, PathParam(pattern=r"^\d{4}-\d{2}-\d{2}$")], bot: str | None = None
+    ) -> dict[str, Any]:
         ref = gateway.bot(bot)
         return await link.call(ref, link.require(ref), "GET", f"/reports/{day}")
 

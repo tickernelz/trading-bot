@@ -203,6 +203,8 @@ def test_bad_input_is_rejected_before_any_model_call(rig):
     )
     assert rig.model.offered == []
     assert rig.get("/gw/v1/analyst/reports/2026-02-30").status_code == 400
+    assert rig.get("/gw/v1/analyst/reports/latest").status_code == 400
+    assert [path for _, path in rig.service_calls] == ["/reports/2026-02-30"]
     assert rig.get("/gw/v1/analyst/reports/2020-01-01").status_code == 404
     assert rig.post("/gw/v1/analyst/ask", {"question": "hi", "bot": "Z"}).status_code == 404
 
