@@ -25,6 +25,21 @@ def test_rules_only_bot_needs_no_shadow_service(example_raw, write_config):
     assert load_settings(write_config(example_raw)).shadow is None
 
 
+def test_analyst_section_is_optional_and_carries_defaults(example_raw, write_config):
+    assert load_settings(EXAMPLE).analyst.url == "http://127.0.0.1:8092"
+    assert load_settings(EXAMPLE).analyst.report_at == "00:10"
+    example_raw["analyst"] = {}
+    analyst = load_settings(write_config(example_raw)).analyst
+    assert (analyst.token_env, analyst.data_dir, analyst.reports_dir, analyst.language) == (
+        "ANALYST_TOKEN",
+        "analyst_data",
+        "analyst_reports",
+        "id",
+    )
+    del example_raw["analyst"]
+    assert load_settings(write_config(example_raw)).analyst is None
+
+
 def _mutations():
     def unknown_key(raw):
         raw["risk"]["max_daily_loss"] = 1.0
@@ -92,11 +107,31 @@ def _mutations():
     def lowercase_bot_id(raw):
         raw["bot_id"] = "b"
 
+    def analyst_beyond_loopback(raw):
+        raw["analyst"]["listen"] = "0.0.0.0"
+
+    def analyst_shares_one_directory(raw):
+        raw["analyst"]["reports_dir"] = raw["analyst"]["data_dir"]
+
+    def analyst_directory_escapes_userdir(raw):
+        raw["analyst"]["data_dir"] = "../elsewhere"
+
+    def analyst_report_time_out_of_range(raw):
+        raw["analyst"]["report_at"] = "24:00"
+
+    def analyst_token_env_lowercase(raw):
+        raw["analyst"]["token_env"] = "analyst_token"
+
     return [
         veto_not_implemented,
         shadow_without_service,
         shadow_beyond_loopback,
         lowercase_bot_id,
+        analyst_beyond_loopback,
+        analyst_shares_one_directory,
+        analyst_directory_escapes_userdir,
+        analyst_report_time_out_of_range,
+        analyst_token_env_lowercase,
         unknown_key,
         live_mode,
         daily_above_total,
