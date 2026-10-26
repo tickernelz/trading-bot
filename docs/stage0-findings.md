@@ -111,32 +111,34 @@ Tanpa parameter tambahan model menjawab tanpa reasoning (`reasoning_tokens` = 0 
 
 ### Hasil 20 contoh per sel
 
-Effort bawaan (`--interval 3`, tanpa 429 pada putaran ini):
+Laporan mentah (JSON per sel dan per kasus, termasuk jawaban dan token) dilampirkan pada ZHA-3763 sebagai `live_default.json`, `live_high.json` dan `live_nopace.json`; tabel di bawah dihitung dari berkas itu. Putaran yang dilaporkan di sini adalah putaran ulang kedua (2026-10-26) dengan `--interval 3`; putaran pertama (angka serupa, berkasnya tidak disimpan) tidak dipakai sebagai bukti.
 
-| Backend | Mode | Valid | Latensi median | p90 | Token masuk (median) | Token keluar (median) | Token reasoning |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| direct | prompt | 20/20 | 1,22 s | 1,50 s | 333 | 36 | 0 |
-| direct | json_object | 20/20 | 1,31 s | 2,24 s | 333 | 36 | 0 |
-| direct | json_schema | 20/20 | 1,23 s | 2,07 s | 654 | 36 | 0 |
-| deepagents | prompt | 20/20 | 1,23 s | 1,57 s | 333 | 36 | 0 |
+Effort bawaan (`live_default.json`, 0 percobaan ulang 429):
 
-`reasoning_effort: high`:
+| Backend | Mode | Valid | Latensi median | p90 | Maks | Token masuk (median) | Token keluar (median) | Token reasoning |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| direct | prompt | 20/20 | 1,36 s | 1,79 s | 6,14 s | 333 | 36 | 0 |
+| direct | json_object | 20/20 | 1,40 s | 1,74 s | 2,10 s | 333 | 36 | 0 |
+| direct | json_schema | 20/20 | 1,30 s | 1,50 s | 1,57 s | 654 | 36 | 0 |
+| deepagents | prompt | 20/20 | 1,75 s | 3,48 s | 5,33 s | 333 | 36 | 0 |
 
-| Backend | Mode | Valid | Latensi median | p90 | Token masuk (median) | Token keluar (median) | Token reasoning (median / total) |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| direct | prompt | 20/20 | 5,23 s | 8,75 s | 358 | 431 | 398 / 8.145 |
-| direct | json_object | 20/20 | 5,04 s | 7,76 s | 358 | 433 | 403 / 8.574 |
-| direct | json_schema | 20/20 | 4,30 s | 9,24 s | 679 | 342 | 312 / 8.742 |
-| deepagents | prompt | 20/20 | 4,89 s | 9,84 s | 358 | 356 | 326 / 10.182 |
+`reasoning_effort: high` (`live_high.json`, 0 percobaan ulang 429):
+
+| Backend | Mode | Valid | Latensi median | p90 | Maks | Token masuk (median) | Token keluar (median) | Token reasoning (median / total) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| direct | prompt | 20/20 | 4,38 s | 8,66 s | 10,28 s | 358 | 390 | 356 / 8.289 |
+| direct | json_object | 20/20 | 5,26 s | 10,47 s | 10,51 s | 358 | 506 | 473 / 9.641 |
+| direct | json_schema | 20/20 | 3,55 s | 5,20 s | 7,53 s | 679 | 267 | 234 / 5.607 |
+| deepagents | prompt | 20/20 | 4,06 s | 7,47 s | 8,12 s | 358 | 375 | 345 / 8.545 |
 
 Biaya moneter tidak diukur: respons tidak membawa `usage.cost`.
 
 ### Temuan operasional
 
 - Mode `json_schema` hampir menggandakan token masuk (654 lawan 333) karena skema ikut dikirim; tanpa selisih kualitas yang terukur pada 20 contoh.
-- Reasoning `high` menaikkan latensi median sekitar 4x (1,2 s menjadi 4,3 sampai 5,2 s) dan token keluar sekitar 12x. Latensi terburuk satu panggilan 27,6 s (deepagents) dan 22,2 s (json_schema), jadi `timeout_s: 30` di `config.example.yaml` tipis untuk effort `high`; di effort bawaan p90 di bawah 2,3 s.
-- Gateway membatasi laju per kunci. Putaran pertama tanpa jeda mengirim empat sel berurutan dan tiga sel terakhir terkena HTTP 429 (`Laju request per key melebihi batas`): 19 dari 20 kasus gagal di tiap sel itu. Tujuh voter paralel pada satu kunci akan menabrak batas ini pada setiap keputusan, jadi kuorum 5 dari 7 akan sering gagal bila ketujuh voter berbagi satu kunci dan satu model. Ini hasil yang bisa diukur, bukan prediksi: batas pastinya belum diukur.
-- Setelah skrip diberi jeda `--interval` dan percobaan ulang 429 (`--rate-limit-retries`, `--rate-limit-wait`), putaran ulang 80/80 valid tanpa satu pun percobaan ulang pada `--interval 3`.
+- Reasoning `high` menaikkan latensi median dari sekitar 1,36 s menjadi 3,55 s sampai 5,26 s dan token keluar dari 36 menjadi sekitar 267 sampai 506. Latensi satu panggilan terlama pada effort `high` 10,51 s, dan pada effort bawaan 6,14 s; putaran pertama mencatat satu panggilan 27,6 s, jadi `timeout_s: 30` di `config.example.yaml` tipis untuk effort `high`.
+- Pembatasan laju per kunci terjadi tetapi tidak deterministik. Pada putaran pertama (empat sel berurutan tanpa jeda) tiga sel terakhir terkena HTTP 429 (`Laju request per key melebihi batas`), 19 dari 20 kasus gagal per sel; berkas laporan putaran itu tidak disimpan, jadi ini hanya catatan pengamatan, bukan data terlampir. Pada percobaan ulang dengan skrip yang sama tanpa jeda dan tanpa percobaan ulang (`--interval 0 --rate-limit-retries 0`, `live_nopace.json`) tidak ada satu pun 429 dan semua 80 panggilan valid. Jadi batas ada, pemicunya belum diketahui (kemungkinan bergantung pada beban gateway atau jendela waktu), dan tujuh voter paralel pada satu kunci belum diuji. Risiko kuorum 5 dari 7 tetap nyata tetapi belum terukur.
+- Skrip uji hidup kini memberi jeda `--interval` (bawaan 3 detik) setelah setiap panggilan selesai, sukses maupun gagal, dan mengulang hanya HTTP 429 (`--rate-limit-retries`, `--rate-limit-wait`).
 
 Cara menjalankan ulang:
 
@@ -183,16 +185,16 @@ Panjang prompt yang dikirim identik (selisih 0 karakter pada stub, karena profil
 
 ### Hidup: deepagents lawan panggilan langsung
 
-Sel yang sama (`prompt`), model nutaraline, 20 contoh:
+Sel yang sama (`prompt`), model nutaraline, 20 contoh, dari laporan yang dilampirkan:
 
 | Effort | Jalur | Latensi median | p90 | Token masuk | Token keluar |
 | --- | --- | --- | --- | --- | --- |
-| bawaan | direct | 1,22 s | 1,50 s | 333 | 36 |
-| bawaan | deepagents | 1,23 s | 1,57 s | 333 | 36 |
-| high | direct | 5,23 s | 8,75 s | 358 | 431 |
-| high | deepagents | 4,89 s | 9,84 s | 358 | 356 |
+| bawaan | direct | 1,36 s | 1,79 s | 333 | 36 |
+| bawaan | deepagents | 1,75 s | 3,48 s | 333 | 36 |
+| high | direct | 4,38 s | 8,66 s | 358 | 390 |
+| high | deepagents | 4,06 s | 7,47 s | 358 | 375 |
 
-Token masuk identik pada kedua jalur (333 dan 358): deepagents tidak menambah prompt. Latensi median pada effort bawaan beda 0,01 s; pada effort `high` deepagents lebih cepat 0,34 s tetapi p90-nya 1,1 s lebih lambat. Itu di dalam derau satu putaran 20 contoh dengan reasoning acak, jadi selisihnya tidak bisa dibaca sebagai keuntungan atau kerugian. Yang terukur hanya bahwa overhead kerangka (5-10 ms pada stub) tidak terlihat di atas latensi jaringan.
+Token masuk identik pada kedua jalur (333 dan 358): deepagents tidak menambah prompt. Latensi median pada effort bawaan: deepagents 1,75 s lawan direct 1,36 s (p90 3,48 s lawan 1,79 s); pada effort `high`: 4,06 s lawan 4,38 s (p90 7,47 s lawan 8,66 s). Arah selisihnya tidak konsisten antar effort dan antar putaran (putaran pertama menunjukkan deepagents sama pada effort bawaan, sekarang lebih lambat), jadi satu putaran 20 contoh tidak cukup untuk menyimpulkan keuntungan atau kerugian latensi. Overhead kerangka yang terukur pada stub (5-10 ms) jauh di bawah derau itu.
 
 Keputusan: voter cepat tidak perlu deepagents (tidak ada manfaat terukur, dan satu lapisan lebih banyak yang harus dijaga batasnya); deepagents dipakai untuk agen analis yang memang butuh tool.
 
@@ -242,7 +244,7 @@ Median antar jalur karena itu bisa dibuat dan masuk akal sebagai voter bayangan:
 ## Yang belum terbukti
 
 1. Bahwa `json_object` dan `json_schema` ditegakkan di sisi server: pada 20 contoh mode `prompt` juga 20/20 valid, jadi tidak ada selisih yang bisa dikaitkan dengan penegakan.
-2. Batas laju per kunci pada gateway nutaraline (angka pastinya) dan perilaku tujuh voter paralel pada satu kunci: yang terukur baru bahwa empat sel berurutan tanpa jeda terkena 429.
+2. Batas laju per kunci pada gateway nutaraline (angka pastinya dan pemicunya) dan perilaku tujuh voter paralel pada satu kunci: 429 teramati sekali pada putaran pertama (laporannya tidak disimpan) dan tidak muncul pada putaran ulang tanpa jeda.
 3. Kualitas keputusan model: 20/20 valid berarti bentuk jawaban benar, bukan bahwa jawabannya tepat. Tidak ada label kebenaran.
 4. Skema autentikasi dan path OpenRouter Decisions serta System One: baru dari dokumentasi, belum diuji hidup (tidak ada kunci untuk keduanya).
 5. Akurasi Kronos: sengaja tidak disimpulkan, dan datanya sintetis.
