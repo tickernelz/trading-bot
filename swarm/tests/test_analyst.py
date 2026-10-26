@@ -256,6 +256,17 @@ async def test_ask_times_out(data_dir):
     assert caught.value.kind == "timeout"
 
 
+async def test_per_call_timeout_overrides_the_runner_default(data_dir):
+    class Slow(RecorderModel):
+        def _generate(self, *args, **kwargs):
+            time.sleep(1.0)
+            return super()._generate(*args, **kwargs)
+
+    with pytest.raises(ProviderError) as caught:
+        await runner(Slow(script=[], calls=[]), data_dir, timeout_s=60).daily_report(DAY, timeout_s=0.05)
+    assert caught.value.kind == "timeout"
+
+
 def sample_report(day, summary="s"):
     return DailyReport(
         day=day,

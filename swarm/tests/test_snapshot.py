@@ -42,8 +42,9 @@ def test_trade_without_a_timestamp_is_refused():
         trade_row({"trade_id": 9, "pair": "BTC/IDR", "is_open": True})
 
 
-def test_decision_row_drops_the_request_and_voter_error_text():
-    row = decision_row(DECISION)
+def test_decision_row_keeps_usage_and_drops_the_request_and_voter_error_text():
+    row = decision_row({**DECISION, "usage": {"input_tokens": 12, "cost": None}})
+    assert row["usage"] == {"input_tokens": 12, "cost": None}
     assert "request" not in row
     assert row["voters"] == [
         {

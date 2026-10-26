@@ -42,9 +42,7 @@ DECISION_FIELDS = (
     "verdict",
     "iqr_limit",
     "aggregate",
-    "input_tokens",
-    "output_tokens",
-    "reasoning_tokens",
+    "usage",
 )
 SKIPS_LISTED = 30
 DAYS_KEPT = 14

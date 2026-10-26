@@ -173,25 +173,25 @@ class AnalystRunner:
         self._timeout_s = timeout_s
         self._slots = asyncio.Semaphore(CONCURRENT_RUNS)
 
-    async def _invoke(self, messages: Sequence[BaseMessage]) -> Run:
+    async def _invoke(self, messages: Sequence[BaseMessage], timeout_s: float | None = None) -> Run:
         started = time.monotonic()
         async with self._slots:
             try:
                 result = await asyncio.wait_for(
                     self._agent.ainvoke({"messages": list(messages)}, config={"recursion_limit": RECURSION_LIMIT}),
-                    timeout=self._timeout_s,
+                    timeout=timeout_s or self._timeout_s,
                 )
             except Exception as exc:
                 raise classify_exception(exc, self._secrets) from None
         return Run(result["messages"], self._model_id, started)
 
-    async def daily_report(self, day: str) -> DailyReport:
+    async def daily_report(self, day: str, timeout_s: float | None = None) -> DailyReport:
         check_day(day)
         prompt = REPORT_PROMPT.format(day=day, timezone=self._timezone, language=LANGUAGE_NAMES[self._language])
-        run = await self._invoke([HumanMessage(prompt)])
+        run = await self._invoke([HumanMessage(prompt)], timeout_s)
         parsed, problem = _parse_report(run.final)
         if parsed is None:
-            retry = await self._invoke([*run.messages, HumanMessage(REPAIR_PROMPT.format(problem=problem))])
+            retry = await self._invoke([*run.messages, HumanMessage(REPAIR_PROMPT.format(problem=problem))], timeout_s)
             retry.latency_s = round(retry.latency_s + run.latency_s, 3)
             run = retry
             parsed, problem = _parse_report(run.final)
@@ -211,7 +211,7 @@ class AnalystRunner:
             latency_s=run.latency_s,
         )
 
-    async def ask(self, question: str, history: Sequence[ChatTurn] = ()) -> ChatAnswer:
+    async def ask(self, question: str, history: Sequence[ChatTurn] = (), timeout_s: float | None = None) -> ChatAnswer:
         text = question.strip()
         if not text:
             raise ValueError("question is empty")
@@ -228,7 +228,7 @@ class AnalystRunner:
             HumanMessage(turn.content) if turn.role == "user" else AIMessage(turn.content) for turn in history
         ]
         messages.append(HumanMessage(context + text))
-        run = await self._invoke(messages)
+        run = await self._invoke(messages, timeout_s)
         answer = redact(run.final.strip(), self._secrets)
         if not answer:
             raise ProviderError("invalid", "analyst returned an empty answer")
