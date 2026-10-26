@@ -31,7 +31,7 @@ def test_rendered_config_passes_freqtrade_validation(tmp_path):
     rendered["api_server"].update(username="bot", password="pw", jwt_secret_key="j" * 32, ws_token="w")
     rendered.update(
         runmode=RunMode.DRY_RUN,
-        strategy=launch.STRATEGY,
+        strategy=load_settings(EXAMPLE).strategy.name,
         strategy_path=str(launch.ENGINE_ROOT / "strategies"),
         user_data_dir=tmp_path,
     )
@@ -45,6 +45,42 @@ def test_rendered_config_passes_freqtrade_validation(tmp_path):
     assert rendered["fee"] == 0.002
     assert rendered["apiserver"] == {"allow_custom_messages": True}
     assert rendered["trading_bot"]["compounding"] is True
+
+
+def _loaded_strategy(settings, tmp_path):
+    rendered = launch.freqtrade_config(settings, serve_api=False)
+    rendered.update(
+        runmode=RunMode.BACKTEST,
+        strategy=settings.strategy.name,
+        strategy_path=str(launch.ENGINE_ROOT / "strategies"),
+        user_data_dir=tmp_path,
+    )
+    return StrategyResolver.load_strategy(rendered)
+
+
+def test_default_rule_strategy_fills_its_take_profit_at_the_gross_target(tmp_path):
+    settings = load_settings(EXAMPLE)
+    strategy = _loaded_strategy(settings, tmp_path)
+    fee = settings.exchange.fee_pct / 100
+    assert type(strategy).__name__ == "RuleStrategy"
+    assert strategy.stoploss == settings.strategy.rule.stoploss
+    assert 1.03 * (1 - fee) / (1 + fee) - 1 == pytest.approx(strategy.minimal_roi[0])
+    assert strategy.rule == settings.strategy.rule
+
+
+def test_swing_strategy_is_still_selectable(example_raw, write_config, tmp_path, monkeypatch, exec_calls):
+    example_raw["strategy"] = {"name": "SwingEmaRsi"}
+    path = write_config(example_raw)
+    strategy = _loaded_strategy(load_settings(path), tmp_path)
+    assert (type(strategy).__name__, strategy.stoploss) == ("SwingEmaRsi", -0.03)
+    assert strategy.minimal_roi == {0: 0.05, 480: 0.025, 1440: 0.012}
+    monkeypatch.setenv("TRADING_BOT_CONFIG", str(path))
+    monkeypatch.setenv("TRADING_BOT_USERDIR", str(tmp_path / "user_data"))
+    launch.main(["backtesting"])
+    [(_, argv, _)] = exec_calls
+    assert argv[argv.index("--strategy") + 1] == "SwingEmaRsi"
+    rendered = json.loads((tmp_path / "user_data" / "trading-bot.freqtrade.json").read_text(encoding="utf-8"))
+    assert "rule" not in rendered["trading_bot"]
 
 
 @pytest.mark.parametrize("command", ["download-data", "backtesting", "show-config"])
@@ -112,7 +148,7 @@ def test_valid_config_execs_freqtrade_with_strategy(monkeypatch, tmp_path, exec_
     [(program, argv, env)] = exec_calls
     assert program == "freqtrade"
     assert argv[:2] == ["freqtrade", "trade"]
-    assert argv[argv.index("--strategy") + 1] == "SwingEmaRsi"
+    assert argv[argv.index("--strategy") + 1] == "RuleStrategy"
     assert argv[-1] == "--dry-run"
     assert env["FREQTRADE__API_SERVER__PASSWORD"] == "pw-example"
     rendered = json.loads((tmp_path / "user_data" / "trading-bot.freqtrade.json").read_text(encoding="utf-8"))

@@ -95,7 +95,7 @@ def execute(run: Run, config_path: Path, out: Path, datadir: Path) -> dict[str, 
     seconds = (datetime.now(UTC) - started).total_seconds()
     if code != 0:
         raise RuntimeError(f"backtest {run.id} exited {code}; see {out / 'freqtrade.log'}")
-    trades, stats = load_run(out)
+    trades, stats = load_run(out, load_settings(config_path).strategy.name)
     log_text = (out / "freqtrade.log").read_text(encoding="utf-8")
     return {**asdict(run), "seconds": round(seconds, 1), "summary": summarize(trades, stats, SEED, log_text)}
 

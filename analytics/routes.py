@@ -21,7 +21,6 @@ from analytics.service import BotSource, evaluate
 from analytics.source import load_decisions
 from analytics.stress import stress
 from analytics.trades import risk_inputs
-from engine.launch import STRATEGY
 from engine.settings import ConfigError, Settings
 
 PREFIX = "/gw/v1/analytics"
@@ -125,6 +124,10 @@ async def audited(
 def make_router(ctx: Context, reader: Callable[..., Any]) -> APIRouter:
     router = APIRouter(prefix=PREFIX, dependencies=[Depends(reader)])
 
+    async def strategy_of(bot: str | None = None) -> str:
+        settings = await asyncio.to_thread(ctx.source(bot).settings)
+        return settings.strategy.name
+
     async def book(bot: str | None) -> tuple[BotSource, Settings, list[dict[str, Any]]]:
         source = ctx.source(bot)
         settings = await asyncio.to_thread(source.settings)
@@ -180,7 +183,7 @@ def make_router(ctx: Context, reader: Callable[..., Any]) -> APIRouter:
         if pair not in settings.exchange.pairs:
             raise AnalyticsError(404, "not_found", f"{pair} is not in the configured pairs")
         history = await analysis_of(ctx).pair_history(
-            pair, settings.exchange.timeframe, timerange_of(start, end), STRATEGY
+            pair, settings.exchange.timeframe, timerange_of(start, end), settings.strategy.name
         )
         return signals_view(history)
 
@@ -251,7 +254,7 @@ def make_router(ctx: Context, reader: Callable[..., Any]) -> APIRouter:
             source = ctx.source(body.bot)
             settings = await asyncio.to_thread(source.settings)
             payload = {
-                "strategy": STRATEGY,
+                "strategy": settings.strategy.name,
                 "timeframe": settings.exchange.timeframe,
                 "timerange": check_timerange(body.timerange),
                 "max_open_trades": body.max_open_trades or settings.risk.max_open_trades,
@@ -261,13 +264,13 @@ def make_router(ctx: Context, reader: Callable[..., Any]) -> APIRouter:
                 "backtest_cache": "none",
             }
             detail["request"] = payload
-            return backtest_view(await analysis_of(ctx).backtest_start(payload), STRATEGY)
+            return backtest_view(await analysis_of(ctx).backtest_start(payload), settings.strategy.name)
 
         return await audited(ctx, request, "analytics.backtest.start", [body.bot or "default"], detail, start)
 
     @router.get("/backtest")
     async def backtest_status() -> dict[str, Any]:
-        return backtest_view(await analysis_of(ctx).backtest_status(), STRATEGY)
+        return backtest_view(await analysis_of(ctx).backtest_status(), await strategy_of())
 
     @router.delete("/backtest", dependencies=[Depends(control(ctx, "analytics.backtest.stop"))])
     async def backtest_stop(request: Request) -> dict[str, Any]:
@@ -276,7 +279,7 @@ def make_router(ctx: Context, reader: Callable[..., Any]) -> APIRouter:
             status = await client.backtest_status()
             if status.get("running"):
                 await client.backtest_abort()
-            return backtest_view(await client.backtest_reset(), STRATEGY)
+            return backtest_view(await client.backtest_reset(), await strategy_of())
 
         return await audited(ctx, request, "analytics.backtest.stop", [], {}, stop)
 
@@ -286,7 +289,8 @@ def make_router(ctx: Context, reader: Callable[..., Any]) -> APIRouter:
 
     @router.get("/backtest/history/result")
     async def backtest_history_result(filename: Annotated[str, Query(pattern=r"^[A-Za-z0-9._-]+$")]) -> dict[str, Any]:
-        return backtest_view(await analysis_of(ctx).backtest_history_result(filename, STRATEGY), STRATEGY)
+        strategy = await strategy_of()
+        return backtest_view(await analysis_of(ctx).backtest_history_result(filename, strategy), strategy)
 
     return router
 

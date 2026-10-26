@@ -11,7 +11,6 @@ from typing import Any
 from engine.modectl import LIVE_ENGINE_PROVEN, MODE_FILE, read_mode, write_capabilities
 from engine.settings import ConfigError, Settings, load_settings
 
-STRATEGY = "SwingEmaRsi"
 STRATEGY_COMMANDS = {"trade", "backtesting"}
 API_COMMANDS = {"trade", "webserver"}
 SHADOW_COMMANDS = {"trade"}
@@ -74,6 +73,8 @@ def freqtrade_config(
             "risk": settings.risk.model_dump(),
         },
     }
+    if settings.strategy.rule is not None:
+        config["trading_bot"]["rule"] = settings.strategy.rule.model_dump()
     if serve_api:
         config["api_server"] = {
             "enabled": True,
@@ -120,10 +121,10 @@ def secret_env(
     return {target: environ[source] for target, source in names.items()}
 
 
-def build_argv(command: str, extra: list[str], config_path: Path, userdir: str) -> list[str]:
+def build_argv(command: str, extra: list[str], config_path: Path, userdir: str, strategy: str) -> list[str]:
     argv = ["freqtrade", command, "--config", str(config_path), "--userdir", userdir]
     if command in STRATEGY_COMMANDS:
-        argv += ["--strategy", STRATEGY, "--strategy-path", str(ENGINE_ROOT / "strategies")]
+        argv += ["--strategy", strategy, "--strategy-path", str(ENGINE_ROOT / "strategies")]
     return argv + extra
 
 
@@ -164,7 +165,7 @@ def main(argv: list[str]) -> int:
     if serve_api:
         config["db_url"] = f"sqlite:///{(Path(userdir) / DRY_RUN_DB).resolve()}"
     rendered.write_text(json.dumps(config, indent=2), encoding="utf-8")
-    command = build_argv(argv[0], argv[1:], rendered, userdir)
+    command = build_argv(argv[0], argv[1:], rendered, userdir, settings.strategy.name)
     return run_freqtrade(command, {**os.environ, **overrides})
 
 
