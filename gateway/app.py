@@ -45,7 +45,6 @@ from gateway.history import periods
 from gateway.ledger import Ledger, LoginThrottle, iso
 from gateway.modeapi import ModeDesk, install_mode
 from gateway.outcomes import Candle, by_open_time, explain
-
 from gateway.settings import BotRef, GatewaySettings
 from gateway.upstream import ApiError, Upstream
 from gateway.views import (
@@ -461,7 +460,7 @@ class Gateway:
             return []
         timeframe = self.engine_settings(bot).exchange.timeframe
         try:
-            links = await asyncio.to_thread(linked_trades, Path(bot.userdir) / DRY_RUN_DB)
+            links = await asyncio.to_thread(linked_trades, Path(bot.userdir) / DRY_RUN_DB, 0.5)
         except sqlite3.Error as exc:
             raise ApiError(503, "upstream_error", f"trade database is busy: {exc}", 1000) from exc
         closed, opened = await self.closed_and_open(bot)
@@ -474,9 +473,13 @@ class Gateway:
             ),
             return_exceptions=True,
         )
-        candles: dict[str, dict[int, Candle]] = {}
-        for pair, frame in zip(pairs, frames, strict=True):
-            candles[pair] = by_open_time({} if isinstance(frame, BaseException) else frame)
+        for frame in frames:
+            if isinstance(frame, BaseException) and not isinstance(frame, ApiError):
+                raise frame
+        candles: dict[str, dict[int, Candle]] = {
+            pair: by_open_time({} if isinstance(frame, BaseException) else frame)
+            for pair, frame in zip(pairs, frames, strict=True)
+        }
         now = self.clock()
         result = []
         for decision in decisions:

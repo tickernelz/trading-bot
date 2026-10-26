@@ -4,6 +4,8 @@ import sqlite3
 
 import pytest
 
+from datetime import UTC, datetime
+
 from engine.decisions import SHADOW_KEY, DecisionStore
 
 
@@ -139,3 +141,16 @@ def test_outcomes_join_trades_through_custom_data(store, tmp_path):
     skipped, allowed = store.outcomes(trades_db)
     assert (skipped.verdict, skipped.trade_id, skipped.profit_abs, skipped.is_open) == ("lewati", 7, -10000.0, False)
     assert (allowed.trade_id, allowed.profit_abs) == (None, None)
+
+
+def test_recent_sorts_with_an_index_instead_of_a_temp_btree(store):
+    seen: list[str] = []
+    store._db.set_trace_callback(seen.append)
+    try:
+        store.recent(20, before=datetime(2026, 10, 26, tzinfo=UTC))
+    finally:
+        store._db.set_trace_callback(None)
+    sql = next(statement for statement in seen if statement.lstrip().upper().startswith("SELECT"))
+    plan = " ".join(row["detail"] for row in store._db.execute("EXPLAIN QUERY PLAN " + sql))
+    assert "TEMP B-TREE" not in plan
+    assert "decisions_candle_seq" in plan

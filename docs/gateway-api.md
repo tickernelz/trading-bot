@@ -903,7 +903,7 @@ Keputusan lain di rekaman yang sama: SOL/IDR 3 dari 7 voter menjawab (empat `fai
 
 ### 17.2 Riwayat trade lengkap
 
-`/gw/v1/trades?state=closed&offset=&limit=` (5.4). Database trade bot dibaca di thread terpisah dengan busy timeout 0,5 detik: bila Freqtrade sedang menulis, `/gw/v1/decisions` menjawab `503 upstream_error` dengan `retry_after_ms: 1000` (bukan 500) dan event `gw.decision` tetap terkirim tanpa `outcome`. Semua trade tertutup dibaca per halaman 500 (`closed_trades` dari ZHA-3764, gagal tertutup bila jumlah halaman tidak sama dengan `total_trades`) untuk riwayat, `/risk`, `/overview`, `gw.risk`, `/equity`, periode 16.3, dan keputusan 16.1. Tesnya `tests/test_gateway.py::test_risk_and_history_page_past_freqtrades_500_trade_limit` dan `test_short_trade_page_fails_closed` (ZHA-3764); `offset` dan `state=closed` di `tests/test_recorded_history.py`.
+`/gw/v1/trades?state=closed&offset=&limit=` (5.4). Database trade bot dibaca di thread terpisah dengan busy timeout 0,5 detik: bila Freqtrade sedang menulis, `/gw/v1/decisions` menjawab `503 upstream_error` dengan `retry_after_ms: 1000` (bukan 500) dan event `gw.decision` tetap terkirim tanpa `outcome`. Semua trade tertutup dibaca per halaman 500 (`closed_trades` dari ZHA-3764, gagal tertutup bila jumlah halaman tidak sama dengan `total_trades`) untuk riwayat, `/risk`, `/overview`, `gw.risk`, `/equity`, periode 17.3, dan keputusan 17.1. Tesnya `tests/test_gateway.py::test_risk_and_history_page_past_freqtrades_500_trade_limit` dan `test_short_trade_page_fails_closed` (ZHA-3764); `offset` dan `state=closed` di `tests/test_recorded_history.py`.
 
 ### 17.3 `GET /gw/v1/profit?window=daily|weekly|monthly&timescale=N&bot=`
 

@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS decisions (
     cost REAL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS decisions_settle_seq ON decisions(settle_seq);
+CREATE INDEX IF NOT EXISTS decisions_candle_seq ON decisions(candle, settle_seq);
 """
 
 
@@ -298,7 +299,7 @@ class DecisionStore:
         return result
 
 
-def linked_trades(trades_db: str | Path, timeout: float = 0.5) -> dict[str, sqlite3.Row]:
+def linked_trades(trades_db: str | Path, timeout: float = 5.0) -> dict[str, sqlite3.Row]:
     """Trades keyed by the shadow decision id in their custom data; empty when the database is absent.
 
     The database belongs to another process, so the busy timeout is short and a lock surfaces as sqlite3.Error.

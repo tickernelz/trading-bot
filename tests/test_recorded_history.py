@@ -298,17 +298,21 @@ def test_total_equity_stacks_both_bots_from_the_first_bot_start(replay):
 
 def test_pages_union_to_every_decision_on_a_shared_candle(replay):
     client, headers = replay()
-    first = client.get("/gw/v1/decisions?bot=B&limit=2", headers=headers).json()
+    first = client.get("/gw/v1/decisions", headers=headers, params={"bot": "B", "limit": 3}).json()
     second = client.get(
-        "/gw/v1/decisions?bot=B&limit=2", headers=headers, params={"before": first[-1]["candle"]}
+        "/gw/v1/decisions",
+        headers=headers,
+        params={"bot": "B", "limit": 3, "before": first[-1]["candle"]},
     ).json()
-    assert [row["decision_id"] for row in first] == [BTC_SECOND, ETH]
+    assert [row["decision_id"] for row in first] == [BTC_SECOND, ETH, SOL]
     assert [row["decision_id"] for row in second] == [ETH, SOL, BTC_FIRST]
+    assert len(first) == 3 and len(second) == 3
     assert {row["decision_id"] for row in first + second} == {
         row["decision_id"] for row in client.get("/gw/v1/decisions?bot=B", headers=headers).json()
     }
+    seen = {row["decision_id"] for row in first}
     assert [row["decision_id"] for row in first] + [
-        row["decision_id"] for row in second if row["decision_id"] != first[-1]["decision_id"]
+        row["decision_id"] for row in second if row["decision_id"] not in seen
     ] == [BTC_SECOND, ETH, SOL, BTC_FIRST]
 
 
