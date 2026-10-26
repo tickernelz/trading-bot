@@ -6,8 +6,8 @@ from engine.backtest_report import bootstrap_mean_interval, closed_trade_drawdow
 
 STATS = {
     "starting_balance": 1000.0,
-    "backtest_start": "2025-01-01 00:00:00+00:00",
-    "backtest_end": "2025-01-31 00:00:00+00:00",
+    "backtest_start": "2025-01-01 00:00:00",
+    "backtest_end": "2025-01-31 00:00:00",
     "max_drawdown_account": 0.25,
 }
 

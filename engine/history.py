@@ -129,6 +129,7 @@ def main(argv: list[str]) -> int:
     exchange = getattr(ccxt, settings.exchange.name)({"enableRateLimit": True})
     exchange.load_markets()
     since_ms, until_ms = _day(args.since), _day(args.until)
+    args.datadir.mkdir(parents=True, exist_ok=True)
     handler = get_datahandler(args.datadir, "feather")
     pairs = []
     for pair in settings.exchange.pairs:

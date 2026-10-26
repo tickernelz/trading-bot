@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -56,7 +56,8 @@ def _scaled(bounds: tuple[float, float] | None) -> list[float] | None:
 
 
 def _date(value: str) -> datetime:
-    return datetime.fromisoformat(value)
+    moment = datetime.fromisoformat(value)
+    return moment if moment.tzinfo else moment.replace(tzinfo=UTC)
 
 
 def summarize(trades: list[dict[str, Any]], stats: dict[str, Any], seed: int, log_text: str = "") -> dict[str, Any]:

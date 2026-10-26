@@ -26,5 +26,5 @@ if [ ! -f "$out/history.json" ]; then
   run --network host --entrypoint python "$image" -m engine.history \
     --since "$since" --until "$until" --datadir "$mount/data/indodax" --manifest "$mount/history.json"
 fi
-run --network none --entrypoint python "$image" -m engine.backtest_suite \
+run --network host --entrypoint python "$image" -m engine.backtest_suite \
   --out "$mount" --datadir "$mount/data/indodax"
