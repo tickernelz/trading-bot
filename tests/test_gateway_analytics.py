@@ -244,6 +244,28 @@ def test_gateway_runs_the_auto_disable_loop_when_the_config_allows_it(tmp_path, 
         gateway.ledger.close()
 
 
+def test_auto_disable_loop_is_restarted_after_an_unexpected_error(stack, monkeypatch):
+    gateway, _, _ = stack
+    calls = []
+
+    async def flaky(sources, audit):
+        calls.append([source.bot_id for source in sources])
+        if len(calls) == 1:
+            raise RuntimeError("boom")
+        await asyncio.sleep(3600)
+
+    monkeypatch.setattr("gateway.analytics_context.auto_disable_loop", flaky)
+    monkeypatch.setattr("gateway.analytics_context.RESTART_DELAY_S", 0.05)
+
+    async def run() -> None:
+        task = asyncio.create_task(gateway.analytics.run_auto_disable())
+        await asyncio.sleep(0.5)
+        task.cancel()
+
+    asyncio.run(run())
+    assert calls == [["B"], ["B"]]
+
+
 def test_gateway_leaves_voters_alone_when_auto_disable_is_off(tmp_path, example_raw):
     gateway, _, config = build(tmp_path, example_raw, auto_disable=False)
     try:

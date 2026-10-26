@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger("trading_bot.gateway.analytics")
 
+RESTART_DELAY_S = 30
 LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1"})
 PROXY_HEADERS = ("forwarded", "x-forwarded-for", "x-forwarded-host", "x-real-ip", "cf-connecting-ip", "true-client-ip")
 
@@ -74,7 +75,7 @@ class AnalyticsContext:
                 await auto_disable_loop(self.scored_sources(), self.audit)
             except Exception as exc:
                 logger.warning("auto-disable loop stopped, restarting: %r", exc)
-                await asyncio.sleep(30)
+                await asyncio.sleep(RESTART_DELAY_S)
 
     async def aclose(self) -> None:
         if self.client is not None:
