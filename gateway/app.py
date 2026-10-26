@@ -33,7 +33,7 @@ from engine.logredact import redact
 from engine.risk import day_start
 from engine.settings import ConfigError, Settings, load_settings
 from gateway import VERSION
-from gateway.control import Confirmations, digest, idempotency_key, is_local, sanitize
+from gateway.control import IDEMPOTENCY_KEY, Confirmations, digest, idempotency_key, is_local, sanitize
 from gateway.events import FILL_SIDES, translate
 from gateway.feed import Client, Hub, now_iso
 from gateway.ledger import Ledger, LoginThrottle, iso
@@ -481,7 +481,8 @@ class Gateway:
         raw_key = request.headers.get("idempotency-key")
         scope = self.ledger.session_scope(token)
         if not is_local(request) or scope != "control":
-            self.audit_control(action, "forbidden", actor=f"{scope}_session", ip=ip, key=raw_key)
+            stored_key = raw_key if raw_key is not None and IDEMPOTENCY_KEY.match(raw_key) else None
+            self.audit_control(action, "forbidden", actor=f"{scope}_session", ip=ip, key=stored_key)
             raise ApiError(403, "forbidden_local_only", "control actions are accepted only on the bot machine itself")
         try:
             key = idempotency_key(raw_key)
@@ -1018,7 +1019,14 @@ def create_app(gateway: Gateway) -> FastAPI:
     bot_state_route("pause", "control.pause", "/pause", "Pause new entries on {bot}", entries_stopped=True)
     bot_state_route("stop-entry", "control.stop_entry", "/stopentry", "Stop new entries on {bot}", entries_stopped=True)
     bot_state_route("resume", "control.resume", "/start", "Resume {bot}", entries_stopped=False)
-    bot_state_route("stop", "control.stop", "/stop", "Stop {bot}; open trades are no longer managed", risky=True)
+    bot_state_route(
+        "stop",
+        "control.stop",
+        "/stop",
+        "Stop {bot}; open trades are no longer managed",
+        risky=True,
+        entries_stopped=True,
+    )
     bot_state_route("reload-config", "control.reload_config", "/reload_config", "Reload the Freqtrade config of {bot}")
 
     @app.post("/gw/v1/trades")
