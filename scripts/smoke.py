@@ -137,7 +137,11 @@ def main() -> int:
             if status == 200:
                 break
             time.sleep(3)
-        answer = json.loads(body)
+        try:
+            answer = json.loads(body)
+        except ValueError:
+            print("FAIL: health answered", status, "with a body that is not JSON:", body[:300])
+            return 1
         if status == 200:
             print("health: 200 gateway", answer["gateway"]["status"], "freqtrade", answer["freqtrade"])
             print("RESULT: gateway and engine answered")
