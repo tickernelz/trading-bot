@@ -69,27 +69,70 @@ flowchart LR
 
 ## Quick start
 
-Try the PWA without a bot, against the mock gateway:
+Download the archive for your system from the [releases page](https://github.com/tickernelz/trading-bot/releases), check it against `SHA256SUMS`, unpack it and start it:
+
+```bash
+tar -xzf trading-bot-<version>-linux-x64.tar.gz
+cd trading-bot-<version>-linux-x64
+./trading-bot run
+```
+
+On Windows unzip the archive and run `trading-bot.exe run`. The first start creates the data folder, prints the password of the web panel and starts bot A, bot B, the shadow swarm, the analyst and the gateway as one application. Open http://127.0.0.1:8090 and sign in. Stop everything with Ctrl+C.
+
+| System | Archive | Data folder |
+| --- | --- | --- |
+| Linux | `linux-x64`, `linux-arm64` (`.tar.gz`) | `~/.local/share/trading-bot` |
+| Windows | `win-x64`, `win-arm64` (`.zip`) | `%LOCALAPPDATA%\TradingBot` |
+| macOS | `mac-x64` (Intel), `mac-arm64` (Apple silicon) (`.tar.gz`) | `~/Library/Application Support/TradingBot` |
+
+The data folder holds `config/` (one YAML file per bot and for the gateway), `secrets/` (generated passwords and the files for provider keys), `run/` (databases) and `logs/`. Options: `--home <folder>` uses another data folder, `--port-base <n>` sets the first of the local ports (default 8080; the panel is on n+10) when the folder is created, `--version` prints the versions of the bundled libraries. Provider keys for the swarm and the analyst go into `secrets/swarm.env` and `secrets/analyst.env` as `NAME=value` lines, or into the panel's configuration editor; without keys the shadow swarm and the analyst refuse to start and the log in `logs/` says why, while the bots and the panel keep running.
+
+### First open without code signing
+
+The archives are not signed, because signing needs a paid developer account. The operating system warns about that:
+
+- **Windows**: SmartScreen shows "Windows protected your PC". Right-click the zip, open Properties and tick Unblock before unpacking, or run `Get-ChildItem -Recurse trading-bot-* | Unblock-File` in PowerShell. If the warning still appears, choose More info, then Run anyway.
+- **macOS**: Gatekeeper blocks files that came from a browser. After unpacking run `xattr -dr com.apple.quarantine trading-bot-<version>-mac-arm64`, or open System Settings, Privacy & Security and choose Open Anyway after the first blocked start.
+- **Linux**: nothing to unblock; the executable bit is kept by the archive.
+
+The checksum of each archive is in `SHA256SUMS` on the release page (`sha256sum -c SHA256SUMS`, `shasum -a 256 -c SHA256SUMS` on macOS, `Get-FileHash` on Windows).
+
+### From source
+
+With [uv](https://docs.astral.sh/uv/) and Node 24:
 
 ```bash
 git clone --recurse-submodules https://github.com/tickernelz/trading-bot.git
-cd trading-bot/pwa
+cd trading-bot
+uv venv --python 3.13
+uv pip install -c swarm/constraints.txt -r vendor/freqtrade/requirements.txt ./swarm pyyaml==6.0.3 pywebpush==2.5.0 http_ece==1.2.1 py-vapid==1.9.6 pytest==9.1.1
+uv pip install --no-deps ./vendor/freqtrade ./vendor/freqtrade/ft_client
+(cd pwa && NODE_ENV=development npm ci --include=dev && npm run build)
+python -m tbapp run
+```
+
+Where a dependency has no wheel for your system (for example `bottleneck`, which Freqtrade does not need, on Windows ARM) remove that line from the requirements first.
+
+To try only the panel against the mock gateway:
+
+```bash
+cd pwa
 NODE_ENV=development npm ci --include=dev
 npm run mock-gateway &
 npm run build && npm run preview
 ```
 
-Open http://127.0.0.1:4173. The mock gateway password is `example`. To build and run the real dry-run (Docker):
+Open http://127.0.0.1:4173. The mock gateway password is `example`. The full two-bot layout, the shadow swarm and the gateway are described in [docs/operations.md](docs/operations.md).
 
-```bash
-cp .env.example .env
-mkdir -p user_data
-cp config/config.example.yaml config/config.yaml
-docker compose build bot
-docker compose up -d bot
-```
+## Releasing
 
-Fill in the variables in `.env` first. The full steps, the two-bot layout with the shadow swarm, the gateway and the CPU limits are in [docs/operations.md](docs/operations.md).
+1. Merge the change to `main`.
+2. Tag the commit: `v1.2.3`, or `v1.2.3-rc.1` for a release candidate (a tag ending in `-rc` or `-rc.<n>` becomes a prerelease).
+3. Push the tag to GitHub. The tag must name a commit that exists on GitHub: when the public history is rewritten from a private one, create the tag on the rewritten head and push it without force.
+4. The `release` workflow runs on the tag: it builds the panel, then builds the six bundles on native runners (`ubuntu-24.04`, `ubuntu-24.04-arm`, `windows-latest`, `windows-11-arm`, `macos-15-intel`, `macos-15`), unpacks each archive and starts it on random ports, checks the panel, sign-in and `/gw/v1/health`, and only then uploads the archives and `SHA256SUMS` to the release. A target that fails is left out of the release, and the other targets still ship.
+5. A manual run of the same workflow (Actions, release, Run workflow) builds and tests without creating a release.
+
+Building locally: `uv run --python 3.13 --no-project packaging/build.py --target linux-x64` after `npm run build` in `pwa`.
 
 ## Configuration
 
@@ -124,20 +167,20 @@ API keys come from environment variables (`api_key_env`) or are written directly
 | `gateway/`, `analytics/` | the PWA gateway and the analytics routes |
 | `pwa/` | the PWA panel and the mock gateway |
 | `scripts/` | run the whole stack as systemd units, measure, record fixtures, backtest |
-| `docker/`, `docker-compose.yml` | the image derived from Freqtrade |
+| `tbapp/`, `packaging/` | the single launcher and the native bundle build |
+| `docker/`, `docker-compose.yml` | container files used by the server stack scripts |
 | `docs/` | [plan](docs/plan.md), [gateway contract](docs/gateway-api.md), [operations](docs/operations.md), [research](docs/research-swarm-pwa.md), [languages](docs/i18n.md), per-stage findings |
 | `vendor/freqtrade` | the Freqtrade submodule, pinned to tag 2026.9 |
 
 ## Tests
 
 ```bash
-docker compose --profile test build tests
-docker compose --profile test run --rm tests
+PYTHONPATH=. python -m pytest
 cd pwa && npm test
 ```
 
-The engine tests run inside the Freqtrade-derived image so the Freqtrade, ccxt and pandas versions match the engine. The git hooks (`git config core.hooksPath .githooks`) reject comments in our code and commits that are not Conventional Commits.
+Run the engine tests in the environment from the source instructions so the Freqtrade, ccxt and pandas versions match the bundle. The git hooks (`git config core.hooksPath .githooks`) reject comments in our code and commits that are not Conventional Commits.
 
 ## License
 
-[GPL-3.0](LICENSE), the same as Freqtrade: the strategy and launcher import Freqtrade and the Docker image derives from it. The software is provided as is, and trading risks losing all of your capital.
+[GPL-3.0](LICENSE), the same as Freqtrade: the strategy and launcher import Freqtrade and every bundle contains it. Each archive carries `LICENSE` and `SOURCE.txt` with the link to this source. The software is provided as is, and trading risks losing all of your capital.

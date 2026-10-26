@@ -1,0 +1,162 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version label for a manual build, which publishes nothing
+        default: 0.0.0-manual
+        required: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  panel:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: pwa/package-lock.json
+      - run: npm ci --include=dev
+        working-directory: pwa
+      - run: npm test
+        working-directory: pwa
+      - run: npm run build
+        working-directory: pwa
+      - uses: actions/upload-artifact@v7
+        with:
+          name: panel
+          path: pwa/dist
+          if-no-files-found: error
+
+  bundle:
+    needs: panel
+    name: bundle (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-x64
+            os: ubuntu-24.04
+          - target: linux-arm64
+            os: ubuntu-24.04-arm
+          - target: win-x64
+            os: windows-latest
+          - target: win-arm64
+            os: windows-11-arm
+            skip: pyarrow
+            from_source: cryptography,python-rapidjson
+          - target: mac-x64
+            os: macos-15-intel
+            from_source: cryptography
+          - target: mac-arm64
+            os: macos-15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      - uses: astral-sh/setup-uv@v10
+      - uses: actions/download-artifact@v8
+        with:
+          name: panel
+          path: pwa/dist
+      - name: Version
+        id: version
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then v="${GITHUB_REF_NAME#v}"; else v="${{ inputs.version }}"; fi
+          echo "value=$v" >> "$GITHUB_OUTPUT"
+      - name: OpenSSL for Windows on ARM
+        if: matrix.target == 'win-arm64'
+        run: |
+          "$VCPKG_INSTALLATION_ROOT/vcpkg.exe" install openssl:arm64-windows-static-md
+          echo "OPENSSL_DIR=$VCPKG_INSTALLATION_ROOT/installed/arm64-windows-static-md" >> "$GITHUB_ENV"
+          echo "OPENSSL_STATIC=1" >> "$GITHUB_ENV"
+      - name: OpenSSL for macOS on Intel
+        if: matrix.target == 'mac-x64'
+        run: |
+          brew install openssl@3
+          echo "OPENSSL_DIR=$(brew --prefix openssl@3)" >> "$GITHUB_ENV"
+          echo "OPENSSL_STATIC=1" >> "$GITHUB_ENV"
+      - name: Build
+        run: >
+          uv run --python 3.13 --no-project packaging/build.py
+          --target ${{ matrix.target }}
+          --version ${{ steps.version.outputs.value }}
+          --commit ${{ github.sha }}
+          --skip "${{ matrix.skip }}"
+          --from-source "${{ matrix.from_source }}"
+          --wheelhouse wheelhouse
+      - name: Unpack the archive and smoke test it
+        run: |
+          mkdir unpacked
+          cd build/${{ matrix.target }}/out
+          case "${{ matrix.target }}" in
+            win-*) 7z x -y -o../../../unpacked trading-bot-*.zip > /dev/null ;;
+            *) tar -xzf trading-bot-*.tar.gz -C ../../../unpacked ;;
+          esac
+          cd ../../..
+          exe=$(ls unpacked/trading-bot-*/trading-bot*.exe unpacked/trading-bot-*/trading-bot 2>/dev/null | head -n 1)
+          echo "smoke: $exe"
+          uv run --python 3.13 --no-project scripts/smoke.py --timeout 300 --engine-wait 150 -- "$exe" 2>&1 | tee smoke.log
+          grep -q "^RESULT:" smoke.log
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: bundle-${{ matrix.target }}
+          path: |
+            build/${{ matrix.target }}/out/*
+            smoke.log
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v7
+        if: always() && matrix.from_source != ''
+        with:
+          name: wheelhouse-${{ matrix.target }}
+          path: wheelhouse
+          if-no-files-found: warn
+
+  release:
+    needs: bundle
+    if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: bundle-*
+          path: artifacts
+          merge-multiple: true
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          shopt -s nullglob
+          cd artifacts
+          ls -l
+          cat trading-bot-*.sha256 > SHA256SUMS
+          sha256sum -c SHA256SUMS
+          flags=()
+          if [[ "${GITHUB_REF_NAME}" =~ -rc(\.[0-9]+)?$ ]]; then flags+=(--prerelease); fi
+          {
+            echo "Native builds of the dry-run trading bot. No code signing: see the first-open steps in the README."
+            echo
+            echo "Checksums are in SHA256SUMS. Source: https://github.com/${GITHUB_REPOSITORY}/tree/${GITHUB_REF_NAME}"
+            echo
+            echo "Targets built and smoke tested in this release:"
+            for f in trading-bot-*.sha256; do echo "- ${f%.sha256}"; done
+          } > notes.md
+          files=(trading-bot-*.tar.gz trading-bot-*.zip SHA256SUMS)
+          gh release create "${GITHUB_REF_NAME}" "${flags[@]}" --title "${GITHUB_REF_NAME}" --notes-file notes.md --verify-tag "${files[@]}"
