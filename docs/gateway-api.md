@@ -491,7 +491,7 @@ The Freqtrade WebSocket client (the gateway) sends `{"type": "subscribe", "data"
 | `stake_amount` | IDR used for this trade (result of `custom_stake_amount`) |
 | `open_trade_value` | Value at entry including the opening fee |
 | `fee_open`, `fee_close` | Fee ratio; Indodax taker 0.2% is written `0.002` |
-| `enter_tag` | strategy signal: `rule_<entry>` for `RuleStrategy` (default `rule_rsi_dip`), `ema_cross_up` for `SwingEmaRsi`; `force_entry` for a manual entry |
+| `enter_tag` | strategy signal: `rule_<entry>` for `RuleStrategy` (default `rule_donchian`), `ema_cross_up` for `SwingEmaRsi`; `force_entry` for a manual entry |
 | `exit_reason` | `roi`, `stop_loss`, `force_exit`, `emergency_exit`; a strategy exit carries its tag: `rule_<exit>` for a `RuleStrategy` exit signal, `rule_lock`, `rule_trail` or `rule_time` for its rule exits, `ema_cross_down_or_rsi` for `SwingEmaRsi` |
 | `profit_abs`, `profit_pct` | Absolute profit/loss in IDR and percent of entry value |
 | `stop_loss_pct` | Per-trade loss limit, `-3.0` means -3% |

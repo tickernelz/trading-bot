@@ -1,14 +1,98 @@
-# Default strategy search, round 1 (ZHA-3872)
+# Default strategy search
+
+**Current default (round 2, ZHA-3876): tier T2, not proven.** `RuleStrategy` with rule `S-don1d20-sma50-tp5-lock3` (1d Donchian 20 breakout while the daily close is above its SMA50, take-profit 5%, profit lock at 3%, Donchian-mid exit, 8% stop) on BTC/IDR, ETH/IDR, SOL/IDR, XRP/IDR and DOGE/IDR meets the locked win-rate target on the walk-forward and on an untouched pre-sample period, with a positive expectancy whose 95% CI still includes zero in both. On the untouched pre-sample (2018-09-01 to 2021-01-01) it made 189 trades on 4 pairs, net win rate 69.8% (Wilson 95% lower bound 63.0%), net expectancy +0.739% per trade (95% CI -0.028% to +1.484%). On the walk-forward (2022-07-01 to 2026-04-26) it made 382 trades, net win rate 66.8% (Wilson 61.9%), net expectancy +0.076% per trade (95% CI -0.436% to +0.598%); at 0.41% per side or with +0.10% slippage per side the walk-forward mean is negative. Nothing here is shown to be profitable. Live mode stays locked (`LIVE_ENGINE_PROVEN = False`).
+
+Generated tables for round 2: [strategy-research/round2/results.md](strategy-research/round2/results.md) (every configuration, fold, control and the pre-sample run), `round2/walk-forward-summary.json` and `round2/presample.json`. Locked plan: [strategy-research/plan.md](strategy-research/plan.md), section "Round 2". Ledger: [strategy-research/ledger.jsonl](strategy-research/ledger.jsonl).
+
+## Round 2: why these changes
+
+Round 1's data (section "Round 1" below) showed three failure modes: every positive-expectancy trend rule failed target (b) because its 1d SMA200 filter left fold F1 (2022-H2) or F8 (2026-01..04) without a trade; the high win rate families had a payoff of 0.06 to 0.56 from fixed percentage targets; and trend rules made too few trades for narrow CIs. Round 2 added two liquid pairs (XRP/IDR, DOGE/IDR), faster trend filters (SMA50, SMA100 on 1d), ATR-scaled targets and stops (ZHA-3871 section 4.4), a Bonferroni bound over the cumulative number of configurations, and an untouched pre-sample period, because the round 1 holdout is used and no forward data after 2026-10-26 exists yet. 49 configurations, 142 over both rounds (budget 600), locked in `4642bd8` before the first run.
+
+## Round 2: locked before the first run
+
+| Item | Value |
+| --- | --- |
+| Lock commit | `4642bd8` (plan, 49-configuration matrix, pre-sample rule) |
+| Walk-forward data | Indodax 1h, 2021-01-01 to 2026-04-26 for the five pairs (BTC, ETH, SOL: the round 1 files, same SHA-256; XRP and DOGE fetched 2026-10-26, 0 gaps); nothing after 2026-04-26 is loaded |
+| Pre-sample data | Indodax 1h, 2018-01-01 to 2021-01-01 for BTC, ETH, XRP (0 gaps) and DOGE (listed 2018-07-25, 0 gaps after); scored from 2018-09-01; no earlier run or probe scored a trade before 2021 |
+| Pre-sample rule | one run, one configuration, only for a walk-forward T1 or T2; refused afterwards (`presample_started`) |
+| Costs, folds, targets, seeds | as in round 1 |
+
+## Round 2: ledger
+
+| Run | Commit | Tree | Outcome |
+| --- | --- | --- | --- |
+| walk-forward, 49 configurations | 4642bd8 | clean | ok, selected `S-don1d20-sma50-tp5-lock3` (walk-forward T2) |
+| validation (stage 2 period, SwingEmaRsi) | fea68c3 | clean | ok, 447 trades, -0.818%, 38.3%, equal to stage 2 |
+| controls, every configuration | fea68c3 | clean | ok |
+| pre-sample, `S-don1d20-sma50-tp5-lock3` | fea68c3 | clean | ok, tier T2 |
+
+Every run first writes a `<kind>_started` line, so a killed run leaves a trace. `fea68c3` differs from `4642bd8` only in `engine/search_report.py` (report headings), which no run imports.
+
+## Round 2: results
+
+Walk-forward, net of taker costs, the selected configuration and the nearest alternatives (all 49 rows: round2/results.md):
+
+| Config | Tier | Trades | Net win rate | Mean net per trade | 95% CI | Fold WR % F1..F8 | Fold SD | Payoff | Max DD |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| S-don1d20-sma50-tp5-lock3 (default) | T2 | 382 | 66.8% | +0.076% | -0.44% .. +0.60% | 51 62 70 69 69 72 73 61 | 7.4 | 0.51 | 5.4% |
+| S-don1d20-nofilter-tp5-lock3 | T2 | 418 | 65.8% | +0.039% | -0.47% .. +0.56% | 51 61 68 69 71 71 71 55 | 7.9 | 0.53 | |
+| Q-J-rsi14-1h-tp3-sl10 (round 1 default) | T3 | 875 | 75.8% | -0.767% | -1.14% .. -0.39% | 75 81 83 76 74 70 80 71 | 4.6 | 0.22 | |
+| Q-F-don1d20-tp5-lock3 | T4 | 280 | 68.2% | +0.353% | -0.27% .. +0.98% | 57 60 71 68 70 74 69 - | 6.1 | 0.54 | |
+| Q-F-don1d20-tp8-lock3 | T4 | 250 | 63.6% | +0.750% | -0.01% .. +1.52% | 57 45 64 68 67 71 66 - | 8.7 | 0.77 | |
+| V-don1d20-sma200-tp2atr-st3atr | T4 | 212 | 59.0% | +0.912% | -0.25% .. +2.08% | 33 43 70 64 67 47 50 - | 13.7 | 0.88 | |
+
+- The faster SMA50 filter is what moved the near miss over target (b): it trades in F1 (51%) and F8 (61%), where the SMA200 version took no trade even on five pairs. It pays for that with a lower mean (+0.08% against +0.35%).
+- ATR exits (family V) raised the mean of trend entries (up to +0.91%) but not the win rate: their folds range from 33% to 79% and none meets (b). ATR exits on pullbacks (family W) lost in every configuration (-0.53% to -0.72%).
+- The default for the walk-forward: profit factor 1.03, payoff 0.51, largest loss -8.57%, mean of the 5 worst trades -8.57% (the 8% stop plus costs), max drawdown 5.4% at 0.5% risk per trade, 8.3 trades per month, rolling 30-trade minimum 50.0%, regimes bear 57.3% (75 trades), range 73.3% (30), bull 68.6% (277). Cost sensitivity of the mean: 0.41% per side -0.122%, no tax +0.287%, +0.05% slippage -0.024%, +0.10% slippage -0.124%.
+- Multiple testing: Bonferroni lower bound of the walk-forward mean over 142 configurations -0.890%. Null (1,000 random-entry series with the same exits and entry rate): mean p95 -0.370%, beaten.
+- Selection walked forward (pick the best earlier mean before each fold) chose four different configurations over seven folds; the walk-forward is not evidence that the S rule would have been picked in advance.
+
+Pre-sample 2018-09-01 to 2021-01-01, `S-don1d20-sma50-tp5-lock3`, taker costs: 189 trades (BTC 55, ETH 58, XRP 42, DOGE 34), net win rate 69.8% (Wilson 63.0%), mean +0.739% (95% CI -0.028% to +1.484%), profit factor 1.37, payoff 0.59, largest loss -8.57%, mean of the 5 worst trades -8.57%, max drawdown 2.3%, 6.7 trades per month, rolling 30-trade minimum 56.7% (walk-forward 50.0%), regimes bear 67.7% (31 trades), range 66.1% (62), bull 72.9% (96). Null p95 -0.100%, beaten. Mean at 0.41% per side +0.539%, with +0.10% slippage +0.537%. Comparators on the same period: SwingEmaRsi 970 trades, -0.935% per trade; buy-and-hold BTC +292%, ETH +149%, XRP -38%, DOGE -5%. Final tier: target (a) to (d) met, mean above zero, CI lower bound below zero: T2.
+
+## Round 2: controls
+
+- Lookahead detection fires for all 47 rule configurations (moving signals one candle earlier raises the mean by 0.35 to 3+ points). For the default, honest +0.076%, shift 1h +1.91%, shift 1d +3.12%, peek at the fill candle +0.54%.
+- Truncation (40 seeded cuts, 5 pairs): 0 of 200 comparisons failed for every configuration; live window (649 candles per timeframe): 0 entry mismatches.
+- Freqtrade 2026.9 backtest of `RuleStrategy` with the default rule on the five pairs over the whole walk-forward at 0.41% per side, one position per pair: 382 trades with the same pair, entry and exit times as the simulator (382 of 382), win rate 64.40% in both, mean -0.1230% (Freqtrade) against -0.1223% (simulator).
+- Freqtrade `lookahead-analysis` on the default rule, 2024: `has_bias: No` (20 signals, 0 biased entries or exits). `recursive-analysis`: indicator differences at most 0.002% with 199 startup candles, 0.000% at the strategy's 400.
+
+## Round 2: what the code now does
+
+- `config.example.yaml` runs the round 2 default on the five pairs; `exchange.fee_pct` is 0.31055, the mean of the taker buy and sell costs, so a dry-run round trip costs the same 0.6211% as the research (it was 0.2% per side).
+- `strategy.rule` accepts `trend_filter` `above_sma50_1d` and `above_sma100_1d`, and `take_profit_atr` and `stop_atr` (multiples of the rule timeframe's ATR(14) at the signal candle; Freqtrade `custom_roi` and `custom_stoploss`; the ATR stop never loosens `stoploss`). The default uses none of the ATR fields.
+- The analytics backtest routes read the strategy name from the backtest result instead of assuming the configured default.
+
+## Round 2: reproduce
+
+```sh
+run=$HOME/trading-bot-search2
+docker build -f docker/Dockerfile --build-context freqtrade-base=docker-image://trading-bot/freqtrade:2026.9 --target test -t trading-bot/engine:search .
+# walk-forward data in $run/data/indodax (five pairs, 2021-01-01 .. 2026-04-26), pre-sample data in $run/pre/indodax (2018-01-01 .. 2021-01-01), both with engine.history
+IMAGE=trading-bot/engine:search scripts/strategy_search.sh $run walk-forward
+IMAGE=trading-bot/engine:search scripts/strategy_search.sh $run controls
+IMAGE=trading-bot/engine:search scripts/strategy_search.sh $run presample --datadir /run-dir/pre/indodax --wf-datadir /run-dir/data/indodax --candidate S-don1d20-sma50-tp5-lock3 --replay
+```
+
+The later `--datadir` replaces the script's walk-forward one. The candle files must match the SHA-256 values in the ledger. A replay is logged as `presample_replay`.
+
+## Round 2: not shown
+
+- A positive expectancy: both CIs include zero, the walk-forward mean is +0.08% and turns negative at 0.41% per side or with +0.10% slippage, and the pre-sample (a long bull run for BTC and ETH) is the only period where the mean is clearly above the costs.
+- The pre-sample is now used. Later rounds can only be judged on forward data (a dry run that keeps adding trades, or Indodax candles after 2026-10-26); until 100 forward trades exist, a later round's result is "not enough data".
+- Stops run on the bot side, as in round 1; a gap or an offline PC can lose more than 8%.
+
+## Round 1 (ZHA-3872), superseded as default by round 2
 
 **Result tier: T3 on the walk-forward, T4 on the holdout.** The new default `RuleStrategy` with rule `J-rsi14-1h-tp3-sl10` often wins but loses money net of costs: walk-forward 2022-07-01 to 2026-04-26, 519 trades, net win rate 77.1% (Wilson 95% lower bound 73.3%), net expectancy -0.599% per trade (95% CI -1.07% to -0.15%). On the untouched holdout (2026-04-26 to 2026-10-26) it made 54 trades, net win rate 77.8%, expectancy -0.112% per trade (95% CI -1.47% to +1.11%); the win-rate target fails there because 54 is below the required 100 trades. Nothing in this round is shown to be profitable. Live mode stays locked (`LIVE_ENGINE_PROVEN = False`).
 
 All tables with every configuration, fold, pair, regime, control and cost level are generated into [strategy-research/results.md](strategy-research/results.md) by `python -m engine.search_report`. The locked plan is [strategy-research/plan.md](strategy-research/plan.md). The run ledger is [strategy-research/ledger.jsonl](strategy-research/ledger.jsonl). The stage 2 baseline is in [stage2-backtest.md](stage2-backtest.md).
 
-## What was asked and how it was read
+### What was asked and how it was read
 
 Zhafron asked for a default strategy with a high and stable win rate (2026-10-26). The locked definitions: a trade wins only when its profit after Indodax costs is above zero; the target is (a) holdout net win rate at least 60% with at least 100 trades on at least 2 pairs and a Wilson lower bound of at least 50%, (b) every walk-forward fold at least 50% with a fold standard deviation of at most 8 points, (c) every rolling 30-trade window at least 40%, (d) at least 50% in every BTC/IDR regime with 20 or more trades. Tiers: T1 target met with positive expectancy and a CI above zero (and above the random-entry null); T2 target met with positive point expectancy; T3 target met with expectancy at or below zero; T4 target not met. Wira's reading is kept next to it: a win rate says nothing about money unless expectancy per trade, which is win rate times average win minus loss rate times average loss minus costs, is reported beside it.
 
-## Locked before the first result
+### Locked before the first result
 
 | Item | Value |
 | --- | --- |
@@ -22,7 +106,7 @@ Zhafron asked for a default strategy with a high and stable win rate (2026-10-26
 
 The simulator (`engine/simulate.py`) reproduces Freqtrade: on the stage 2 in-sample period it gives SwingEmaRsi 447 trades, -0.818% per trade, win rate 38.3%, exactly the stage 2 Freqtrade report. For the selected rule, a Freqtrade 2026.9 backtest of `RuleStrategy` over the whole walk-forward at 0.41% per side produced the same 519 trades with the same entry and exit times (519 of 519), win rate 77.07% in both, mean -0.797% (Freqtrade) against -0.796% (simulator).
 
-## Ledger
+### Ledger
 
 | Run | Commit | Tree | Outcome |
 | --- | --- | --- | --- |
@@ -36,7 +120,7 @@ Two attempts left no ledger line: a controls launch at 09:39 UTC that never star
 
 **The holdout of round 1 is used.** `python -m engine.strategy_search holdout` refuses any further holdout run except a `--replay` of the same configuration. Later rounds (ZHA-3876) must be judged on data after 2026-10-26.
 
-## Results
+### Results
 
 Walk-forward, net of taker costs, selected rows (all 93 rows: results.md):
 
@@ -65,27 +149,29 @@ The trade-off is the whole story of this round:
 
 Holdout for the default (`J-rsi14-1h-tp3-sl10`, taker costs): 54 trades, 77.8% net win rate (Wilson lower bound 65.1%), mean -0.112% (95% CI -1.47% to +1.11%), profit factor 0.94, payoff 0.27, largest loss -10.56%, mean of the 5 worst trades -10.56%, max drawdown 2.2%, 9.0 trades per month. Per pair: BTC/IDR 11 trades, ETH/IDR 19, SOL/IDR 24. The null's 95th percentile on the holdout is -0.053%; the default does not beat it. Holdout tier: T4, because the holdout has fewer than 100 trades; checks (b) to (d) pass. At 0.41% per side the holdout mean is -0.310%. Comparators on the same holdout: SwingEmaRsi 124 trades, 33.9% win rate, -0.583% per trade; buy-and-hold BTC/IDR +7.9%, ETH/IDR +4.8%, SOL/IDR +22.9%.
 
-## Why this configuration is the default
+### Why this configuration is the default
 
 The locked rule makes the default the highest tier reached, then the highest net expectancy, then the lowest drawdown, among deployable configurations with at least 100 walk-forward trades on at least 2 pairs (61 of 93). T3 beats T4, so `J-rsi14-1h-tp3-sl10` wins over every positive-expectancy trend configuration. Against the old default it trades less (11.3 instead of 17.3 trades per month on the walk-forward), loses a little less per trade (-0.60% against -0.62%) and has a far lower sized drawdown (16.0% against 50.4%). Its tail risk is explicit: each stop costs about 10.6% of the stake, and five of them in a row would cost about 2.5% of equity under the 0.5% risk rule.
 
 Alternative not taken: making a trend configuration (for example `B-don1d-20-adx20-mid`) the default. Its walk-forward mean is positive, but its win rate is 52%, it made 52 trades in almost four years, and the locked rule ranks it below every T3 configuration.
 
-## Controls
+### Controls
 
 - Lookahead detection fires. Moving every signal one rule candle earlier makes trend rules look far better (`A-don1d-20-sl10` +3.80% to +14.40% per trade). For dip-buying rules an earlier signal buys before the dip and looks worse, so a second control was added before the holdout: keep an entry only when its fill candle closes green. For the default this moves the mean from -0.599% to -0.082% and the win rate from 77.1% to 81.1%; the median uplift over all configurations is +0.56 points.
 - Truncation: at 40 seeded cut points, the signals of the last 48 candles computed on data cut at the point equal those computed on full data, for all 91 configurations except buy-and-hold and the random-entry control (0 of 120 comparisons failed per configuration).
 - Live window: entries computed from the last 649 candles of each timeframe (what a live start gets from Indodax) equal entries from full history at the same cuts, for all configurations.
 - Freqtrade 2026.9 on `RuleStrategy` with the default rule, 2024: `lookahead-analysis` reports `has_bias: No` (20 signals, 0 biased entries or exits); `recursive-analysis` shows indicator differences of at most 0.002% with 199 startup candles and 0.000% at the strategy's 400.
 
-## What the code now does
+### What the code now does
 
 - `config.strategy.name` selects `RuleStrategy` (default in `config/config.example.yaml`) or `SwingEmaRsi`; `strategy.rule` holds the rule (`engine/rules.py`), validated by the schema, so an unknown name, a missing or extra rule, a positive stop, or an unknown field stops the bot before it starts.
 - `engine/strategies/rule_strategy.py` runs any rule from the searched families through the same signal code as the simulator (`engine/signals.py`), with 4h and 1d candles taken from the exchange as informative pairs and merged with `merge_informative_pair`. The take-profit is converted into Freqtrade's fee-inclusive ROI so it fills at the gross target price.
 - Both strategies inherit the risk layer, startup check, heartbeat and shadow swarm hooks from `engine/strategies/gated.py`. The swarm stays a shadow and was not part of the search. The chart columns (EMA 20/50, RSI 14) are still computed for the PWA chart and the shadow candidate.
 - The analytics backtest and signal routes use the configured strategy name.
 
-## Reproduce
+### Reproduce
+
+Run these at commit `09f73d0`: from round 2 on, `walk-forward` and `controls` run the round 2 matrix and the example config lists five pairs. The `holdout --replay` command still replays round 1 at later commits.
 
 ```sh
 docker build -f docker/Dockerfile --build-context freqtrade-base=docker-image://trading-bot/freqtrade:2026.9 --target test -t trading-bot/engine:search .
@@ -102,7 +188,7 @@ IMAGE=trading-bot/engine:search scripts/strategy_search.sh $run holdout --candid
 
 The candle files must match the SHA-256 values in the ledger; Indodax can revise recent candles, and the Fear and Greed file grows daily (only the exploratory family I reads it). A replay is logged as `holdout_replay`.
 
-## Not shown
+### Not shown
 
 - No configuration is shown to be profitable after costs on data it was not chosen on.
 - A high and stable win rate with positive expectancy was not found in this matrix; no source reviewed in ZHA-3871 reports one for spot crypto after these costs.

@@ -17,7 +17,7 @@ from engine.strategies.swing_ema_rsi import SwingEmaRsi
 from tests.conftest import EXAMPLE
 
 NOW = datetime(2026, 10, 25, 9, 0, tzinfo=UTC)
-FEE = 0.002
+FEE = load_settings(EXAMPLE).exchange.fee_pct / 100
 
 
 class CandleStub:

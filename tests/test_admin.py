@@ -334,7 +334,7 @@ def test_idempotency_key_is_required_replayed_from_the_ledger_and_refuses_a_diff
     rig.fake.closed = []
     missing = rig.call("PATCH", "/gw/v1/settings", json={"changes": {"exchange": {"fee_pct": 0.1}}}, auto_key=False)
     assert missing.status_code == 400
-    assert rig.raw()["exchange"]["fee_pct"] == 0.2
+    assert rig.raw()["exchange"]["fee_pct"] == 0.31055
     first = rig.patch({"exchange": {"fee_pct": 0.1}}, key="idem-0001")
     assert first.status_code == 200
     assert rig.gateway.ledger.stored_result("idem-0001")[1] == 200
@@ -355,7 +355,7 @@ def test_a_key_still_running_is_not_started_twice(rig):
     response = rig.patch({"exchange": {"fee_pct": 0.1}}, key="busy-key-01")
     assert response.status_code == 409
     assert "still running" in response.json()["error"]["message"]
-    assert rig.raw()["exchange"]["fee_pct"] == 0.2
+    assert rig.raw()["exchange"]["fee_pct"] == 0.31055
 
 
 def test_our_own_write_is_not_reported_again_by_the_file_watcher(rig):

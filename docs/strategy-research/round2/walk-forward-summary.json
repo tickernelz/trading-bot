@@ -1,0 +1,3180 @@
+{
+ "selected": "S-don1d20-sma50-tp5-lock3",
+ "eligible": [
+  "S-don1d20-sma50-tp5-lock3",
+  "S-don1d20-nofilter-tp5-lock3",
+  "Q-J-rsi14-1h-tp3-sl10",
+  "V-don1d20-sma200-tp2atr-st3atr",
+  "Q-F-don1d20-tp8-lock3",
+  "V-don1d20-sma100-tp2atr-st3atr",
+  "V-don1d20-sma200-tp2atr-st2atr",
+  "V-don1d20-sma100-tp2atr-st2atr",
+  "V-don1d20-sma200-tp1.5atr-st3atr",
+  "S-don1d20-sma100-tp8-lock3",
+  "Q-F-don1d20-tp5-lock3",
+  "S-don1d20-nofilter-tp8-lock3",
+  "S-don1d20-sma50-tp8-lock3",
+  "V-don1d20-sma100-tp1.5atr-st3atr",
+  "V-don1d20-sma200-tp1.5atr-st2atr",
+  "V-don1d20-sma100-tp1.5atr-st2atr",
+  "S-don1d10-sma50-tp8-lock3",
+  "S-don1d20-sma100-tp5-lock3",
+  "S-don1d10-sma100-tp8-lock3",
+  "V-don1d20-sma200-tp1atr-st3atr",
+  "Q-G-rsi2-1d-10-sl25",
+  "V-don4h20-sma200-tp3.5atr-st3atr",
+  "S-don1d10-nofilter-tp8-lock3",
+  "V-don4h20-sma200-tp2.5atr-st3atr",
+  "S-don1d10-sma50-tp5-lock3",
+  "V-don1d20-sma200-tp1atr-st2atr",
+  "V-don4h20-sma200-tp3.5atr-st2atr",
+  "V-don4h20-sma200-tp2.5atr-st2atr",
+  "V-don1d20-sma100-tp1atr-st3atr",
+  "S-don1d10-nofilter-tp5-lock3",
+  "S-don1d10-sma100-tp5-lock3",
+  "V-don4h20-sma200-tp1.5atr-st3atr",
+  "V-don1d20-sma100-tp1atr-st2atr",
+  "W-rsi2-4h-sma50-tp1atr-st2.5atr",
+  "V-don4h20-sma200-tp1.5atr-st2atr",
+  "W-rsi2-4h-sma50-tp1atr-st1.5atr",
+  "W-rsi14-1h-sma100-tp2atr-st3atr",
+  "W-rsi14-1h-sma100-tp3atr-st3atr",
+  "W-rsi2-4h-sma50-tp1.5atr-st1.5atr",
+  "W-rsi2-4h-sma100-tp1atr-st2.5atr",
+  "W-rsi2-4h-sma50-tp1.5atr-st2.5atr",
+  "W-rsi14-1h-sma100-tp2atr-st5atr",
+  "W-rsi2-4h-sma100-tp1atr-st1.5atr",
+  "K-SwingEmaRsi",
+  "W-rsi2-4h-sma100-tp1.5atr-st1.5atr",
+  "W-rsi2-4h-sma100-tp1.5atr-st2.5atr",
+  "W-rsi14-1h-sma100-tp3atr-st5atr"
+ ],
+ "results": [
+  {
+   "id": "S-don1d20-sma50-tp5-lock3",
+   "family": "S faster trend filter",
+   "deployable": true,
+   "tier": "T2",
+   "checks": "abcd",
+   "all": {
+    "trades": 382,
+    "trades_per_month": 8.335,
+    "win_rate": 0.6675392670157068,
+    "wilson_lower": 0.618835765705631,
+    "mean": 0.0007589905217123195,
+    "ci95": [
+     -0.00435899961974684,
+     0.005976806351902881
+    ],
+    "median": 0.04349182754847414,
+    "profit_factor": 1.0334390303197192,
+    "payoff_ratio": 0.5146931641200171,
+    "largest_loss": -0.0857023987194323,
+    "worst5_mean": -0.0857023987194323,
+    "max_drawdown": 0.054125295024973874,
+    "rolling30_min_win_rate": 0.5,
+    "longest_days_without_entry": 89.5,
+    "days_without_entry_at_end": 8.4,
+    "exit_reasons": {
+     "end": 3,
+     "exit_signal": 35,
+     "lock": 69,
+     "roi": 198,
+     "stoploss": 77
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.5128205128205128,
+    "F2": 0.6190476190476191,
+    "F3": 0.7,
+    "F4": 0.6885245901639344,
+    "F5": 0.6875,
+    "F6": 0.71875,
+    "F7": 0.7333333333333333,
+    "F8": 0.6086956521739131
+   },
+   "fold_std": 0.0736344603948496,
+   "regimes": {
+    "bear": {
+     "trades": 75,
+     "win_rate": 0.5733333333333334
+    },
+    "range": {
+     "trades": 30,
+     "win_rate": 0.7333333333333333
+    },
+    "bull": {
+     "trades": 277,
+     "win_rate": 0.6859205776173285
+    }
+   },
+   "sensitivity": {
+    "taker": 0.0007589905217123195,
+    "stress_041": -0.0012230463476255048,
+    "no_tax": 0.002869354017313883,
+    "slip_005": -0.00024233041878194341,
+    "slip_010": -0.0012426530885520416
+   }
+  },
+  {
+   "id": "S-don1d20-nofilter-tp5-lock3",
+   "family": "S faster trend filter",
+   "deployable": true,
+   "tier": "T2",
+   "checks": "abcd",
+   "all": {
+    "trades": 418,
+    "trades_per_month": 9.12,
+    "win_rate": 0.6578947368421053,
+    "wilson_lower": 0.6111618617691771,
+    "mean": 0.0003908906469473577,
+    "ci95": [
+     -0.004683096903252122,
+     0.005178558433191974
+    ],
+    "median": 0.043491827548473916,
+    "profit_factor": 1.0171812147696497,
+    "payoff_ratio": 0.5289342316802178,
+    "largest_loss": -0.0857023987194323,
+    "worst5_mean": -0.0857023987194323,
+    "max_drawdown": 0.055229031692678454,
+    "rolling30_min_win_rate": 0.4666666666666667,
+    "longest_days_without_entry": 65.2,
+    "days_without_entry_at_end": 8.4,
+    "exit_reasons": {
+     "end": 4,
+     "exit_signal": 45,
+     "lock": 77,
+     "roi": 214,
+     "stoploss": 78
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.5106382978723404,
+    "F2": 0.6122448979591837,
+    "F3": 0.6825396825396826,
+    "F4": 0.6875,
+    "F5": 0.7108433734939759,
+    "F6": 0.7058823529411765,
+    "F7": 0.7142857142857143,
+    "F8": 0.5517241379310345
+   },
+   "fold_std": 0.0791505802212239,
+   "regimes": {
+    "bear": {
+     "trades": 91,
+     "win_rate": 0.5494505494505495
+    },
+    "range": {
+     "trades": 36,
+     "win_rate": 0.7222222222222222
+    },
+    "bull": {
+     "trades": 291,
+     "win_rate": 0.6838487972508591
+    }
+   },
+   "sensitivity": {
+    "taker": 0.0003908906469473577,
+    "stress_041": -0.0015904171881971256,
+    "no_tax": 0.0025004779071657805,
+    "slip_005": -0.000610061986975307,
+    "slip_010": -0.0016100167173584438
+   }
+  },
+  {
+   "id": "Q-J-rsi14-1h-tp3-sl10",
+   "family": "Q round 1 near miss on five pairs",
+   "deployable": true,
+   "tier": "T3",
+   "checks": "abcd",
+   "all": {
+    "trades": 875,
+    "trades_per_month": 19.092,
+    "win_rate": 0.7577142857142857,
+    "wilson_lower": 0.7282378355546771,
+    "mean": -0.007674858482858142,
+    "ci95": [
+     -0.011373434006247218,
+     -0.004111829014948378
+    ],
+    "median": 0.02361579273802694,
+    "profit_factor": 0.6999681538734649,
+    "payoff_ratio": 0.22382088781474294,
+    "largest_loss": -0.1055784335298795,
+    "worst5_mean": -0.10557843352987942,
+    "max_drawdown": 0.1521478801298901,
+    "rolling30_min_win_rate": 0.4,
+    "longest_days_without_entry": 15.3,
+    "days_without_entry_at_end": 6.0,
+    "exit_reasons": {
+     "roi": 663,
+     "stoploss": 212
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.7463768115942029,
+    "F2": 0.8055555555555556,
+    "F3": 0.8307692307692308,
+    "F4": 0.7603305785123967,
+    "F5": 0.7433628318584071,
+    "F6": 0.6962962962962963,
+    "F7": 0.7950819672131147,
+    "F8": 0.7123287671232876
+   },
+   "fold_std": 0.04643703095622597,
+   "regimes": {
+    "bear": {
+     "trades": 245,
+     "win_rate": 0.7510204081632653
+    },
+    "range": {
+     "trades": 106,
+     "win_rate": 0.8584905660377359
+    },
+    "bull": {
+     "trades": 524,
+     "win_rate": 0.7404580152671756
+    }
+   },
+   "sensitivity": {
+    "taker": -0.007674858482858142,
+    "stress_041": -0.009640191830333256,
+    "no_tax": -0.005582279975685595,
+    "slip_005": -0.008667740838541058,
+    "slip_010": -0.009659633336379049
+   }
+  },
+  {
+   "id": "V-don1d20-sma200-tp2atr-st3atr",
+   "family": "V volatility exits on 1d trend entry",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "---d",
+   "all": {
+    "trades": 212,
+    "trades_per_month": 4.626,
+    "win_rate": 0.589622641509434,
+    "wilson_lower": 0.5223846858149808,
+    "mean": 0.009122151527498882,
+    "ci95": [
+     -0.0025488032511086106,
+     0.02052916100707076
+    ],
+    "median": 0.04401981858309412,
+    "profit_factor": 1.2617107493515884,
+    "payoff_ratio": 0.8781506815487057,
+    "largest_loss": -0.15526852055599727,
+    "worst5_mean": -0.1552685205559972,
+    "max_drawdown": 0.025069549787528733,
+    "rolling30_min_win_rate": 0.36666666666666664,
+    "longest_days_without_entry": 201.4,
+    "days_without_entry_at_end": 201.4,
+    "exit_reasons": {
+     "exit_signal": 66,
+     "roi": 125,
+     "stoploss": 21
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.3333333333333333,
+    "F2": 0.43333333333333335,
+    "F3": 0.7045454545454546,
+    "F4": 0.6363636363636364,
+    "F5": 0.6666666666666666,
+    "F6": 0.4666666666666667,
+    "F7": 0.5,
+    "F8": null
+   },
+   "fold_std": 0.1373887236117338,
+   "regimes": {
+    "bear": {
+     "trades": 9,
+     "win_rate": 0.5555555555555556
+    },
+    "range": {
+     "trades": 17,
+     "win_rate": 0.6470588235294118
+    },
+    "bull": {
+     "trades": 186,
+     "win_rate": 0.5860215053763441
+    }
+   },
+   "sensitivity": {
+    "taker": 0.009122151527498882,
+    "stress_041": 0.007123551136259505,
+    "no_tax": 0.011250150947295588,
+    "slip_005": 0.008112462729885037,
+    "slip_010": 0.007103780545362382
+   }
+  },
+  {
+   "id": "Q-F-don1d20-tp8-lock3",
+   "family": "Q round 1 near miss on five pairs",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "a-cd",
+   "all": {
+    "trades": 250,
+    "trades_per_month": 5.455,
+    "win_rate": 0.636,
+    "wilson_lower": 0.574716410018678,
+    "mean": 0.007495794601983474,
+    "ci95": [
+     -7.73114220633851e-05,
+     0.014930767808655512
+    ],
+    "median": 0.006407070741779264,
+    "profit_factor": 1.3435779885997916,
+    "payoff_ratio": 0.7689660186325852,
+    "largest_loss": -0.0857023987194323,
+    "worst5_mean": -0.0857023987194323,
+    "max_drawdown": 0.028884673488195123,
+    "rolling30_min_win_rate": 0.4,
+    "longest_days_without_entry": 201.4,
+    "days_without_entry_at_end": 201.4,
+    "exit_reasons": {
+     "exit_signal": 27,
+     "lock": 83,
+     "roi": 95,
+     "stoploss": 45
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.5714285714285714,
+    "F2": 0.45161290322580644,
+    "F3": 0.6382978723404256,
+    "F4": 0.6785714285714286,
+    "F5": 0.6666666666666666,
+    "F6": 0.7058823529411765,
+    "F7": 0.65625,
+    "F8": null
+   },
+   "fold_std": 0.0868223194239747,
+   "regimes": {
+    "bear": {
+     "trades": 10,
+     "win_rate": 0.7
+    },
+    "range": {
+     "trades": 17,
+     "win_rate": 0.7058823529411765
+    },
+    "bull": {
+     "trades": 223,
+     "win_rate": 0.6278026905829597
+    }
+   },
+   "sensitivity": {
+    "taker": 0.007495794601983474,
+    "stress_041": 0.005500415265383229,
+    "no_tax": 0.009620364420528594,
+    "slip_005": 0.006487733074533232,
+    "slip_010": 0.005480676537860999
+   }
+  },
+  {
+   "id": "V-don1d20-sma100-tp2atr-st3atr",
+   "family": "V volatility exits on 1d trend entry",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 239,
+    "trades_per_month": 5.215,
+    "win_rate": 0.5774058577405857,
+    "wilson_lower": 0.514041092084857,
+    "mean": 0.0071926568939544334,
+    "ci95": [
+     -0.0039462958848287604,
+     0.018239944365310765
+    ],
+    "median": 0.04284585818240072,
+    "profit_factor": 1.1969249595842864,
+    "payoff_ratio": 0.8760102965073399,
+    "largest_loss": -0.15526852055599727,
+    "worst5_mean": -0.1552685205559972,
+    "max_drawdown": 0.05107885306171345,
+    "rolling30_min_win_rate": 0.3333333333333333,
+    "longest_days_without_entry": 98.3,
+    "days_without_entry_at_end": 8.6,
+    "exit_reasons": {
+     "end": 2,
+     "exit_signal": 78,
+     "roi": 137,
+     "stoploss": 22
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.35,
+    "F2": 0.3870967741935484,
+    "F3": 0.7209302325581395,
+    "F4": 0.6046511627906976,
+    "F5": 0.673469387755102,
+    "F6": 0.5555555555555556,
+    "F7": 0.5625,
+    "F8": 0.3333333333333333
+   },
+   "fold_std": 0.14903259859943802,
+   "regimes": {
+    "bear": {
+     "trades": 29,
+     "win_rate": 0.41379310344827586
+    },
+    "range": {
+     "trades": 17,
+     "win_rate": 0.7058823529411765
+    },
+    "bull": {
+     "trades": 193,
+     "win_rate": 0.5906735751295337
+    }
+   },
+   "sensitivity": {
+    "taker": 0.0071926568939544334,
+    "stress_041": 0.005197877931789484,
+    "no_tax": 0.009316587466927727,
+    "slip_005": 0.006184898674431245,
+    "slip_010": 0.005178145143302088
+   }
+  },
+  {
+   "id": "V-don1d20-sma200-tp2atr-st2atr",
+   "family": "V volatility exits on 1d trend entry",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "---d",
+   "all": {
+    "trades": 221,
+    "trades_per_month": 4.822,
+    "win_rate": 0.5520361990950227,
+    "wilson_lower": 0.4861408052264824,
+    "mean": 0.0051502292499264815,
+    "ci95": [
+     -0.00618862215035979,
+     0.01621468022676566
+    ],
+    "median": 0.04071594810021684,
+    "profit_factor": 1.1432340782855237,
+    "payoff_ratio": 0.9277063422153021,
+    "largest_loss": -0.15526852055599716,
+    "worst5_mean": -0.1509267532391927,
+    "max_drawdown": 0.02168175595340438,
+    "rolling30_min_win_rate": 0.36666666666666664,
+    "longest_days_without_entry": 201.4,
+    "days_without_entry_at_end": 201.4,
+    "exit_reasons": {
+     "exit_signal": 42,
+     "roi": 122,
+     "stoploss": 57
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.3333333333333333,
+    "F2": 0.41935483870967744,
+    "F3": 0.6521739130434783,
+    "F4": 0.6086956521739131,
+    "F5": 0.5833333333333334,
+    "F6": 0.4666666666666667,
+    "F7": 0.4827586206896552,
+    "F8": null
+   },
+   "fold_std": 0.11350435181581275,
+   "regimes": {
+    "bear": {
+     "trades": 9,
+     "win_rate": 0.5555555555555556
+    },
+    "range": {
+     "trades": 18,
+     "win_rate": 0.5555555555555556
+    },
+    "bull": {
+     "trades": 194,
+     "win_rate": 0.5515463917525774
+    }
+   },
+   "sensitivity": {
+    "taker": 0.0051502292499264815,
+    "stress_041": 0.0031594953844648922,
+    "no_tax": 0.007269852827126375,
+    "slip_005": 0.0041445146049190265,
+    "slip_010": 0.0031398026109561846
+   }
+  },
+  {
+   "id": "V-don1d20-sma100-tp2atr-st2atr",
+   "family": "V volatility exits on 1d trend entry",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 247,
+    "trades_per_month": 5.389,
+    "win_rate": 0.5465587044534413,
+    "wilson_lower": 0.48423494611442575,
+    "mean": 0.004409117257693067,
+    "ci95": [
+     -0.006096955713979971,
+     0.01476830033393323
+    ],
+    "median": 0.040155521077836154,
+    "profit_factor": 1.1194880867538968,
+    "payoff_ratio": 0.9287604867884179,
+    "largest_loss": -0.15526852055599716,
+    "worst5_mean": -0.1509267532391927,
+    "max_drawdown": 0.0459111519671781,
+    "rolling30_min_win_rate": 0.3333333333333333,
+    "longest_days_without_entry": 98.3,
+    "days_without_entry_at_end": 8.6,
+    "exit_reasons": {
+     "end": 2,
+     "exit_signal": 49,
+     "roi": 134,
+     "stoploss": 62
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.35,
+    "F2": 0.375,
+    "F3": 0.6818181818181818,
+    "F4": 0.5777777777777777,
+    "F5": 0.5961538461538461,
+    "F6": 0.5555555555555556,
+    "F7": 0.5454545454545454,
+    "F8": 0.3333333333333333
+   },
+   "fold_std": 0.13059185797316103,
+   "regimes": {
+    "bear": {
+     "trades": 29,
+     "win_rate": 0.41379310344827586
+    },
+    "range": {
+     "trades": 18,
+     "win_rate": 0.6111111111111112
+    },
+    "bull": {
+     "trades": 200,
+     "win_rate": 0.56
+    }
+   },
+   "sensitivity": {
+    "taker": 0.004409117257693067,
+    "stress_041": 0.002419851189480193,
+    "no_tax": 0.006527178005371193,
+    "slip_005": 0.0034041441408298435,
+    "slip_010": 0.0024001729357419443
+   }
+  },
+  {
+   "id": "V-don1d20-sma200-tp1.5atr-st3atr",
+   "family": "V volatility exits on 1d trend entry",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "a-cd",
+   "all": {
+    "trades": 247,
+    "trades_per_month": 5.389,
+    "win_rate": 0.6518218623481782,
+    "wilson_lower": 0.590496938725904,
+    "mean": 0.003669374139741359,
+    "ci95": [
+     -0.006067334842649603,
+     0.012971392158229069
+    ],
+    "median": 0.03597186261570129,
+    "profit_factor": 1.11497497865309,
+    "payoff_ratio": 0.5955766966718369,
+    "largest_loss": -0.15526852055599727,
+    "worst5_mean": -0.1552685205559972,
+    "max_drawdown": 0.03284449559728975,
+    "rolling30_min_win_rate": 0.4,
+    "longest_days_without_entry": 201.4,
+    "days_without_entry_at_end": 201.4,
+    "exit_reasons": {
+     "exit_signal": 61,
+     "roi": 161,
+     "stoploss": 25
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.42857142857142855,
+    "F2": 0.48484848484848486,
+    "F3": 0.7755102040816326,
+    "F4": 0.6981132075471698,
+    "F5": 0.7037037037037037,
+    "F6": 0.47058823529411764,
+    "F7": 0.6176470588235294,
+    "F8": null
+   },
+   "fold_std": 0.13590918252001863,
+   "regimes": {
+    "bear": {
+     "trades": 10,
+     "win_rate": 0.6
+    },
+    "range": {
+     "trades": 18,
+     "win_rate": 0.7777777777777778
+    },
+    "bull": {
+     "trades": 219,
+     "win_rate": 0.6438356164383562
+    }
+   },
+   "sensitivity": {
+    "taker": 0.003669374139741359,
+    "stress_041": 0.0016815731576755937,
+    "no_tax": 0.005785874944529087,
+    "slip_005": 0.0026651411813794425,
+    "slip_010": 0.001661909396888998
+   }
+  },
+  {
+   "id": "S-don1d20-sma100-tp8-lock3",
+   "family": "S faster trend filter",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "a---",
+   "all": {
+    "trades": 283,
+    "trades_per_month": 6.175,
+    "win_rate": 0.607773851590106,
+    "wilson_lower": 0.5498097465726106,
+    "mean": 0.0035416118063907073,
+    "ci95": [
+     -0.003593785196150409,
+     0.01066336940700888
+    ],
+    "median": 0.005890576330731978,
+    "profit_factor": 1.143767535946628,
+    "payoff_ratio": 0.7381290493609054,
+    "largest_loss": -0.0857023987194323,
+    "worst5_mean": -0.0857023987194323,
+    "max_drawdown": 0.07526837834580202,
+    "rolling30_min_win_rate": 0.26666666666666666,
+    "longest_days_without_entry": 98.3,
+    "days_without_entry_at_end": 8.6,
+    "exit_reasons": {
+     "end": 2,
+     "exit_signal": 28,
+     "lock": 89,
+     "roi": 103,
+     "stoploss": 61
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.4090909090909091,
+    "F2": 0.34375,
+    "F3": 0.6521739130434783,
+    "F4": 0.6785714285714286,
+    "F5": 0.6461538461538462,
+    "F6": 0.6666666666666666,
+    "F7": 0.7105263157894737,
+    "F8": 0.3333333333333333
+   },
+   "fold_std": 0.16245073886327235,
+   "regimes": {
+    "bear": {
+     "trades": 32,
+     "win_rate": 0.4375
+    },
+    "range": {
+     "trades": 17,
+     "win_rate": 0.6470588235294118
+    },
+    "bull": {
+     "trades": 234,
+     "win_rate": 0.6282051282051282
+    }
+   },
+   "sensitivity": {
+    "taker": 0.0035416118063907073,
+    "stress_041": 0.0015540638619270285,
+    "no_tax": 0.005657843190701626,
+    "slip_005": 0.0025375066821037317,
+    "slip_010": 0.0015344026042435736
+   }
+  },
+  {
+   "id": "Q-F-don1d20-tp5-lock3",
+   "family": "Q round 1 near miss on five pairs",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "a-cd",
+   "all": {
+    "trades": 280,
+    "trades_per_month": 6.109,
+    "win_rate": 0.6821428571428572,
+    "wilson_lower": 0.625451086452051,
+    "mean": 0.003531700095855433,
+    "ci95": [
+     -0.0026567614205015256,
+     0.009478217165919785
+    ],
+    "median": 0.04349182754847414,
+    "profit_factor": 1.1691461867746715,
+    "payoff_ratio": 0.5447853959316531,
+    "largest_loss": -0.0857023987194323,
+    "worst5_mean": -0.0857023987194323,
+    "max_drawdown": 0.022319197721861972,
+    "rolling30_min_win_rate": 0.5333333333333333,
+    "longest_days_without_entry": 201.4,
+    "days_without_entry_at_end": 201.4,
+    "exit_reasons": {
+     "exit_signal": 27,
+     "lock": 50,
+     "roi": 152,
+     "stoploss": 51
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.5714285714285714,
+    "F2": 0.6,
+    "F3": 0.7115384615384616,
+    "F4": 0.6774193548387096,
+    "F5": 0.696969696969697,
+    "F6": 0.7368421052631579,
+    "F7": 0.6923076923076923,
+    "F8": null
+   },
+   "fold_std": 0.06067390673093249,
+   "regimes": {
+    "bear": {
+     "trades": 10,
+     "win_rate": 0.7
+    },
+    "range": {
+     "trades": 20,
+     "win_rate": 0.75
+    },
+    "bull": {
+     "trades": 250,
+     "win_rate": 0.676
+    }
+   },
+   "sensitivity": {
+    "taker": 0.003531700095855433,
+    "stress_041": 0.001544171781868129,
+    "no_tax": 0.005647910578718259,
+    "slip_005": 0.002527604888844666,
+    "slip_010": 0.0015245107183736192
+   }
+  },
+  {
+   "id": "S-don1d20-nofilter-tp8-lock3",
+   "family": "S faster trend filter",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "a--d",
+   "all": {
+    "trades": 373,
+    "trades_per_month": 8.138,
+    "win_rate": 0.613941018766756,
+    "wilson_lower": 0.563611797196536,
+    "mean": 0.0029143445123334098,
+    "ci95": [
+     -0.003155954885128935,
+     0.009089286841312213
+    ],
+    "median": 0.00549734779885358,
+    "profit_factor": 1.1231965552585483,
+    "payoff_ratio": 0.7062895369311397,
+    "largest_loss": -0.0857023987194323,
+    "worst5_mean": -0.0857023987194323,
+    "max_drawdown": 0.0639058430940791,
+    "rolling30_min_win_rate": 0.36666666666666664,
+    "longest_days_without_entry": 65.2,
+    "days_without_entry_at_end": 8.4,
+    "exit_reasons": {
+     "end": 3,
+     "exit_signal": 45,
+     "lock": 130,
+     "roi": 127,
+     "stoploss": 68
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.45454545454545453,
+    "F2": 0.5,
+    "F3": 0.6181818181818182,
+    "F4": 0.7017543859649122,
+    "F5": 0.6666666666666666,
+    "F6": 0.6774193548387096,
+    "F7": 0.6904761904761905,
+    "F8": 0.52
+   },
+   "fold_std": 0.09765848442190748,
+   "regimes": {
+    "bear": {
+     "trades": 83,
+     "win_rate": 0.5060240963855421
+    },
+    "range": {
+     "trades": 31,
+     "win_rate": 0.6451612903225806
+    },
+    "bull": {
+     "trades": 259,
+     "win_rate": 0.6447876447876448
+    }
+   },
+   "sensitivity": {
+    "taker": 0.0029143445123334098,
+    "stress_041": 0.0009280388918613416,
+    "no_tax": 0.005029253138605774,
+    "slip_005": 0.0019108670075659896,
+    "slip_010": 0.0009083899235177201
+   }
+  },
+  {
+   "id": "S-don1d20-sma50-tp8-lock3",
+   "family": "S faster trend filter",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "a--d",
+   "all": {
+    "trades": 341,
+    "trades_per_month": 7.44,
+    "win_rate": 0.6187683284457478,
+    "wilson_lower": 0.5661660469371492,
+    "mean": 0.0028308685129101556,
+    "ci95": [
+     -0.003681970259721005,
+     0.009330097410049133
+    ],
+    "median": 0.005890576330731978,
+    "profit_factor": 1.1191398302235358,
+    "payoff_ratio": 0.6895174309434108,
+    "largest_loss": -0.0857023987194323,
+    "worst5_mean": -0.0857023987194323,
+    "max_drawdown": 0.06399271485654356,
+    "rolling30_min_win_rate": 0.36666666666666664,
+    "longest_days_without_entry": 89.5,
+    "days_without_entry_at_end": 8.4,
+    "exit_reasons": {
+     "end": 2,
+     "exit_signal": 36,
+     "lock": 119,
+     "roi": 116,
+     "stoploss": 68
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.4473684210526316,
+    "F2": 0.4864864864864865,
+    "F3": 0.6226415094339622,
+    "F4": 0.6964285714285714,
+    "F5": 0.6428571428571429,
+    "F6": 0.7142857142857143,
+    "F7": 0.7105263157894737,
+    "F8": 0.5714285714285714
+   },
+   "fold_std": 0.10202566431855467,
+   "regimes": {
+    "bear": {
+     "trades": 70,
+     "win_rate": 0.5285714285714286
+    },
+    "range": {
+     "trades": 25,
+     "win_rate": 0.64
+    },
+    "bull": {
+     "trades": 246,
+     "win_rate": 0.6422764227642277
+    }
+   },
+   "sensitivity": {
+    "taker": 0.0028308685129101556,
+    "stress_041": 0.000844728219465001,
+    "no_tax": 0.004945601108086511,
+    "slip_005": 0.0018274745310159128,
+    "slip_010": 0.0008250808865723835
+   }
+  },
+  {
+   "id": "V-don1d20-sma100-tp1.5atr-st3atr",
+   "family": "V volatility exits on 1d trend entry",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "a---",
+   "all": {
+    "trades": 275,
+    "trades_per_month": 6.0,
+    "win_rate": 0.64,
+    "wilson_lower": 0.5816990889844447,
+    "mean": 0.002344752038397503,
+    "ci95": [
+     -0.006830824956744347,
+     0.0113403589817079
+    ],
+    "median": 0.03597186261570129,
+    "profit_factor": 1.0707856244857643,
+    "payoff_ratio": 0.6023169137732424,
+    "largest_loss": -0.15526852055599727,
+    "worst5_mean": -0.1552685205559972,
+    "max_drawdown": 0.05496246517657577,
+    "rolling30_min_win_rate": 0.36666666666666664,
+    "longest_days_without_entry": 98.3,
+    "days_without_entry_at_end": 8.6,
+    "exit_reasons": {
+     "end": 2,
+     "exit_signal": 71,
+     "roi": 175,
+     "stoploss": 27
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.43478260869565216,
+    "F2": 0.4411764705882353,
+    "F3": 0.7872340425531915,
+    "F4": 0.6862745098039216,
+    "F5": 0.711864406779661,
+    "F6": 0.55,
+    "F7": 0.6578947368421053,
+    "F8": 0.3333333333333333
+   },
+   "fold_std": 0.1601897628914515,
+   "regimes": {
+    "bear": {
+     "trades": 33,
+     "win_rate": 0.45454545454545453
+    },
+    "range": {
+     "trades": 18,
+     "win_rate": 0.8333333333333334
+    },
+    "bull": {
+     "trades": 224,
+     "win_rate": 0.6517857142857143
+    }
+   },
+   "sensitivity": {
+    "taker": 0.002344752038397503,
+    "stress_041": 0.0003595745149942871,
+    "no_tax": 0.004458459529155966,
+    "slip_005": 0.0013418444459437427,
+    "slip_010": 0.00033993670603286476
+   }
+  },
+  {
+   "id": "V-don1d20-sma200-tp1.5atr-st2atr",
+   "family": "V volatility exits on 1d trend entry",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "a-cd",
+   "all": {
+    "trades": 255,
+    "trades_per_month": 5.564,
+    "win_rate": 0.6078431372549019,
+    "wilson_lower": 0.5467430440273789,
+    "mean": 0.0008386529358863763,
+    "ci95": [
+     -0.008171478280795287,
+     0.009640778853169812
+    ],
+    "median": 0.03232610605189512,
+    "profit_factor": 1.0259391480524962,
+    "payoff_ratio": 0.6618962245499975,
+    "largest_loss": -0.15526852055599716,
+    "worst5_mean": -0.1509267532391927,
+    "max_drawdown": 0.02832289966924484,
+    "rolling30_min_win_rate": 0.4,
+    "longest_days_without_entry": 201.4,
+    "days_without_entry_at_end": 201.4,
+    "exit_reasons": {
+     "exit_signal": 36,
+     "roi": 155,
+     "stoploss": 64
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.42857142857142855,
+    "F2": 0.45454545454545453,
+    "F3": 0.72,
+    "F4": 0.6607142857142857,
+    "F5": 0.6140350877192983,
+    "F6": 0.47058823529411764,
+    "F7": 0.6,
+    "F8": null
+   },
+   "fold_std": 0.1129425272875823,
+   "regimes": {
+    "bear": {
+     "trades": 10,
+     "win_rate": 0.6
+    },
+    "range": {
+     "trades": 19,
+     "win_rate": 0.631578947368421
+    },
+    "bull": {
+     "trades": 226,
+     "win_rate": 0.6061946902654868
+    }
+   },
+   "sensitivity": {
+    "taker": 0.0008386529358863763,
+    "stress_041": -0.0011435417075444166,
+    "no_tax": 0.0029491844206365942,
+    "slip_005": -0.00016274771175441239,
+    "slip_010": -0.001163150009206682
+   }
+  },
+  {
+   "id": "V-don1d20-sma100-tp1.5atr-st2atr",
+   "family": "V volatility exits on 1d trend entry",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "a---",
+   "all": {
+    "trades": 283,
+    "trades_per_month": 6.175,
+    "win_rate": 0.6042402826855123,
+    "wilson_lower": 0.5462360011882754,
+    "mean": 0.0006332061729729377,
+    "ci95": [
+     -0.008055550074105652,
+     0.008965052122707965
+    ],
+    "median": 0.032308467999607515,
+    "profit_factor": 1.019311963328097,
+    "payoff_ratio": 0.6676195315365313,
+    "largest_loss": -0.15526852055599716,
+    "worst5_mean": -0.1509267532391927,
+    "max_drawdown": 0.04654776183414078,
+    "rolling30_min_win_rate": 0.3333333333333333,
+    "longest_days_without_entry": 98.3,
+    "days_without_entry_at_end": 8.6,
+    "exit_reasons": {
+     "end": 2,
+     "exit_signal": 43,
+     "roi": 170,
+     "stoploss": 68
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.43478260869565216,
+    "F2": 0.4117647058823529,
+    "F3": 0.75,
+    "F4": 0.6481481481481481,
+    "F5": 0.6290322580645161,
+    "F6": 0.55,
+    "F7": 0.6410256410256411,
+    "F8": 0.3333333333333333
+   },
+   "fold_std": 0.14317464598729002,
+   "regimes": {
+    "bear": {
+     "trades": 33,
+     "win_rate": 0.45454545454545453
+    },
+    "range": {
+     "trades": 19,
+     "win_rate": 0.6842105263157895
+    },
+    "bull": {
+     "trades": 231,
+     "win_rate": 0.6190476190476191
+    }
+   },
+   "sensitivity": {
+    "taker": 0.0006332061729729377,
+    "stress_041": -0.0013485815762279358,
+    "no_tax": 0.0027433044191983525,
+    "slip_005": -0.0003679889125416944,
+    "slip_010": -0.0013681858528037524
+   }
+  },
+  {
+   "id": "S-don1d10-sma50-tp8-lock3",
+   "family": "S faster trend filter",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "---d",
+   "all": {
+    "trades": 417,
+    "trades_per_month": 9.099,
+    "win_rate": 0.5707434052757794,
+    "wilson_lower": 0.5228034157395376,
+    "mean": 0.0005919127999346527,
+    "ci95": [
+     -0.005234107243540321,
+     0.00617929831039874
+    ],
+    "median": 0.004069929962150942,
+    "profit_factor": 1.0246516634845242,
+    "payoff_ratio": 0.7706413771585288,
+    "largest_loss": -0.0857023987194323,
+    "worst5_mean": -0.0857023987194323,
+    "max_drawdown": 0.06087954473621526,
+    "rolling30_min_win_rate": 0.3333333333333333,
+    "longest_days_without_entry": 68.1,
+    "days_without_entry_at_end": 3.5,
+    "exit_reasons": {
+     "end": 1,
+     "exit_signal": 98,
+     "lock": 128,
+     "roi": 131,
+     "stoploss": 59
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.4782608695652174,
+    "F2": 0.5106382978723404,
+    "F3": 0.5373134328358209,
+    "F4": 0.6,
+    "F5": 0.6666666666666666,
+    "F6": 0.5238095238095238,
+    "F7": 0.6326530612244898,
+    "F8": 0.5384615384615384
+   },
+   "fold_std": 0.06508766920029274,
+   "regimes": {
+    "bear": {
+     "trades": 88,
+     "win_rate": 0.5568181818181818
+    },
+    "range": {
+     "trades": 25,
+     "win_rate": 0.68
+    },
+    "bull": {
+     "trades": 304,
+     "win_rate": 0.5657894736842105
+    }
+   },
+   "sensitivity": {
+    "taker": 0.0005919127999346527,
+    "stress_041": -0.0013897931663508457,
+    "no_tax": 0.0027019239682243294,
+    "slip_005": -0.0004092409690197302,
+    "slip_010": -0.0014093966339122305
+   }
+  },
+  {
+   "id": "S-don1d20-sma100-tp5-lock3",
+   "family": "S faster trend filter",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "a-c-",
+   "all": {
+    "trades": 316,
+    "trades_per_month": 6.895,
+    "win_rate": 0.6582278481012658,
+    "wilson_lower": 0.6043126156442378,
+    "mean": 0.00036532410967295023,
+    "ci95": [
+     -0.005346234067634712,
+     0.006279414318084484
+    ],
+    "median": 0.04349182754847414,
+    "profit_factor": 1.0157297759520738,
+    "payoff_ratio": 0.5273981528981921,
+    "largest_loss": -0.0857023987194323,
+    "worst5_mean": -0.0857023987194323,
+    "max_drawdown": 0.06330651765258377,
+    "rolling30_min_win_rate": 0.4,
+    "longest_days_without_entry": 98.3,
+    "days_without_entry_at_end": 8.6,
+    "exit_reasons": {
+     "end": 2,
+     "exit_signal": 28,
+     "lock": 54,
+     "roi": 165,
+     "stoploss": 67
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.4782608695652174,
+    "F2": 0.5135135135135135,
+    "F3": 0.7115384615384616,
+    "F4": 0.6721311475409836,
+    "F5": 0.6944444444444444,
+    "F6": 0.6956521739130435,
+    "F7": 0.7333333333333333,
+    "F8": 0.3333333333333333
+   },
+   "fold_std": 0.1448015271394423,
+   "regimes": {
+    "bear": {
+     "trades": 33,
+     "win_rate": 0.48484848484848486
+    },
+    "range": {
+     "trades": 21,
+     "win_rate": 0.7619047619047619
+    },
+    "bull": {
+     "trades": 262,
+     "win_rate": 0.6717557251908397
+    }
+   },
+   "sensitivity": {
+    "taker": 0.00036532410967295023,
+    "stress_041": -0.0016159330900838108,
+    "no_tax": 0.00247485745612444,
+    "slip_005": -0.0006356029433562176,
+    "slip_010": -0.001635532118348835
+   }
+  },
+  {
+   "id": "S-don1d10-sma100-tp8-lock3",
+   "family": "S faster trend filter",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 367,
+    "trades_per_month": 8.008,
+    "win_rate": 0.553133514986376,
+    "wilson_lower": 0.501979272187069,
+    "mean": -0.0006356872705380366,
+    "ci95": [
+     -0.006657220168216452,
+     0.005380220710397006
+    ],
+    "median": 0.0032728895274991565,
+    "profit_factor": 0.9748573493271484,
+    "payoff_ratio": 0.7875694841854795,
+    "largest_loss": -0.0857023987194323,
+    "worst5_mean": -0.0857023987194323,
+    "max_drawdown": 0.05495131877319226,
+    "rolling30_min_win_rate": 0.36666666666666664,
+    "longest_days_without_entry": 98.3,
+    "days_without_entry_at_end": 3.5,
+    "exit_reasons": {
+     "end": 1,
+     "exit_signal": 88,
+     "lock": 103,
+     "roi": 116,
+     "stoploss": 59
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.4666666666666667,
+    "F2": 0.46511627906976744,
+    "F3": 0.55,
+    "F4": 0.5857142857142857,
+    "F5": 0.6285714285714286,
+    "F6": 0.5,
+    "F7": 0.6153846153846154,
+    "F8": 0.0
+   },
+   "fold_std": 0.20268744839761768,
+   "regimes": {
+    "bear": {
+     "trades": 43,
+     "win_rate": 0.46511627906976744
+    },
+    "range": {
+     "trades": 18,
+     "win_rate": 0.6111111111111112
+    },
+    "bull": {
+     "trades": 306,
+     "win_rate": 0.5620915032679739
+    }
+   },
+   "sensitivity": {
+    "taker": -0.0006356872705380366,
+    "stress_041": -0.002614961933559194,
+    "no_tax": 0.001471735180187812,
+    "slip_005": -0.0016356127500953151,
+    "slip_010": -0.002634541350138501
+   }
+  },
+  {
+   "id": "V-don1d20-sma200-tp1atr-st3atr",
+   "family": "V volatility exits on 1d trend entry",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "a-cd",
+   "all": {
+    "trades": 283,
+    "trades_per_month": 6.175,
+    "win_rate": 0.7279151943462897,
+    "wilson_lower": 0.6732710470770848,
+    "mean": -0.0008322566991703955,
+    "ci95": [
+     -0.00828870035867198,
+     0.006255704134027054
+    ],
+    "median": 0.024006250337297308,
+    "profit_factor": 0.967434132862536,
+    "payoff_ratio": 0.3616137292738605,
+    "largest_loss": -0.15526852055599727,
+    "worst5_mean": -0.15526852055599719,
+    "max_drawdown": 0.03300303805530769,
+    "rolling30_min_win_rate": 0.4666666666666667,
+    "longest_days_without_entry": 201.4,
+    "days_without_entry_at_end": 201.4,
+    "exit_reasons": {
+     "exit_signal": 56,
+     "roi": 206,
+     "stoploss": 21
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.5714285714285714,
+    "F2": 0.6153846153846154,
+    "F3": 0.7857142857142857,
+    "F4": 0.7931034482758621,
+    "F5": 0.7704918032786885,
+    "F6": 0.6666666666666666,
+    "F7": 0.6585365853658537,
+    "F8": null
+   },
+   "fold_std": 0.08877998837906258,
+   "regimes": {
+    "bear": {
+     "trades": 10,
+     "win_rate": 0.7
+    },
+    "range": {
+     "trades": 23,
+     "win_rate": 0.8695652173913043
+    },
+    "bull": {
+     "trades": 250,
+     "win_rate": 0.716
+    }
+   },
+   "sensitivity": {
+    "taker": -0.0008322566991703955,
+    "stress_041": -0.0028111420498210245,
+    "no_tax": 0.0012747512332244113,
+    "slip_005": -0.001831985498920631,
+    "slip_010": -0.0028307176152374586
+   }
+  },
+  {
+   "id": "Q-G-rsi2-1d-10-sl25",
+   "family": "Q round 1 near miss on five pairs",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "a--d",
+   "all": {
+    "trades": 168,
+    "trades_per_month": 3.666,
+    "win_rate": 0.6130952380952381,
+    "wilson_lower": 0.5377032490898431,
+    "mean": -0.0009284832187472925,
+    "ci95": [
+     -0.011417832867348826,
+     0.008974208188556532
+    ],
+    "median": 0.010152077755277489,
+    "profit_factor": 0.9573180332286153,
+    "payoff_ratio": 0.6041327394161166,
+    "largest_loss": -0.2546486946082329,
+    "worst5_mean": -0.2546486946082328,
+    "max_drawdown": 0.021949096872464158,
+    "rolling30_min_win_rate": 0.3333333333333333,
+    "longest_days_without_entry": 173.0,
+    "days_without_entry_at_end": 173.0,
+    "exit_reasons": {
+     "exit_signal": 160,
+     "stoploss": 5,
+     "time": 3
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.3333333333333333,
+    "F2": 0.7083333333333334,
+    "F3": 0.6818181818181818,
+    "F4": 0.5263157894736842,
+    "F5": 0.6086956521739131,
+    "F6": 0.6538461538461539,
+    "F7": 0.6206896551724138,
+    "F8": null
+   },
+   "fold_std": 0.12762785293515896,
+   "regimes": {
+    "bear": {
+     "trades": 6,
+     "win_rate": 0.3333333333333333
+    },
+    "range": {
+     "trades": 10,
+     "win_rate": 0.7
+    },
+    "bull": {
+     "trades": 152,
+     "win_rate": 0.618421052631579
+    }
+   },
+   "sensitivity": {
+    "taker": -0.0009284832187472925,
+    "stress_041": -0.0029071779895366123,
+    "no_tax": 0.0011783217947268214,
+    "slip_005": -0.001928115737944478,
+    "slip_010": -0.002926751669695496
+   }
+  },
+  {
+   "id": "V-don4h20-sma200-tp3.5atr-st3atr",
+   "family": "V volatility exits on 4h trend entry",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 659,
+    "trades_per_month": 14.379,
+    "win_rate": 0.40212443095599393,
+    "wilson_lower": 0.36535985450867187,
+    "mean": -0.0011356990259361458,
+    "ci95": [
+     -0.004857670265168628,
+     0.0026502529707487506
+    ],
+    "median": -0.015533692380069297,
+    "profit_factor": 0.9450564986522598,
+    "payoff_ratio": 1.4051028696943033,
+    "largest_loss": -0.10557843352987939,
+    "worst5_mean": -0.10557843352987935,
+    "max_drawdown": 0.0901112961529994,
+    "rolling30_min_win_rate": 0.13333333333333333,
+    "longest_days_without_entry": 167.4,
+    "days_without_entry_at_end": 167.4,
+    "exit_reasons": {
+     "exit_signal": 329,
+     "roi": 247,
+     "stoploss": 83
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.35,
+    "F2": 0.36607142857142855,
+    "F3": 0.41935483870967744,
+    "F4": 0.40441176470588236,
+    "F5": 0.422680412371134,
+    "F6": 0.3835616438356164,
+    "F7": 0.422680412371134,
+    "F8": null
+   },
+   "fold_std": 0.029452866253383742,
+   "regimes": {
+    "bear": {
+     "trades": 26,
+     "win_rate": 0.4230769230769231
+    },
+    "range": {
+     "trades": 41,
+     "win_rate": 0.3902439024390244
+    },
+    "bull": {
+     "trades": 592,
+     "win_rate": 0.40202702702702703
+    }
+   },
+   "sensitivity": {
+    "taker": -0.0011356990259361458,
+    "stress_041": -0.0031139833988438124,
+    "no_tax": 0.0009706690185181108,
+    "slip_005": -0.0021351242129695404,
+    "slip_010": -0.0031335530192573686
+   }
+  },
+  {
+   "id": "S-don1d10-nofilter-tp8-lock3",
+   "family": "S faster trend filter",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "---d",
+   "all": {
+    "trades": 549,
+    "trades_per_month": 11.979,
+    "win_rate": 0.5355191256830601,
+    "wilson_lower": 0.49369783590715294,
+    "mean": -0.0013865466438130166,
+    "ci95": [
+     -0.006396245337927313,
+     0.0033899366342698785
+    ],
+    "median": 0.00287251318476911,
+    "profit_factor": 0.9451460253334963,
+    "payoff_ratio": 0.8197695117688489,
+    "largest_loss": -0.0857023987194323,
+    "worst5_mean": -0.0857023987194323,
+    "max_drawdown": 0.08904830187126411,
+    "rolling30_min_win_rate": 0.3,
+    "longest_days_without_entry": 31.9,
+    "days_without_entry_at_end": 3.5,
+    "exit_reasons": {
+     "end": 1,
+     "exit_signal": 152,
+     "lock": 155,
+     "roi": 168,
+     "stoploss": 73
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.44285714285714284,
+    "F2": 0.5507246376811594,
+    "F3": 0.4810126582278481,
+    "F4": 0.5714285714285714,
+    "F5": 0.6451612903225806,
+    "F6": 0.5,
+    "F7": 0.5396825396825397,
+    "F8": 0.5
+   },
+   "fold_std": 0.06243273166265016,
+   "regimes": {
+    "bear": {
+     "trades": 131,
+     "win_rate": 0.5038167938931297
+    },
+    "range": {
+     "trades": 48,
+     "win_rate": 0.5
+    },
+    "bull": {
+     "trades": 370,
+     "win_rate": 0.5513513513513514
+    }
+   },
+   "sensitivity": {
+    "taker": -0.0013865466438130166,
+    "stress_041": -0.0033643342045691768,
+    "no_tax": 0.0007192924224749224,
+    "slip_005": -0.0023857208423716247,
+    "slip_010": -0.003383898910408592
+   }
+  },
+  {
+   "id": "V-don4h20-sma200-tp2.5atr-st3atr",
+   "family": "V volatility exits on 4h trend entry",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 750,
+    "trades_per_month": 16.364,
+    "win_rate": 0.4746666666666667,
+    "wilson_lower": 0.4391487786258422,
+    "mean": -0.001915413153596561,
+    "ci95": [
+     -0.004960098620451779,
+     0.0012035741999931295
+    ],
+    "median": -0.009885789878950724,
+    "profit_factor": 0.8982560657172688,
+    "payoff_ratio": 0.9941373311589997,
+    "largest_loss": -0.10557843352987939,
+    "worst5_mean": -0.10557843352987936,
+    "max_drawdown": 0.12235684813224745,
+    "rolling30_min_win_rate": 0.2,
+    "longest_days_without_entry": 167.4,
+    "days_without_entry_at_end": 167.4,
+    "exit_reasons": {
+     "exit_signal": 308,
+     "roi": 348,
+     "stoploss": 94
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.42857142857142855,
+    "F2": 0.4166666666666667,
+    "F3": 0.5177304964539007,
+    "F4": 0.46794871794871795,
+    "F5": 0.5,
+    "F6": 0.4457831325301205,
+    "F7": 0.49557522123893805,
+    "F8": null
+   },
+   "fold_std": 0.038598032686938136,
+   "regimes": {
+    "bear": {
+     "trades": 28,
+     "win_rate": 0.4642857142857143
+    },
+    "range": {
+     "trades": 47,
+     "win_rate": 0.46808510638297873
+    },
+    "bull": {
+     "trades": 675,
+     "win_rate": 0.47555555555555556
+    }
+   },
+   "sensitivity": {
+    "taker": -0.001915413153596561,
+    "stress_041": -0.0038921532764268356,
+    "no_tax": 0.00018931065858238078,
+    "slip_005": -0.002914058188674269,
+    "slip_010": -0.003911707620781875
+   }
+  },
+  {
+   "id": "S-don1d10-sma50-tp5-lock3",
+   "family": "S faster trend filter",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "ab-d",
+   "all": {
+    "trades": 470,
+    "trades_per_month": 10.255,
+    "win_rate": 0.6085106382978723,
+    "wilson_lower": 0.5636754971225632,
+    "mean": -0.002264424027049311,
+    "ci95": [
+     -0.006871614466214059,
+     0.002271331475796795
+    ],
+    "median": 0.008031109779896073,
+    "profit_factor": 0.9037605699943466,
+    "payoff_ratio": 0.5814403667096496,
+    "largest_loss": -0.0857023987194323,
+    "worst5_mean": -0.0857023987194323,
+    "max_drawdown": 0.05139253992714221,
+    "rolling30_min_win_rate": 0.36666666666666664,
+    "longest_days_without_entry": 68.1,
+    "days_without_entry_at_end": 3.5,
+    "exit_reasons": {
+     "end": 1,
+     "exit_signal": 104,
+     "lock": 77,
+     "roi": 221,
+     "stoploss": 67
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.56,
+    "F2": 0.5849056603773585,
+    "F3": 0.6052631578947368,
+    "F4": 0.625,
+    "F5": 0.6744186046511628,
+    "F6": 0.5531914893617021,
+    "F7": 0.6491228070175439,
+    "F8": 0.5172413793103449
+   },
+   "fold_std": 0.05258017854178961,
+   "regimes": {
+    "bear": {
+     "trades": 98,
+     "win_rate": 0.5918367346938775
+    },
+    "range": {
+     "trades": 31,
+     "win_rate": 0.6774193548387096
+    },
+    "bull": {
+     "trades": 341,
+     "win_rate": 0.6070381231671554
+    }
+   },
+   "sensitivity": {
+    "taker": -0.002264424027049311,
+    "stress_041": -0.004240472922095924,
+    "no_tax": -0.00016043619607450932,
+    "slip_005": -0.003262719855275644,
+    "slip_010": -0.004260020428674998
+   }
+  },
+  {
+   "id": "V-don1d20-sma200-tp1atr-st2atr",
+   "family": "V volatility exits on 1d trend entry",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "a-cd",
+   "all": {
+    "trades": 287,
+    "trades_per_month": 6.262,
+    "win_rate": 0.6933797909407665,
+    "wilson_lower": 0.6377726312857219,
+    "mean": -0.0022845540793008895,
+    "ci95": [
+     -0.009153052981245965,
+     0.004495036721116819
+    ],
+    "median": 0.02322185071661531,
+    "profit_factor": 0.9113571296068026,
+    "payoff_ratio": 0.4030121980170785,
+    "largest_loss": -0.15526852055599716,
+    "worst5_mean": -0.1509267532391927,
+    "max_drawdown": 0.030384284114769677,
+    "rolling30_min_win_rate": 0.4666666666666667,
+    "longest_days_without_entry": 201.4,
+    "days_without_entry_at_end": 201.4,
+    "exit_reasons": {
+     "exit_signal": 31,
+     "roi": 199,
+     "stoploss": 57
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.5714285714285714,
+    "F2": 0.5897435897435898,
+    "F3": 0.75,
+    "F4": 0.7457627118644068,
+    "F5": 0.71875,
+    "F6": 0.6666666666666666,
+    "F7": 0.6341463414634146,
+    "F8": null
+   },
+   "fold_std": 0.0729663403916557,
+   "regimes": {
+    "bear": {
+     "trades": 10,
+     "win_rate": 0.7
+    },
+    "range": {
+     "trades": 24,
+     "win_rate": 0.7916666666666666
+    },
+    "bull": {
+     "trades": 253,
+     "win_rate": 0.6837944664031621
+    }
+   },
+   "sensitivity": {
+    "taker": -0.0022845540793008895,
+    "stress_041": -0.004260563106101396,
+    "no_tax": -0.00018060869783473852,
+    "slip_005": -0.0032828297661714775,
+    "slip_010": -0.0042801102182950775
+   }
+  },
+  {
+   "id": "V-don4h20-sma200-tp3.5atr-st2atr",
+   "family": "V volatility exits on 4h trend entry",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 689,
+    "trades_per_month": 15.033,
+    "win_rate": 0.3686502177068215,
+    "wilson_lower": 0.3334480369624538,
+    "mean": -0.0027652883627664435,
+    "ci95": [
+     -0.006339471638056279,
+     0.0007846689848518382
+    ],
+    "median": -0.018161070385253386,
+    "profit_factor": 0.8668622240311658,
+    "payoff_ratio": 1.4845868797384139,
+    "largest_loss": -0.10557843352987928,
+    "worst5_mean": -0.10513086865539403,
+    "max_drawdown": 0.11878216532610786,
+    "rolling30_min_win_rate": 0.13333333333333333,
+    "longest_days_without_entry": 167.4,
+    "days_without_entry_at_end": 167.4,
+    "exit_reasons": {
+     "exit_signal": 216,
+     "roi": 237,
+     "stoploss": 236
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.3333333333333333,
+    "F2": 0.3333333333333333,
+    "F3": 0.3609022556390977,
+    "F4": 0.37857142857142856,
+    "F5": 0.3786407766990291,
+    "F6": 0.36486486486486486,
+    "F7": 0.40594059405940597,
+    "F8": null
+   },
+   "fold_std": 0.026040682516175,
+   "regimes": {
+    "bear": {
+     "trades": 28,
+     "win_rate": 0.35714285714285715
+    },
+    "range": {
+     "trades": 43,
+     "win_rate": 0.32558139534883723
+    },
+    "bull": {
+     "trades": 618,
+     "win_rate": 0.37216828478964403
+    }
+   },
+   "sensitivity": {
+    "taker": -0.0027652883627664435,
+    "stress_041": -0.004740345279135551,
+    "no_tax": -0.0006623567359530388,
+    "slip_005": -0.00376308304540984,
+    "slip_010": -0.00475988297284523
+   }
+  },
+  {
+   "id": "V-don4h20-sma200-tp2.5atr-st2atr",
+   "family": "V volatility exits on 4h trend entry",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 782,
+    "trades_per_month": 17.062,
+    "win_rate": 0.4322250639386189,
+    "wilson_lower": 0.3979191073464696,
+    "mean": -0.0036333716041914285,
+    "ci95": [
+     -0.006419250436939958,
+     -0.00075718674340794
+    ],
+    "median": -0.016063816554877375,
+    "profit_factor": 0.8086110639068075,
+    "payoff_ratio": 1.0621991490373448,
+    "largest_loss": -0.10557843352987928,
+    "worst5_mean": -0.10471274729754192,
+    "max_drawdown": 0.14368089141600815,
+    "rolling30_min_win_rate": 0.16666666666666666,
+    "longest_days_without_entry": 167.4,
+    "days_without_entry_at_end": 167.4,
+    "exit_reasons": {
+     "exit_signal": 188,
+     "roi": 330,
+     "stoploss": 264
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.4090909090909091,
+    "F2": 0.376,
+    "F3": 0.44594594594594594,
+    "F4": 0.4329268292682927,
+    "F5": 0.4666666666666667,
+    "F6": 0.4235294117647059,
+    "F7": 0.4491525423728814,
+    "F8": null
+   },
+   "fold_std": 0.029896413154264972,
+   "regimes": {
+    "bear": {
+     "trades": 29,
+     "win_rate": 0.41379310344827586
+    },
+    "range": {
+     "trades": 50,
+     "win_rate": 0.42
+    },
+    "bull": {
+     "trades": 703,
+     "win_rate": 0.43385490753911804
+    }
+   },
+   "sensitivity": {
+    "taker": -0.0036333716041914285,
+    "stress_041": -0.005606709252478563,
+    "no_tax": -0.0015322705591676517,
+    "slip_005": -0.004630297716144019,
+    "slip_010": -0.005626229938813457
+   }
+  },
+  {
+   "id": "V-don1d20-sma100-tp1atr-st3atr",
+   "family": "V volatility exits on 1d trend entry",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "a-c-",
+   "all": {
+    "trades": 315,
+    "trades_per_month": 6.873,
+    "win_rate": 0.7015873015873015,
+    "wilson_lower": 0.6488759764791021,
+    "mean": -0.003681193064205622,
+    "ci95": [
+     -0.01077701038102851,
+     0.003289894438592759
+    ],
+    "median": 0.024588051584107262,
+    "profit_factor": 0.868229876115664,
+    "payoff_ratio": 0.3692923454971603,
+    "largest_loss": -0.15526852055599727,
+    "worst5_mean": -0.15526852055599719,
+    "max_drawdown": 0.059049495686628206,
+    "rolling30_min_win_rate": 0.43333333333333335,
+    "longest_days_without_entry": 98.3,
+    "days_without_entry_at_end": 8.6,
+    "exit_reasons": {
+     "end": 1,
+     "exit_signal": 70,
+     "roi": 221,
+     "stoploss": 23
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.4782608695652174,
+    "F2": 0.5384615384615384,
+    "F3": 0.7857142857142857,
+    "F4": 0.7857142857142857,
+    "F5": 0.7611940298507462,
+    "F6": 0.6666666666666666,
+    "F7": 0.7021276595744681,
+    "F8": 0.3333333333333333
+   },
+   "fold_std": 0.16546527763952337,
+   "regimes": {
+    "bear": {
+     "trades": 33,
+     "win_rate": 0.48484848484848486
+    },
+    "range": {
+     "trades": 22,
+     "win_rate": 0.8636363636363636
+    },
+    "bull": {
+     "trades": 260,
+     "win_rate": 0.7153846153846154
+    }
+   },
+   "sensitivity": {
+    "taker": -0.003681193064205622,
+    "stress_041": -0.0056544360004813785,
+    "no_tax": -0.0015801928633056184,
+    "slip_005": -0.0046780713278453045,
+    "slip_010": -0.005673955749904405
+   }
+  },
+  {
+   "id": "S-don1d10-nofilter-tp5-lock3",
+   "family": "S faster trend filter",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "-b-d",
+   "all": {
+    "trades": 611,
+    "trades_per_month": 13.331,
+    "win_rate": 0.5810147299509002,
+    "wilson_lower": 0.5415057360984078,
+    "mean": -0.003915331727809576,
+    "ci95": [
+     -0.00805758059726573,
+     5.6778154955761375e-05
+    ],
+    "median": 0.0071392730129300475,
+    "profit_factor": 0.8397029512755608,
+    "payoff_ratio": 0.605532269088855,
+    "largest_loss": -0.0857023987194323,
+    "worst5_mean": -0.0857023987194323,
+    "max_drawdown": 0.06887083237176395,
+    "rolling30_min_win_rate": 0.3333333333333333,
+    "longest_days_without_entry": 31.9,
+    "days_without_entry_at_end": 3.5,
+    "exit_reasons": {
+     "end": 1,
+     "exit_signal": 157,
+     "lock": 94,
+     "roi": 277,
+     "stoploss": 82
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.5324675324675324,
+    "F2": 0.6447368421052632,
+    "F3": 0.5393258426966292,
+    "F4": 0.6071428571428571,
+    "F5": 0.6601941747572816,
+    "F6": 0.5142857142857142,
+    "F7": 0.5633802816901409,
+    "F8": 0.5365853658536586
+   },
+   "fold_std": 0.055462443052319996,
+   "regimes": {
+    "bear": {
+     "trades": 146,
+     "win_rate": 0.5684931506849316
+    },
+    "range": {
+     "trades": 56,
+     "win_rate": 0.5178571428571429
+    },
+    "bull": {
+     "trades": 409,
+     "win_rate": 0.5941320293398533
+    }
+   },
+   "sensitivity": {
+    "taker": -0.003915331727809576,
+    "stress_041": -0.0058881109445802346,
+    "no_tax": -0.0018148252698519467,
+    "slip_005": -0.004911975721311221,
+    "slip_010": -0.005907626106788794
+   }
+  },
+  {
+   "id": "S-don1d10-sma100-tp5-lock3",
+   "family": "S faster trend filter",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "--cd",
+   "all": {
+    "trades": 408,
+    "trades_per_month": 8.902,
+    "win_rate": 0.5906862745098039,
+    "wilson_lower": 0.5423442323895241,
+    "mean": -0.00406124964507693,
+    "ci95": [
+     -0.00905397571113587,
+     0.0009719221700815055
+    ],
+    "median": 0.007069365280822804,
+    "profit_factor": 0.8342806164246583,
+    "payoff_ratio": 0.5781114644934354,
+    "largest_loss": -0.0857023987194323,
+    "worst5_mean": -0.0857023987194323,
+    "max_drawdown": 0.056887011009717714,
+    "rolling30_min_win_rate": 0.43333333333333335,
+    "longest_days_without_entry": 98.3,
+    "days_without_entry_at_end": 3.5,
+    "exit_reasons": {
+     "end": 1,
+     "exit_signal": 91,
+     "lock": 68,
+     "roi": 184,
+     "stoploss": 64
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.53125,
+    "F2": 0.5416666666666666,
+    "F3": 0.5882352941176471,
+    "F4": 0.6052631578947368,
+    "F5": 0.6623376623376623,
+    "F6": 0.5348837209302325,
+    "F7": 0.6333333333333333,
+    "F8": 0.0
+   },
+   "fold_std": 0.2123848420427942,
+   "regimes": {
+    "bear": {
+     "trades": 45,
+     "win_rate": 0.5111111111111111
+    },
+    "range": {
+     "trades": 22,
+     "win_rate": 0.6818181818181818
+    },
+    "bull": {
+     "trades": 341,
+     "win_rate": 0.5953079178885631
+    }
+   },
+   "sensitivity": {
+    "taker": -0.00406124964507693,
+    "stress_041": -0.006033739866500393,
+    "no_tax": -0.0019610508934190885,
+    "slip_005": -0.005057747638724921,
+    "slip_010": -0.006053252169903963
+   }
+  },
+  {
+   "id": "V-don4h20-sma200-tp1.5atr-st3atr",
+   "family": "V volatility exits on 4h trend entry",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "---d",
+   "all": {
+    "trades": 933,
+    "trades_per_month": 20.357,
+    "win_rate": 0.5959271168274384,
+    "wilson_lower": 0.5641087589831509,
+    "mean": -0.004325708622406972,
+    "ci95": [
+     -0.0065400647166277085,
+     -0.002143529610262139
+    ],
+    "median": 0.006586837885035335,
+    "profit_factor": 0.7303964514946637,
+    "payoff_ratio": 0.4952508313192233,
+    "largest_loss": -0.10557843352987939,
+    "worst5_mean": -0.10557843352987936,
+    "max_drawdown": 0.16803913194819398,
+    "rolling30_min_win_rate": 0.2,
+    "longest_days_without_entry": 167.0,
+    "days_without_entry_at_end": 167.0,
+    "exit_reasons": {
+     "exit_signal": 264,
+     "roi": 562,
+     "stoploss": 107
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.5,
+    "F2": 0.5540540540540541,
+    "F3": 0.5868263473053892,
+    "F4": 0.6122448979591837,
+    "F5": 0.6068965517241379,
+    "F6": 0.5961538461538461,
+    "F7": 0.6308724832214765,
+    "F8": null
+   },
+   "fold_std": 0.044021567623187166,
+   "regimes": {
+    "bear": {
+     "trades": 32,
+     "win_rate": 0.5625
+    },
+    "range": {
+     "trades": 52,
+     "win_rate": 0.5769230769230769
+    },
+    "bull": {
+     "trades": 849,
+     "win_rate": 0.5983510011778563
+    }
+   },
+   "sensitivity": {
+    "taker": -0.004325708622406972,
+    "stress_041": -0.006297675073923343,
+    "no_tax": -0.0022260675520461536,
+    "slip_005": -0.005321942008577641,
+    "slip_010": -0.006317182196080772
+   }
+  },
+  {
+   "id": "V-don1d20-sma100-tp1atr-st2atr",
+   "family": "V volatility exits on 1d trend entry",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "a-c-",
+   "all": {
+    "trades": 320,
+    "trades_per_month": 6.982,
+    "win_rate": 0.671875,
+    "wilson_lower": 0.6186573263916912,
+    "mean": -0.0045055963371246985,
+    "ci95": [
+     -0.011085520260304023,
+     0.0020310739844436507
+    ],
+    "median": 0.023220055075888757,
+    "profit_factor": 0.8370748338008468,
+    "payoff_ratio": 0.4088039886004136,
+    "largest_loss": -0.15526852055599716,
+    "worst5_mean": -0.1509267532391927,
+    "max_drawdown": 0.05219070042592566,
+    "rolling30_min_win_rate": 0.4,
+    "longest_days_without_entry": 98.3,
+    "days_without_entry_at_end": 8.6,
+    "exit_reasons": {
+     "end": 1,
+     "exit_signal": 39,
+     "roi": 215,
+     "stoploss": 65
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.4782608695652174,
+    "F2": 0.5128205128205128,
+    "F3": 0.7678571428571429,
+    "F4": 0.7368421052631579,
+    "F5": 0.7142857142857143,
+    "F6": 0.64,
+    "F7": 0.6808510638297872,
+    "F8": 0.3333333333333333
+   },
+   "fold_std": 0.1517119787332037,
+   "regimes": {
+    "bear": {
+     "trades": 33,
+     "win_rate": 0.48484848484848486
+    },
+    "range": {
+     "trades": 23,
+     "win_rate": 0.782608695652174
+    },
+    "bull": {
+     "trades": 264,
+     "win_rate": 0.6856060606060606
+    }
+   },
+   "sensitivity": {
+    "taker": -0.0045055963371246985,
+    "stress_041": -0.0064772065149665044,
+    "no_tax": -0.0024063346073144366,
+    "slip_005": -0.005501649734569418,
+    "slip_010": -0.006496710112787049
+   }
+  },
+  {
+   "id": "W-rsi2-4h-sma50-tp1atr-st2.5atr",
+   "family": "W trend pullback with volatility exits",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "ab-d",
+   "all": {
+    "trades": 967,
+    "trades_per_month": 21.099,
+    "win_rate": 0.6463288521199586,
+    "wilson_lower": 0.6156696343218147,
+    "mean": -0.005315506790923372,
+    "ci95": [
+     -0.007382293117828482,
+     -0.0032374091664187418
+    ],
+    "median": 0.005764452944849063,
+    "profit_factor": 0.6365058893529874,
+    "payoff_ratio": 0.3482960226539547,
+    "largest_loss": -0.12545446834032659,
+    "worst5_mean": -0.12545446834032645,
+    "max_drawdown": 0.17363774631896267,
+    "rolling30_min_win_rate": 0.36666666666666664,
+    "longest_days_without_entry": 70.8,
+    "days_without_entry_at_end": 0.2,
+    "exit_reasons": {
+     "end": 4,
+     "roi": 630,
+     "stoploss": 247,
+     "time": 86
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.6226415094339622,
+    "F2": 0.6830985915492958,
+    "F3": 0.6139240506329114,
+    "F4": 0.7202797202797203,
+    "F5": 0.6875,
+    "F6": 0.5425531914893617,
+    "F7": 0.6226415094339622,
+    "F8": 0.6216216216216216
+   },
+   "fold_std": 0.05564002762185603,
+   "regimes": {
+    "bear": {
+     "trades": 211,
+     "win_rate": 0.6303317535545023
+    },
+    "range": {
+     "trades": 51,
+     "win_rate": 0.7843137254901961
+    },
+    "bull": {
+     "trades": 705,
+     "win_rate": 0.6411347517730497
+    }
+   },
+   "sensitivity": {
+    "taker": -0.005315506790923372,
+    "stress_041": -0.007285512913847364,
+    "no_tax": -0.003217952970282643,
+    "slip_005": -0.006310749823130312,
+    "slip_010": -0.007305000644006881
+   }
+  },
+  {
+   "id": "V-don4h20-sma200-tp1.5atr-st2atr",
+   "family": "V volatility exits on 4h trend entry",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "---d",
+   "all": {
+    "trades": 958,
+    "trades_per_month": 20.903,
+    "win_rate": 0.5490605427974948,
+    "wilson_lower": 0.51741797909699,
+    "mean": -0.005387239426015353,
+    "ci95": [
+     -0.007444765734099841,
+     -0.0033179542666603905
+    ],
+    "median": 0.004880719255274002,
+    "profit_factor": 0.6675464251038187,
+    "payoff_ratio": 0.5482510563590299,
+    "largest_loss": -0.10557843352987928,
+    "worst5_mean": -0.10471274729754192,
+    "max_drawdown": 0.19831477928263241,
+    "rolling30_min_win_rate": 0.2,
+    "longest_days_without_entry": 167.0,
+    "days_without_entry_at_end": 167.0,
+    "exit_reasons": {
+     "exit_signal": 125,
+     "roi": 532,
+     "stoploss": 301
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.4583333333333333,
+    "F2": 0.5131578947368421,
+    "F3": 0.5235294117647059,
+    "F4": 0.5693069306930693,
+    "F5": 0.5657894736842105,
+    "F6": 0.5619047619047619,
+    "F7": 0.5751633986928104,
+    "F8": null
+   },
+   "fold_std": 0.04257941565245874,
+   "regimes": {
+    "bear": {
+     "trades": 32,
+     "win_rate": 0.53125
+    },
+    "range": {
+     "trades": 54,
+     "win_rate": 0.5185185185185185
+    },
+    "bull": {
+     "trades": 872,
+     "win_rate": 0.551605504587156
+    }
+   },
+   "sensitivity": {
+    "taker": -0.005387239426015353,
+    "stress_041": -0.007357103480040801,
+    "no_tax": -0.003289836872498861,
+    "slip_005": -0.006382410685307623,
+    "slip_010": -0.0073765898048237894
+   }
+  },
+  {
+   "id": "W-rsi2-4h-sma50-tp1atr-st1.5atr",
+   "family": "W trend pullback with volatility exits",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "-b-d",
+   "all": {
+    "trades": 1051,
+    "trades_per_month": 22.932,
+    "win_rate": 0.5651760228353948,
+    "wilson_lower": 0.535021756198718,
+    "mean": -0.005483803477919749,
+    "ci95": [
+     -0.007136774145404857,
+     -0.003793550776151996
+    ],
+    "median": 0.003774308417661798,
+    "profit_factor": 0.602235635178459,
+    "payoff_ratio": 0.46333617049925213,
+    "largest_loss": -0.11935611705840066,
+    "worst5_mean": -0.09354613101569902,
+    "max_drawdown": 0.199548789226611,
+    "rolling30_min_win_rate": 0.3333333333333333,
+    "longest_days_without_entry": 70.8,
+    "days_without_entry_at_end": 0.2,
+    "exit_reasons": {
+     "end": 4,
+     "roi": 603,
+     "stoploss": 410,
+     "time": 34
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.5726495726495726,
+    "F2": 0.5477707006369427,
+    "F3": 0.5588235294117647,
+    "F4": 0.5974025974025974,
+    "F5": 0.5849056603773585,
+    "F6": 0.5247524752475248,
+    "F7": 0.5526315789473685,
+    "F8": 0.569620253164557
+   },
+   "fold_std": 0.02273290685451194,
+   "regimes": {
+    "bear": {
+     "trades": 230,
+     "win_rate": 0.5695652173913044
+    },
+    "range": {
+     "trades": 57,
+     "win_rate": 0.631578947368421
+    },
+    "bull": {
+     "trades": 764,
+     "win_rate": 0.5589005235602095
+    }
+   },
+   "sensitivity": {
+    "taker": -0.005483803477919749,
+    "stress_041": -0.007453476283589765,
+    "no_tax": -0.0033866045550996074,
+    "slip_005": -0.006478878118937099,
+    "slip_010": -0.007472960716502315
+   }
+  },
+  {
+   "id": "W-rsi14-1h-sma100-tp2atr-st3atr",
+   "family": "W trend pullback with volatility exits",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 802,
+    "trades_per_month": 17.499,
+    "win_rate": 0.5361596009975063,
+    "wilson_lower": 0.5015554012820191,
+    "mean": -0.005501114534853902,
+    "ci95": [
+     -0.007372235023434441,
+     -0.003583148485582579
+    ],
+    "median": 0.0015196179732792636,
+    "profit_factor": 0.5861129482348126,
+    "payoff_ratio": 0.5070558528915123,
+    "largest_loss": -0.10557843352987928,
+    "worst5_mean": -0.09749349843279002,
+    "max_drawdown": 0.1971936237880414,
+    "rolling30_min_win_rate": 0.26666666666666666,
+    "longest_days_without_entry": 96.6,
+    "days_without_entry_at_end": 6.0,
+    "exit_reasons": {
+     "roi": 478,
+     "stoploss": 322,
+     "time": 2
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.4307692307692308,
+    "F2": 0.47770700636942676,
+    "F3": 0.5354330708661418,
+    "F4": 0.5796178343949044,
+    "F5": 0.5268817204301075,
+    "F6": 0.5252525252525253,
+    "F7": 0.6363636363636364,
+    "F8": 0.8
+   },
+   "fold_std": 0.11343250609811974,
+   "regimes": {
+    "bear": {
+     "trades": 82,
+     "win_rate": 0.43902439024390244
+    },
+    "range": {
+     "trades": 33,
+     "win_rate": 0.696969696969697
+    },
+    "bull": {
+     "trades": 687,
+     "win_rate": 0.5400291120815138
+    }
+   },
+   "sensitivity": {
+    "taker": -0.005501114534853902,
+    "stress_041": -0.007470753055392918,
+    "no_tax": -0.0034039521169495044,
+    "slip_005": -0.006496171855093751,
+    "slip_010": -0.007490237149149471
+   }
+  },
+  {
+   "id": "W-rsi14-1h-sma100-tp3atr-st3atr",
+   "family": "W trend pullback with volatility exits",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 755,
+    "trades_per_month": 16.473,
+    "win_rate": 0.4794701986754967,
+    "wilson_lower": 0.4440291659312649,
+    "mean": -0.005833988277426899,
+    "ci95": [
+     -0.008233217283159955,
+     -0.0034198533572700946
+    ],
+    "median": -0.011822536734985567,
+    "profit_factor": 0.6565567852918669,
+    "payoff_ratio": 0.7127812613803969,
+    "largest_loss": -0.10557843352987928,
+    "worst5_mean": -0.09749349843279002,
+    "max_drawdown": 0.19401425271991735,
+    "rolling30_min_win_rate": 0.2,
+    "longest_days_without_entry": 96.6,
+    "days_without_entry_at_end": 6.0,
+    "exit_reasons": {
+     "roi": 365,
+     "stoploss": 385,
+     "time": 5
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.39344262295081966,
+    "F2": 0.47651006711409394,
+    "F3": 0.5175438596491229,
+    "F4": 0.48299319727891155,
+    "F5": 0.4673913043478261,
+    "F6": 0.4148936170212766,
+    "F7": 0.5483870967741935,
+    "F8": 0.8
+   },
+   "fold_std": 0.1264186873901702,
+   "regimes": {
+    "bear": {
+     "trades": 78,
+     "win_rate": 0.41025641025641024
+    },
+    "range": {
+     "trades": 33,
+     "win_rate": 0.6363636363636364
+    },
+    "bull": {
+     "trades": 644,
+     "win_rate": 0.4798136645962733
+    }
+   },
+   "sensitivity": {
+    "taker": -0.005833988277426899,
+    "stress_041": -0.007802967530313199,
+    "no_tax": -0.0037375278113426945,
+    "slip_005": -0.0068287125370076595,
+    "slip_010": -0.007822445102450375
+   }
+  },
+  {
+   "id": "W-rsi2-4h-sma50-tp1.5atr-st1.5atr",
+   "family": "W trend pullback with volatility exits",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 988,
+    "trades_per_month": 21.557,
+    "win_rate": 0.47368421052631576,
+    "wilson_lower": 0.4427121480656184,
+    "mean": -0.0059698605654608175,
+    "ci95": [
+     -0.008036424182405464,
+     -0.003920964387687687
+    ],
+    "median": -0.009563243927441123,
+    "profit_factor": 0.650623318377592,
+    "payoff_ratio": 0.7229147981973246,
+    "largest_loss": -0.12522431764355035,
+    "worst5_mean": -0.10171400098946241,
+    "max_drawdown": 0.20361156541454195,
+    "rolling30_min_win_rate": 0.23333333333333334,
+    "longest_days_without_entry": 70.8,
+    "days_without_entry_at_end": 0.2,
+    "exit_reasons": {
+     "end": 4,
+     "roi": 448,
+     "stoploss": 463,
+     "time": 73
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.4444444444444444,
+    "F2": 0.5,
+    "F3": 0.5,
+    "F4": 0.48951048951048953,
+    "F5": 0.46710526315789475,
+    "F6": 0.3978494623655914,
+    "F7": 0.48598130841121495,
+    "F8": 0.4657534246575342
+   },
+   "fold_std": 0.03445560269562939,
+   "regimes": {
+    "bear": {
+     "trades": 214,
+     "win_rate": 0.46261682242990654
+    },
+    "range": {
+     "trades": 54,
+     "win_rate": 0.5
+    },
+    "bull": {
+     "trades": 720,
+     "win_rate": 0.475
+    }
+   },
+   "sensitivity": {
+    "taker": -0.0059698605654608175,
+    "stress_041": -0.007938570718706786,
+    "no_tax": -0.003873686621825515,
+    "slip_005": -0.006964448876458017,
+    "slip_010": -0.007958045628851636
+   }
+  },
+  {
+   "id": "W-rsi2-4h-sma100-tp1atr-st2.5atr",
+   "family": "W trend pullback with volatility exits",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "ab-d",
+   "all": {
+    "trades": 989,
+    "trades_per_month": 21.579,
+    "win_rate": 0.627906976744186,
+    "wilson_lower": 0.5973416032632208,
+    "mean": -0.006015991656996483,
+    "ci95": [
+     -0.008165882798039587,
+     -0.003936451848336493
+    ],
+    "median": 0.005451739362541952,
+    "profit_factor": 0.6116161848209136,
+    "payoff_ratio": 0.3624392206346155,
+    "largest_loss": -0.12545446834032659,
+    "worst5_mean": -0.12545446834032645,
+    "max_drawdown": 0.20856621494961924,
+    "rolling30_min_win_rate": 0.26666666666666666,
+    "longest_days_without_entry": 85.7,
+    "days_without_entry_at_end": 2.8,
+    "exit_reasons": {
+     "end": 1,
+     "roi": 629,
+     "stoploss": 274,
+     "time": 85
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.5633802816901409,
+    "F2": 0.6144578313253012,
+    "F3": 0.558282208588957,
+    "F4": 0.7135678391959799,
+    "F5": 0.6962962962962963,
+    "F6": 0.5132743362831859,
+    "F7": 0.6666666666666666,
+    "F8": 0.5714285714285714
+   },
+   "fold_std": 0.07276029465461956,
+   "regimes": {
+    "bear": {
+     "trades": 88,
+     "win_rate": 0.5681818181818182
+    },
+    "range": {
+     "trades": 49,
+     "win_rate": 0.7346938775510204
+    },
+    "bull": {
+     "trades": 852,
+     "win_rate": 0.6279342723004695
+    }
+   },
+   "sensitivity": {
+    "taker": -0.006015991656996483,
+    "stress_041": -0.007984610446062752,
+    "no_tax": -0.00391991499289852,
+    "slip_005": -0.007010533810998437,
+    "slip_010": -0.008004084452413218
+   }
+  },
+  {
+   "id": "W-rsi2-4h-sma50-tp1.5atr-st2.5atr",
+   "family": "W trend pullback with volatility exits",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "---d",
+   "all": {
+    "trades": 883,
+    "trades_per_month": 19.266,
+    "win_rate": 0.5469988674971688,
+    "wilson_lower": 0.5140328387398777,
+    "mean": -0.006037173092745126,
+    "ci95": [
+     -0.008594648913066185,
+     -0.0035580643812036157
+    ],
+    "median": 0.0057054314089570735,
+    "profit_factor": 0.6718746197056685,
+    "payoff_ratio": 0.556417904518152,
+    "largest_loss": -0.12545446834032659,
+    "worst5_mean": -0.12545446834032645,
+    "max_drawdown": 0.16294200111476853,
+    "rolling30_min_win_rate": 0.26666666666666666,
+    "longest_days_without_entry": 70.8,
+    "days_without_entry_at_end": 0.2,
+    "exit_reasons": {
+     "end": 4,
+     "roi": 451,
+     "stoploss": 267,
+     "time": 161
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.46808510638297873,
+    "F2": 0.6323529411764706,
+    "F3": 0.5384615384615384,
+    "F4": 0.5625,
+    "F5": 0.556390977443609,
+    "F6": 0.45348837209302323,
+    "F7": 0.59375,
+    "F8": 0.5074626865671642
+   },
+   "fold_std": 0.06083120995791377,
+   "regimes": {
+    "bear": {
+     "trades": 189,
+     "win_rate": 0.5079365079365079
+    },
+    "range": {
+     "trades": 48,
+     "win_rate": 0.6458333333333334
+    },
+    "bull": {
+     "trades": 646,
+     "win_rate": 0.5510835913312694
+    }
+   },
+   "sensitivity": {
+    "taker": -0.006037173092745126,
+    "stress_041": -0.008005749931264865,
+    "no_tax": -0.003941141095274405,
+    "slip_005": -0.0070316940534174595,
+    "slip_010": -0.008025223522631372
+   }
+  },
+  {
+   "id": "W-rsi14-1h-sma100-tp2atr-st5atr",
+   "family": "W trend pullback with volatility exits",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "a---",
+   "all": {
+    "trades": 712,
+    "trades_per_month": 15.535,
+    "win_rate": 0.6193820224719101,
+    "wilson_lower": 0.5831672657667972,
+    "mean": -0.006076204673782425,
+    "ci95": [
+     -0.008553570052323056,
+     -0.0036923402703473406
+    ],
+    "median": 0.004259974770765895,
+    "profit_factor": 0.5924702774300034,
+    "payoff_ratio": 0.3640803745658297,
+    "largest_loss": -0.10557843352987939,
+    "worst5_mean": -0.1055784335298793,
+    "max_drawdown": 0.17996162146685213,
+    "rolling30_min_win_rate": 0.3333333333333333,
+    "longest_days_without_entry": 96.6,
+    "days_without_entry_at_end": 6.0,
+    "exit_reasons": {
+     "roi": 491,
+     "stoploss": 214,
+     "time": 7
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.4915254237288136,
+    "F2": 0.5928571428571429,
+    "F3": 0.5877192982456141,
+    "F4": 0.6906474820143885,
+    "F5": 0.6,
+    "F6": 0.6067415730337079,
+    "F7": 0.6923076923076923,
+    "F8": 0.8
+   },
+   "fold_std": 0.09272415345277994,
+   "regimes": {
+    "bear": {
+     "trades": 74,
+     "win_rate": 0.4864864864864865
+    },
+    "range": {
+     "trades": 26,
+     "win_rate": 0.8461538461538461
+    },
+    "bull": {
+     "trades": 612,
+     "win_rate": 0.6258169934640523
+    }
+   },
+   "sensitivity": {
+    "taker": -0.006076204673782425,
+    "stress_041": -0.008044704208941997,
+    "no_tax": -0.003980254984664249,
+    "slip_005": -0.007070686580956557,
+    "slip_010": -0.00806417703560681
+   }
+  },
+  {
+   "id": "W-rsi2-4h-sma100-tp1atr-st1.5atr",
+   "family": "W trend pullback with volatility exits",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "---d",
+   "all": {
+    "trades": 1086,
+    "trades_per_month": 23.695,
+    "win_rate": 0.5460405156537753,
+    "wilson_lower": 0.5163189456143339,
+    "mean": -0.0061789315796529996,
+    "ci95": [
+     -0.007809729340569027,
+     -0.0045315861249921666
+    ],
+    "median": 0.0029690896983797233,
+    "profit_factor": 0.5753927129607305,
+    "payoff_ratio": 0.4783619013316023,
+    "largest_loss": -0.11935611705840066,
+    "worst5_mean": -0.09354613101569902,
+    "max_drawdown": 0.23220971077423835,
+    "rolling30_min_win_rate": 0.16666666666666666,
+    "longest_days_without_entry": 85.7,
+    "days_without_entry_at_end": 2.8,
+    "exit_reasons": {
+     "end": 1,
+     "roi": 603,
+     "stoploss": 451,
+     "time": 31
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.5384615384615384,
+    "F2": 0.478494623655914,
+    "F3": 0.5055555555555555,
+    "F4": 0.6027397260273972,
+    "F5": 0.6054421768707483,
+    "F6": 0.4959349593495935,
+    "F7": 0.5862068965517241,
+    "F8": 0.5
+   },
+   "fold_std": 0.05190793838076107,
+   "regimes": {
+    "bear": {
+     "trades": 98,
+     "win_rate": 0.5408163265306123
+    },
+    "range": {
+     "trades": 54,
+     "win_rate": 0.6111111111111112
+    },
+    "bull": {
+     "trades": 934,
+     "win_rate": 0.5428265524625268
+    }
+   },
+   "sensitivity": {
+    "taker": -0.0061789315796529996,
+    "stress_041": -0.008147227660717394,
+    "no_tax": -0.004083198517229376,
+    "slip_005": -0.007173310702237656,
+    "slip_010": -0.008166698474769928
+   }
+  },
+  {
+   "id": "K-SwingEmaRsi",
+   "family": "K benchmark",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 1411,
+    "trades_per_month": 30.787,
+    "win_rate": 0.3798724309000709,
+    "wilson_lower": 0.35490620970707804,
+    "mean": -0.006454443827193322,
+    "ci95": [
+     -0.007664968293017986,
+     -0.005244479437691326
+    ],
+    "median": -0.013289101671429604,
+    "profit_factor": 0.5464044783370994,
+    "payoff_ratio": 0.891984922658511,
+    "largest_loss": -0.036313463735896945,
+    "worst5_mean": -0.03607254210183104,
+    "max_drawdown": 0.6824167429460783,
+    "rolling30_min_win_rate": 0.06666666666666667,
+    "longest_days_without_entry": 9.1,
+    "days_without_entry_at_end": 1.1,
+    "exit_reasons": {
+     "exit_signal": 712,
+     "roi": 455,
+     "stoploss": 244
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.4101123595505618,
+    "F2": 0.33879781420765026,
+    "F3": 0.39634146341463417,
+    "F4": 0.34782608695652173,
+    "F5": 0.4530386740331492,
+    "F6": 0.36548223350253806,
+    "F7": 0.36507936507936506,
+    "F8": 0.36607142857142855
+   },
+   "fold_std": 0.03754554833504795,
+   "regimes": {
+    "bear": {
+     "trades": 363,
+     "win_rate": 0.39944903581267216
+    },
+    "range": {
+     "trades": 167,
+     "win_rate": 0.4491017964071856
+    },
+    "bull": {
+     "trades": 881,
+     "win_rate": 0.358683314415437
+    }
+   },
+   "sensitivity": {
+    "taker": -0.006454443827193322,
+    "stress_041": -0.008406160548631516,
+    "no_tax": -0.0043709309583670215,
+    "slip_005": -0.007420743358810834,
+    "slip_010": -0.008422604194930485
+   }
+  },
+  {
+   "id": "W-rsi2-4h-sma100-tp1.5atr-st1.5atr",
+   "family": "W trend pullback with volatility exits",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 1025,
+    "trades_per_month": 22.364,
+    "win_rate": 0.45658536585365855,
+    "wilson_lower": 0.4263101272282884,
+    "mean": -0.006721881349873514,
+    "ci95": [
+     -0.00876371086143058,
+     -0.0046277318718174745
+    ],
+    "median": -0.014310240895312853,
+    "profit_factor": 0.6243851764594812,
+    "payoff_ratio": 0.7431250924955791,
+    "largest_loss": -0.12522431764355035,
+    "worst5_mean": -0.10171400098946241,
+    "max_drawdown": 0.22827578815709026,
+    "rolling30_min_win_rate": 0.13333333333333333,
+    "longest_days_without_entry": 85.7,
+    "days_without_entry_at_end": 2.8,
+    "exit_reasons": {
+     "end": 1,
+     "roi": 448,
+     "stoploss": 511,
+     "time": 65
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.410958904109589,
+    "F2": 0.41899441340782123,
+    "F3": 0.44970414201183434,
+    "F4": 0.5123152709359606,
+    "F5": 0.47183098591549294,
+    "F6": 0.3826086956521739,
+    "F7": 0.5073529411764706,
+    "F8": 0.375
+   },
+   "fold_std": 0.053005494241409205,
+   "regimes": {
+    "bear": {
+     "trades": 93,
+     "win_rate": 0.40860215053763443
+    },
+    "range": {
+     "trades": 51,
+     "win_rate": 0.43137254901960786
+    },
+    "bull": {
+     "trades": 881,
+     "win_rate": 0.46311010215664017
+    }
+   },
+   "sensitivity": {
+    "taker": -0.006721881349873514,
+    "stress_041": -0.008689102100640634,
+    "no_tax": -0.004627293239816916,
+    "slip_005": -0.007715717217808746,
+    "slip_010": -0.008708562277291373
+   }
+  },
+  {
+   "id": "W-rsi2-4h-sma100-tp1.5atr-st2.5atr",
+   "family": "W trend pullback with volatility exits",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 909,
+    "trades_per_month": 19.833,
+    "win_rate": 0.5324532453245324,
+    "wilson_lower": 0.4999492945568453,
+    "mean": -0.006772078567328566,
+    "ci95": [
+     -0.009393295287305876,
+     -0.004249147560378962
+    ],
+    "median": 0.004688720097142385,
+    "profit_factor": 0.6504202798502028,
+    "payoff_ratio": 0.5711335101990417,
+    "largest_loss": -0.12545446834032659,
+    "worst5_mean": -0.12545446834032645,
+    "max_drawdown": 0.19011787682002357,
+    "rolling30_min_win_rate": 0.16666666666666666,
+    "longest_days_without_entry": 85.7,
+    "days_without_entry_at_end": 2.8,
+    "exit_reasons": {
+     "end": 1,
+     "roi": 452,
+     "stoploss": 297,
+     "time": 159
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.4153846153846154,
+    "F2": 0.5414012738853503,
+    "F3": 0.4864864864864865,
+    "F4": 0.580110497237569,
+    "F5": 0.5634920634920635,
+    "F6": 0.4423076923076923,
+    "F7": 0.628099173553719,
+    "F8": 0.2857142857142857
+   },
+   "fold_std": 0.11003594540387111,
+   "regimes": {
+    "bear": {
+     "trades": 81,
+     "win_rate": 0.41975308641975306
+    },
+    "range": {
+     "trades": 46,
+     "win_rate": 0.5652173913043478
+    },
+    "bull": {
+     "trades": 782,
+     "win_rate": 0.5421994884910486
+    }
+   },
+   "sensitivity": {
+    "taker": -0.006772078567328566,
+    "stress_041": -0.008739199900816728,
+    "no_tax": -0.004677596311305055,
+    "slip_005": -0.007765864209859412,
+    "slip_010": -0.008758659094010062
+   }
+  },
+  {
+   "id": "W-rsi14-1h-sma100-tp3atr-st5atr",
+   "family": "W trend pullback with volatility exits",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 654,
+    "trades_per_month": 14.27,
+    "win_rate": 0.5779816513761468,
+    "wilson_lower": 0.5397828126898466,
+    "mean": -0.007240394826555011,
+    "ci95": [
+     -0.010458176832945325,
+     -0.004053775567021986
+    ],
+    "median": 0.004992407430250423,
+    "profit_factor": 0.6394755118269987,
+    "payoff_ratio": 0.46691862768320536,
+    "largest_loss": -0.10557843352987939,
+    "worst5_mean": -0.1055784335298793,
+    "max_drawdown": 0.19239789581826405,
+    "rolling30_min_win_rate": 0.26666666666666666,
+    "longest_days_without_entry": 96.6,
+    "days_without_entry_at_end": 6.0,
+    "exit_reasons": {
+     "roi": 381,
+     "stoploss": 262,
+     "time": 11
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.44642857142857145,
+    "F2": 0.6434108527131783,
+    "F3": 0.58,
+    "F4": 0.5806451612903226,
+    "F5": 0.527027027027027,
+    "F6": 0.5365853658536586,
+    "F7": 0.6309523809523809,
+    "F8": 0.8
+   },
+   "fold_std": 0.10431433915173045,
+   "regimes": {
+    "bear": {
+     "trades": 71,
+     "win_rate": 0.4647887323943662
+    },
+    "range": {
+     "trades": 26,
+     "win_rate": 0.8076923076923077
+    },
+    "bull": {
+     "trades": 557,
+     "win_rate": 0.5816876122082585
+    }
+   },
+   "sensitivity": {
+    "taker": -0.007240394826555011,
+    "stress_041": -0.009206588643926816,
+    "no_tax": -0.005146900138514642,
+    "slip_005": -0.008233711889855923,
+    "slip_010": -0.009226038661928476
+   }
+  },
+  {
+   "id": "R-random-V-don1d20-exits",
+   "family": "R random entry control",
+   "deployable": false,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 150,
+    "trades_per_month": 3.273,
+    "win_rate": 0.21333333333333335,
+    "wilson_lower": 0.15536236119471128,
+    "mean": -0.007905175301645612,
+    "ci95": [
+     -0.014247898376006589,
+     -0.0016420612253477103
+    ],
+    "median": -0.0066682732725476535,
+    "profit_factor": 0.5203893713429485,
+    "payoff_ratio": 1.9189358068271225,
+    "largest_loss": -0.1418648918045492,
+    "worst5_mean": -0.1261214850394102,
+    "max_drawdown": 0.03965724046240193,
+    "rolling30_min_win_rate": 0.1,
+    "longest_days_without_entry": 54.4,
+    "days_without_entry_at_end": 13.2,
+    "exit_reasons": {
+     "exit_signal": 121,
+     "roi": 23,
+     "stoploss": 6
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.11764705882352941,
+    "F2": 0.18518518518518517,
+    "F3": 0.3684210526315789,
+    "F4": 0.2777777777777778,
+    "F5": 0.23809523809523808,
+    "F6": 0.1111111111111111,
+    "F7": 0.1111111111111111,
+    "F8": 0.3333333333333333
+   },
+   "fold_std": 0.10275021653689484,
+   "regimes": {
+    "bear": {
+     "trades": 39,
+     "win_rate": 0.1794871794871795
+    },
+    "range": {
+     "trades": 21,
+     "win_rate": 0.19047619047619047
+    },
+    "bull": {
+     "trades": 90,
+     "win_rate": 0.23333333333333334
+    }
+   },
+   "sensitivity": {
+    "taker": -0.007905175301645612,
+    "stress_041": -0.00987005249890795,
+    "no_tax": -0.005813082478050619,
+    "slip_005": -0.008897827211181366,
+    "slip_010": -0.009889489492616348
+   }
+  }
+ ],
+ "selected_null": {
+  "shuffles": 1000,
+  "entry_rate_per_bar": {
+   "BTC/IDR": 0.0067801672640382315,
+   "ETH/IDR": 0.006720430107526882,
+   "SOL/IDR": 0.006541218637992832,
+   "XRP/IDR": 0.0034348864994026285,
+   "DOGE/IDR": 0.0033751493428912783
+  },
+  "mean_p95": -0.003695544963131414,
+  "mean_p50": -0.0051723005019034055,
+  "win_rate_p95": 0.30330161288217866,
+  "win_rate_p50": 0.2790121127687158,
+  "trades_median": 779.0
+ }
+}

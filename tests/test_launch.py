@@ -64,7 +64,8 @@ def test_default_rule_strategy_fills_its_take_profit_at_the_gross_target(tmp_pat
     fee = settings.exchange.fee_pct / 100
     assert type(strategy).__name__ == "RuleStrategy"
     assert strategy.stoploss == settings.strategy.rule.stoploss
-    assert 1.03 * (1 - fee) / (1 + fee) - 1 == pytest.approx(strategy.minimal_roi[0])
+    gross = 1 + settings.strategy.rule.take_profit
+    assert gross * (1 - fee) / (1 + fee) - 1 == pytest.approx(strategy.minimal_roi[0])
     assert strategy.rule == settings.strategy.rule
 
 
