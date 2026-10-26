@@ -80,7 +80,7 @@ start_pwa() {
   local node_bin
   node_bin=$(dirname "$(command -v npm)")
   if [ ! -d "$pwa_dir/node_modules" ]; then
-    npm --prefix "$pwa_dir" ci
+    npm --prefix "$pwa_dir" ci --include=dev
   fi
   npm --prefix "$pwa_dir" run build
   systemd-run --user --collect --unit "$1" \
