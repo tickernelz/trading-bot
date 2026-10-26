@@ -101,7 +101,7 @@ def token_of(gateway: Gateway, scope: str = "read") -> str:
 def call(gateway: Gateway, method: str, path: str, host: str = "127.0.0.1", **kwargs) -> httpx.Response:
     async def go() -> httpx.Response:
         transport = httpx.ASGITransport(app=create_app(gateway), client=(host, 51000))
-        async with httpx.AsyncClient(transport=transport, base_url="http://gw") as http:
+        async with httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1:8090") as http:
             return await http.request(method, path, **kwargs)
 
     return asyncio.run(go())
@@ -220,7 +220,7 @@ def test_a_forbidden_control_call_reaches_a_waiting_audit_subscriber_on_the_even
         waiter = asyncio.create_task(client.queue.get())
         await asyncio.sleep(0)
         transport = httpx.ASGITransport(app=create_app(gateway), client=("127.0.0.1", 51000))
-        async with httpx.AsyncClient(transport=transport, base_url="http://gw") as http:
+        async with httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1:8090") as http:
             response = await http.post(f"{PREFIX}/scoreboard/apply?bot=B", headers=headers)
         event = await asyncio.wait_for(waiter, 2)
         return response.status_code, event
