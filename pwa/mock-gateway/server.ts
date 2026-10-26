@@ -5,13 +5,13 @@ import { WebSocket, WebSocketServer } from "ws";
 import { buildCandles, buildDecision, buildNews, buildSentiment, COLUMNS, HOUR, iso, isoMs, PAIRS, rng, type Row, START_CAPITAL, STAKE_RATIO } from "./data";
 import { createStage2, type MockTrade, type Session } from "./stage2";
 
-type Scenario = "aman" | "ditahan" | "berhenti";
+type Scenario = "safe" | "held" | "stopped";
 
 const PORT = Number(process.env.MOCK_GATEWAY_PORT ?? 8090);
-const PASSWORD = process.env.MOCK_GATEWAY_PASSWORD ?? "contoh";
+const PASSWORD = process.env.MOCK_GATEWAY_PASSWORD ?? "example";
 const random = rng(Number(process.env.MOCK_GATEWAY_SEED ?? 7));
 const vapid = webpush.generateVAPIDKeys();
-webpush.setVapidDetails("mailto:contoh@localhost", vapid.publicKey, vapid.privateKey);
+webpush.setVapidDetails("mailto:example@localhost", vapid.publicKey, vapid.privateKey);
 
 const tokens = new Map<string, Session>();
 let remote = process.env.MOCK_REMOTE === "1";
@@ -28,7 +28,7 @@ function wants(ws: WebSocket, type: string): boolean {
   return ALWAYS.has(type) || (clients.get(ws)?.topics.has(type) ?? false);
 }
 let seq = 0;
-let scenario: Scenario = (process.env.MOCK_SCENARIO as Scenario) ?? "aman";
+let scenario: Scenario = (process.env.MOCK_SCENARIO as Scenario) ?? "safe";
 let droppedUntil = 0;
 const started = Date.now();
 
@@ -71,7 +71,7 @@ function riskSnapshot() {
   const before = trades.filter((t) => t.close_ms && t.close_ms < dayStart).reduce((s, t) => s + profitOf(t, t.close_rate!), 0);
   const dayStartEquity = START_CAPITAL + before;
   let equity = START_CAPITAL + realized() + unrealized();
-  if (scenario === "ditahan") equity = Math.min(equity, dayStartEquity * (1 - 0.0102));
+  if (scenario === "held") equity = Math.min(equity, dayStartEquity * (1 - 0.0102));
   const peak = Math.max(START_CAPITAL, dayStartEquity, equity);
   const dailyPnl = equity - dayStartEquity;
   const dailyLoss = Math.max(0, (-dailyPnl / dayStartEquity) * 100);
@@ -152,8 +152,8 @@ const sentiment = buildSentiment(rng(211), newsAt);
 function health() {
   const last = buffer.at(-1);
   return {
-    gateway: { status: "ok", version: "0.1.0-contoh", uptime_s: Math.round((Date.now() - started) / 1000), sample_data: true },
-    freqtrade: { version: "2026.9", state: scenario === "berhenti" ? "stopped" : "running", last_process: iso(Date.now() - 4000), bot_start: iso(started - 26 * HOUR), dry_run: true },
+    gateway: { status: "ok", version: "0.1.0-example", uptime_s: Math.round((Date.now() - started) / 1000), sample_data: true },
+    freqtrade: { version: "2026.9", state: scenario === "stopped" ? "stopped" : "running", last_process: iso(Date.now() - 4000), bot_start: iso(started - 26 * HOUR), dry_run: true },
     exchange: { name: "indodax", reachable: true, latency_ms: 1843 },
     feed: { connected: true, last_event_at: last?.ts ?? null, sequence: seq },
   };
@@ -195,16 +195,16 @@ function emit(type: string, data: unknown, bot?: string) {
 }
 
 function hello(ws: WebSocket) {
-  send(ws, { type: "gw.hello", seq, ts: isoMs(Date.now()), data: { gateway_version: "0.1.0-contoh", freqtrade_version: "2026.9", dry_run: true, whitelist: PAIRS.map((p) => p.pair), sequence_resume_window: 200, sample_data: true, bots: stage2.bots } });
+  send(ws, { type: "gw.hello", seq, ts: isoMs(Date.now()), data: { gateway_version: "0.1.0-example", freqtrade_version: "2026.9", dry_run: true, whitelist: PAIRS.map((p) => p.pair), sequence_resume_window: 200, sample_data: true, bots: stage2.bots } });
 }
 
 const PUSH_SAMPLES: Record<string, { title: string; body: string; url: string }> = {
-  fill: { title: "Beli BTC/IDR terisi", body: "Dry-run: Rp 333.323 di 1.463.933.000. Contoh data.", url: "/#aksi" },
-  risk_breach: { title: "Batas rugi harian terlewati", body: "Rugi hari ini \u22121,02% dari batas 1,0%. Entry baru ditahan sampai besok. Contoh data.", url: "/#ringkas" },
-  kill_switch: { title: "Kill switch aktif", body: "Bot berhenti membuka posisi baru. Posisi terbuka tetap dijaga stop loss. Contoh data.", url: "/#ringkas" },
-  heartbeat_lost: { title: "Heartbeat bot hilang", body: "Tidak ada kabar dari bot selama 3 menit. Periksa PC. Contoh data.", url: "/#sistem" },
-  quorum_failed: { title: "Kuorum swarm gagal", body: "ETH/IDR: 2 dari 7 voter menjawab (minimal 5). Entry dilewati. Contoh data.", url: "/#swarm" },
-  daily_summary: { title: "Ringkasan hari ini", body: "Dry-run: \u22120,31% rugi, 2 trade ditutup, batas tidak tersentuh. Contoh data.", url: "/#ringkas" },
+  fill: { title: "Buy BTC/IDR filled", body: "Dry-run: Rp 333,323 at 1,463,933,000. Sample data.", url: "/#activity" },
+  risk_breach: { title: "Daily loss limit breached", body: "Loss today \u22121.02% against a 1.0% limit. New entries are held until tomorrow. Sample data.", url: "/#summary" },
+  kill_switch: { title: "Kill switch on", body: "The bot stopped opening new positions. Open positions keep their stop loss. Sample data.", url: "/#summary" },
+  heartbeat_lost: { title: "Bot heartbeat lost", body: "No word from the bot for 3 minutes. Check the PC. Sample data.", url: "/#system" },
+  quorum_failed: { title: "Swarm quorum failed", body: "ETH/IDR: 2 of 7 voters answered (minimum 5). Entry skipped. Sample data.", url: "/#swarm" },
+  daily_summary: { title: "Today's summary", body: "Dry-run: \u22120.31% loss, 2 trades closed, limits untouched. Sample data.", url: "/#summary" },
 };
 
 async function push(kind: string) {
@@ -271,7 +271,7 @@ const server = createServer(async (req, res) => {
   try {
     if (req.method === "POST" && path === "/gw/v1/session") {
       const b = await readBody();
-      if (b.password !== PASSWORD) return fail(res, 401, "unauthorized", "Kata sandi salah");
+      if (b.password !== PASSWORD) return fail(res, 401, "unauthorized", "Wrong password");
       const token = randomBytes(24).toString("hex");
       const session: Session = { scope: scopeFor(remote), expires_at: iso(Date.now() + 30 * 24 * HOUR) };
       tokens.set(token, session);
@@ -280,8 +280,8 @@ const server = createServer(async (req, res) => {
     if (path.startsWith("/gw/v1/dev/")) {
       const b = req.method === "POST" ? await readBody() : {};
       if (path === "/gw/v1/dev/scenario") {
-        scenario = (b.name as Scenario) ?? "aman";
-        emit("status", { status: scenario === "berhenti" ? "stopped" : "running" });
+        scenario = (b.name as Scenario) ?? "safe";
+        emit("status", { status: scenario === "stopped" ? "stopped" : "running" });
         emit("gw.risk", riskSnapshot());
         return json(res, 200, { scenario });
       }
@@ -311,9 +311,9 @@ const server = createServer(async (req, res) => {
     }
     const auth = req.headers.authorization?.replace(/^Bearer /, "");
     const session = auth ? tokens.get(auth) : undefined;
-    if (!auth || !session) return fail(res, 401, "unauthorized", "Token tidak sah");
+    if (!auth || !session) return fail(res, 401, "unauthorized", "Invalid token");
     const forced = req.method === "GET" ? failing.get(path) : undefined;
-    if (forced) return fail(res, forced, forced === 404 ? "not_found" : "upstream_error", "Gagal dipaksa oleh rute dev");
+    if (forced) return fail(res, forced, forced === 404 ? "not_found" : "upstream_error", "Failure forced by a dev route");
     if (upstreamDown() && ["/gw/v1/health", "/gw/v1/overview", "/gw/v1/risk"].includes(path)) {
       return fail(res, 503, "upstream_unavailable", "Freqtrade API did not answer within 5s");
     }
@@ -344,8 +344,8 @@ const server = createServer(async (req, res) => {
         case "/gw/v1/candles": {
           const pair = url.searchParams.get("pair") ?? "";
           const rows = candles.get(pair);
-          if (!rows) return fail(res, 404, "not_found", "Pair tidak ada di whitelist");
-          if (url.searchParams.get("timeframe") !== "1h") return fail(res, 400, "invalid_request", "Hanya timeframe 1h");
+          if (!rows) return fail(res, 404, "not_found", "Pair is not on the whitelist");
+          if (url.searchParams.get("timeframe") !== "1h") return fail(res, 400, "invalid_request", "Only the 1h timeframe");
           const limit = Math.min(1500, Number(url.searchParams.get("limit") ?? 300));
           return json(res, 200, { pair, timeframe: "1h", strategy: "SwingEmaRsi", columns: COLUMNS, length: Math.min(limit, rows.length), last_analyzed: ftDate(lastHour + 60000), data: rows.slice(-limit) });
         }
@@ -354,15 +354,15 @@ const server = createServer(async (req, res) => {
           const risk = riskSnapshot();
           if (window === "day") {
             const from = jakartaDayStart(Date.now());
-            return json(res, 200, { window, start_equity: risk.day_start_equity, series: [equitySeries("A", "Bot A", "aturan saja", from, 300000, risk.day_start_equity, risk.equity, 5, scenario === "ditahan" ? -0.00012 : -0.00002)] });
+            return json(res, 200, { window, start_equity: risk.day_start_equity, series: [equitySeries("A", "Bot A", "rules only", from, 300000, risk.day_start_equity, risk.equity, 5, scenario === "held" ? -0.00012 : -0.00002)] });
           }
           const from = Date.now() - 7 * 24 * HOUR;
           return json(res, 200, {
             window: "7d",
             start_equity: START_CAPITAL,
             series: [
-              equitySeries("A", "Bot A", "aturan saja", from, HOUR, START_CAPITAL, risk.equity, 13, 0.00001),
-              equitySeries("B", "Bot B", "aturan + swarm bayangan", from, HOUR, START_CAPITAL, risk.equity + 5150, 29, 0.00003),
+              equitySeries("A", "Bot A", "rules only", from, HOUR, START_CAPITAL, risk.equity, 13, 0.00001),
+              equitySeries("B", "Bot B", "rules + shadow swarm", from, HOUR, START_CAPITAL, risk.equity + 5150, 29, 0.00003),
             ],
           });
         }
@@ -376,7 +376,7 @@ const server = createServer(async (req, res) => {
         case "/gw/v1/news": {
           const pair = url.searchParams.get("pair");
           const limit = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") ?? 50)));
-          if (pair && !news.has(pair)) return fail(res, 404, "not_found", "Pair tidak ada di whitelist");
+          if (pair && !news.has(pair)) return fail(res, 404, "not_found", "Pair is not on the whitelist");
           const all = pair ? news.get(pair)! : [...news.values()][0];
           const items = pair ? all.items : [...news.values()].flatMap((n) => n.items).sort((a, b) => b.published.localeCompare(a.published));
           return json(res, 200, { ...all, items: items.slice(0, limit) });
@@ -397,17 +397,18 @@ const server = createServer(async (req, res) => {
       const b = await readBody();
       const sub = b.subscription as PushSubscription | undefined;
       if (req.method === "POST" && sub?.endpoint) {
+        const lang = typeof b.lang === "string" && b.lang ? b.lang : "en";
         subscriptions.set(sub.endpoint, sub);
-        return json(res, 201, { endpoint: sub.endpoint, kinds: b.kinds ?? [] });
+        return json(res, 201, { endpoint: sub.endpoint, kinds: b.kinds ?? [], lang });
       }
       if (req.method === "DELETE" && typeof b.endpoint === "string") {
         subscriptions.delete(b.endpoint);
         return json(res, 200, { removed: true });
       }
-      return fail(res, 400, "invalid_request", "subscription atau endpoint wajib");
+      return fail(res, 400, "invalid_request", "subscription or endpoint is required");
     }
     if (req.method === "POST" && path === "/gw/v1/push/test") return json(res, 200, await push("daily_summary"));
-    return fail(res, 404, "not_found", "Tidak ada endpoint " + path);
+    return fail(res, 404, "not_found", "No endpoint " + path);
   } catch (error) {
     return fail(res, 500, "upstream_error", error instanceof Error ? error.message : "error");
   }
@@ -498,12 +499,12 @@ function script() {
   const pair = PAIRS[step % 3].pair;
   const phase = step % 4;
   step++;
-  if (scenario === "ditahan") {
+  if (scenario === "held") {
     const r = riskSnapshot();
     emit("gw.risk_denied", { pair, breaches: r.breaches, daily_loss_pct: r.daily_loss_pct, drawdown_pct: r.drawdown_pct, equity: r.equity });
     return;
   }
-  if (scenario === "berhenti") return;
+  if (scenario === "stopped") return;
   if (phase === 0 || phase === 2) {
     const d = buildDecision(random, pair, lastHour, Date.now(), phase === 2 && random() < 0.3);
     decisions.unshift(d);
@@ -536,16 +537,16 @@ function script() {
     }
     return;
   }
-  emit("warning", { status: "nutaraline membalas 429; voter v6 dibuang untuk keputusan ini." });
+  emit("warning", { status: "nutaraline answered 429; voter v6 dropped for this decision." });
 }
 
 const tickTimer = setInterval(tick, 5000);
 const scriptTimer = setInterval(script, Number(process.env.MOCK_SCRIPT_MS ?? 20000));
-emit("status", { status: scenario === "berhenti" ? "stopped" : "running" });
+emit("status", { status: scenario === "stopped" ? "stopped" : "running" });
 emit("warning", { status: "Dry run is enabled. All trades are simulated." });
 
 server.listen(PORT, "127.0.0.1", () => {
-  process.stdout.write("mock gateway (contoh data) on http://127.0.0.1:" + PORT + "\n");
+  process.stdout.write("mock gateway (sample data) on http://127.0.0.1:" + PORT + "\n");
 });
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {

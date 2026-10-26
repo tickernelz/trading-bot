@@ -1,6 +1,6 @@
 const CACHE = "tb-shell-__SW_VERSION__";
 const SHELL = ["/", "/manifest.webmanifest", "/icons/icon.svg", "/icons/icon-192.png", ...__SW_ASSETS__];
-const HOME = "/#ringkas";
+const HOME = "/#summary";
 const URGENT = new Set(["risk_breach", "kill_switch", "heartbeat_lost"]);
 
 self.addEventListener("install", (event) => {
@@ -77,16 +77,16 @@ function parse(event) {
   try {
     return event.data ? event.data.json() : null;
   } catch {
-    return { title: "Bot Trading", body: event.data.text() };
+    return { title: "Trading Bot", body: event.data.text() };
   }
 }
 
 self.addEventListener("push", (event) => {
   const data = parse(event) ?? {};
   const kind = data.kind ?? "info";
-  const title = data.title ?? "Bot Trading";
+  const title = data.title ?? "Trading Bot";
   const options = {
-    body: data.body ?? "Ada kabar baru dari bot. Buka aplikasi untuk detail.",
+    body: data.body ?? "New update from the bot. Open the app for details.",
     tag: kind + ":" + (data.id ?? Date.now()),
     timestamp: data.ts ? Date.parse(data.ts) : Date.now(),
     icon: "/icons/icon-192.png",

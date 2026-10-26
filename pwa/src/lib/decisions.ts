@@ -2,7 +2,7 @@ import { clock } from "./format";
 import { t } from "./i18n";
 import type { Decision, DecisionOutcome } from "./types";
 
-export type DecisionFilter = "semua" | "skip" | "ok";
+export type DecisionFilter = "all" | "skip" | "ok";
 
 export interface OutcomeView {
   settled: boolean;
@@ -14,7 +14,7 @@ export interface OutcomeView {
 
 export function decisionsPath(filter: DecisionFilter, before: string | null, bot: string | null, limit = 30): string {
   const q = new URLSearchParams({ limit: String(limit) });
-  if (filter !== "semua") q.set("status", filter);
+  if (filter !== "all") q.set("status", filter);
   if (before) q.set("before", before);
   if (bot) q.set("bot", bot);
   return "/gw/v1/decisions?" + q.toString();

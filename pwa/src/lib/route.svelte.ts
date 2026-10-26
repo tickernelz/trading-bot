@@ -1,27 +1,27 @@
 import { t } from "./i18n";
 
 export const SCREENS = [
-  { id: "ringkas", label: t("nav.ringkas"), group: "pantau", tab: true },
-  { id: "grafik", label: t("nav.grafik"), group: "pantau", tab: true },
-  { id: "aksi", label: t("nav.aksi"), group: "pantau", tab: true },
-  { id: "swarm", label: t("nav.swarm"), group: "pantau", tab: false },
-  { id: "kontrol", label: t("nav.kontrol"), group: "kendali", tab: true },
-  { id: "konfigurasi", label: t("nav.konfigurasi"), group: "kendali", tab: false },
-  { id: "provider", label: t("nav.provider"), group: "kendali", tab: false },
-  { id: "riwayat", label: t("nav.riwayat"), group: "catatan", tab: false },
-  { id: "ab", label: t("nav.ab"), group: "catatan", tab: false },
-  { id: "audit", label: t("nav.audit"), group: "catatan", tab: false },
-  { id: "sistem", label: t("nav.sistem"), group: "sistem", tab: false },
-  { id: "lainnya", label: t("nav.lainnya"), group: null, tab: true },
+  { id: "summary", label: t("nav.summary"), group: "watch", tab: true },
+  { id: "chart", label: t("nav.chart"), group: "watch", tab: true },
+  { id: "activity", label: t("nav.activity"), group: "watch", tab: true },
+  { id: "swarm", label: t("nav.swarm"), group: "watch", tab: false },
+  { id: "control", label: t("nav.control"), group: "control", tab: true },
+  { id: "config", label: t("nav.config"), group: "control", tab: false },
+  { id: "provider", label: t("nav.provider"), group: "control", tab: false },
+  { id: "history", label: t("nav.history"), group: "records", tab: false },
+  { id: "ab", label: t("nav.ab"), group: "records", tab: false },
+  { id: "audit", label: t("nav.audit"), group: "records", tab: false },
+  { id: "system", label: t("nav.system"), group: "system", tab: false },
+  { id: "more", label: t("nav.more"), group: null, tab: true },
 ] as const;
 
 export type Screen = (typeof SCREENS)[number]["id"];
 
 export const GROUPS = [
-  { id: "pantau", label: t("nav.group.pantau") },
-  { id: "kendali", label: t("nav.group.kendali") },
-  { id: "catatan", label: t("nav.group.catatan") },
-  { id: "sistem", label: t("nav.group.sistem") },
+  { id: "watch", label: t("nav.group.watch") },
+  { id: "control", label: t("nav.group.control") },
+  { id: "records", label: t("nav.group.records") },
+  { id: "system", label: t("nav.group.system") },
 ] as const;
 
 export function inGroup(group: string) {
@@ -29,12 +29,12 @@ export function inGroup(group: string) {
 }
 
 export function tabFor(screen: Screen): Screen {
-  return SCREENS.find((s) => s.id === screen)?.tab ? screen : "lainnya";
+  return SCREENS.find((s) => s.id === screen)?.tab ? screen : "more";
 }
 
 function parse(hash: string): Screen {
   const id = hash.replace(/^#/, "");
-  return SCREENS.find((s) => s.id === id)?.id ?? "ringkas";
+  return SCREENS.find((s) => s.id === id)?.id ?? "summary";
 }
 
 class Route {

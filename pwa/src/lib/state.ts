@@ -3,7 +3,7 @@ import type { Decision, Equity, Health, LogLine, Overview, Risk, Sysinfo, Trade 
 
 export const STALE_AFTER_MS = 90000;
 
-export type SafetyState = "aman" | "ditahan" | "berhenti";
+export type SafetyState = "safe" | "held" | "stopped";
 
 export const FEED_TOPICS = [
   "entry",
@@ -58,9 +58,9 @@ export function isStale(f: Freshness): boolean {
 
 export function safetyOf(health: Health | null, risk: Risk | null): SafetyState | null {
   if (!health || !risk) return null;
-  if (health.freqtrade.state !== "running") return "berhenti";
-  if (!risk.entries_allowed) return "ditahan";
-  return "aman";
+  if (health.freqtrade.state !== "running") return "stopped";
+  if (!risk.entries_allowed) return "held";
+  return "safe";
 }
 
 export function faultOf(error: unknown, at: number): Fault {

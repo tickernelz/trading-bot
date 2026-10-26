@@ -1,7 +1,7 @@
 import { t, type Key } from "./i18n";
 import type { Decision, FearGreedClass, VoterRecord } from "./types";
 
-const CHOICES: Record<string, Key> = { izinkan: "choice.izinkan", kecilkan: "choice.kecilkan", lewati: "choice.lewati" };
+const CHOICES: Record<string, Key> = { allow: "choice.allow", reduce: "choice.reduce", skip: "choice.skip" };
 const REASONS: Record<string, Key> = { quorum_not_met: "reason.quorum_not_met", spread_too_wide: "reason.spread_too_wide" };
 const FEAR_GREED: Record<FearGreedClass, Key> = {
   "Extreme Fear": "fng.extreme_fear",

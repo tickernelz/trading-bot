@@ -14,7 +14,7 @@ let token: string | null = null;
 let api: Api;
 
 async function login(): Promise<SessionInfo> {
-  return api.post<SessionInfo>("/gw/v1/session", { password: "contoh" });
+  return api.post<SessionInfo>("/gw/v1/session", { password: "example" });
 }
 
 async function remotely<T>(fn: (remote: Api) => Promise<T>): Promise<T> {
@@ -199,9 +199,9 @@ describe("configuration (2b ZHA-3775, 15.1)", () => {
   });
 
   it("sets the analyst through roles", async () => {
-    const out = await send<WriteResult>(api, { method: "put", path: "/gw/v1/roles?bot=A", body: { analyst: { provider: "omniroute", model: "contoh-model-lokal" } } }, idempotencyKey());
-    expect(out).toMatchObject({ kind: "done", result: { changes: [{ key: "llm.analyst_model", new: "omniroute:contoh-model-lokal" }] } });
-    expect((await api.get<Roles>("/gw/v1/roles?bot=A")).analyst).toEqual({ provider: "omniroute", model: "contoh-model-lokal" });
+    const out = await send<WriteResult>(api, { method: "put", path: "/gw/v1/roles?bot=A", body: { analyst: { provider: "omniroute", model: "example-local-model" } } }, idempotencyKey());
+    expect(out).toMatchObject({ kind: "done", result: { changes: [{ key: "llm.analyst_model", new: "omniroute:example-local-model" }] } });
+    expect((await api.get<Roles>("/gw/v1/roles?bot=A")).analyst).toEqual({ provider: "omniroute", model: "example-local-model" });
   });
 });
 
@@ -217,7 +217,7 @@ describe("providers and keys (2b ZHA-3775, 15.1, 15.2)", () => {
       expect(again).toMatchObject({ kind: "failed", error: { status: 429, code: "rate_limited" } });
       for (const request of [
         { method: "put" as const, path: "/gw/v1/providers/nutaraline?bot=A", body: { type: "openai-completions", base_url: "https://x.invalid/v1", models: ["m"] } },
-        { method: "put" as const, path: "/gw/v1/providers/nutaraline/key?bot=A", body: { api_key: "sk-contoh-12345678" } },
+        { method: "put" as const, path: "/gw/v1/providers/nutaraline/key?bot=A", body: { api_key: "sk-example-12345678" } },
         { method: "post" as const, path: "/gw/v1/providers/nutaraline/state?bot=A", body: { enabled: false } },
       ]) {
         expect(await send(remote, request, idempotencyKey())).toMatchObject({ kind: "failed", error: { code: "forbidden_local_only" } });
@@ -227,12 +227,12 @@ describe("providers and keys (2b ZHA-3775, 15.1, 15.2)", () => {
   });
 
   it("stores a key only through the key route, shows its last four characters, and masks it in audit and changes", async () => {
-    const inBody = await send(api, { method: "put", path: "/gw/v1/providers/omniroute?bot=A", body: { type: "openai-completions", base_url: "https://omni.invalid/v1", models: ["contoh-model-lokal"], api_key: "sk-contoh-WXYZ" } }, idempotencyKey());
+    const inBody = await send(api, { method: "put", path: "/gw/v1/providers/omniroute?bot=A", body: { type: "openai-completions", base_url: "https://omni.invalid/v1", models: ["example-local-model"], api_key: "sk-example-WXYZ" } }, idempotencyKey());
     expect(inBody).toMatchObject({ kind: "failed", error: { status: 400 } });
-    const out = await send<WriteResult & { provider: Provider }>(api, { method: "put", path: "/gw/v1/providers/omniroute/key?bot=A", body: { api_key: "sk-contoh-PENANDA-WXYZ" } }, idempotencyKey());
+    const out = await send<WriteResult & { provider: Provider }>(api, { method: "put", path: "/gw/v1/providers/omniroute/key?bot=A", body: { api_key: "sk-example-MARKER-WXYZ" } }, idempotencyKey());
     expect(out).toMatchObject({ kind: "done", result: { provider: { key: { source: "config", configured: true, last4: "WXYZ" } } } });
     const everything = JSON.stringify([await api.get("/gw/v1/audit?limit=200"), await api.get("/gw/v1/settings/changes?limit=200"), await api.get("/gw/v1/settings?bot=A"), await api.get("/gw/v1/providers?bot=A")]);
-    expect(everything).not.toContain("PENANDA");
+    expect(everything).not.toContain("MARKER");
     expect(everything).toContain("****WXYZ");
     const env = await send<WriteResult & { provider: Provider }>(api, { method: "put", path: "/gw/v1/providers/omniroute/key?bot=A", body: { api_key_env: "OMNIROUTE_API_KEY" } }, idempotencyKey());
     expect(env).toMatchObject({ kind: "done", result: { provider: { key: { source: "env", env_name: "OMNIROUTE_API_KEY", last4: null } } } });
@@ -262,6 +262,8 @@ describe("history, decisions, A vs B, audit (15.3)", () => {
     for (const d of [...first, ...next]) expect(["pending", "insufficient_data", "settled"]).toContain(d.outcome?.state);
     const skipped = await api.get<Decision[]>("/gw/v1/decisions?limit=50&status=skip");
     expect(skipped.every((d) => d.status === "skip")).toBe(true);
+    const choices = [...first, ...next, ...skipped].flatMap((d) => [d.verdict, ...d.voters.map((v) => v.answers?.action?.choice).filter(Boolean)]);
+    expect(new Set(choices)).toEqual(new Set(["allow", "reduce", "skip"]));
   });
 
   it("returns closed trades by offset and total profit per bot", async () => {

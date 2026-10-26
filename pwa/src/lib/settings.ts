@@ -6,7 +6,7 @@ export interface FieldError {
   message: string;
 }
 
-export type Direction = "naik" | "turun" | "netral";
+export type Direction = "up" | "down" | "neutral";
 
 export const RISK_KEYS = ["risk.max_daily_loss_pct", "risk.max_total_drawdown_pct", "risk.risk_per_trade_pct", "risk.max_open_trades"] as const;
 const CONFIRM_KEYS: readonly string[] = [...RISK_KEYS, "capital.initial_idr"];
@@ -80,14 +80,14 @@ export function patchBody(changes: Change[]): Plain {
 
 export function direction(change: Change): Direction {
   if (CONFIRM_KEYS.includes(change.key) && typeof change.old === "number" && typeof change.new === "number") {
-    if (change.new > change.old) return "naik";
-    if (change.new < change.old) return "turun";
+    if (change.new > change.old) return "up";
+    if (change.new < change.old) return "down";
   }
-  return "netral";
+  return "neutral";
 }
 
 export function needsConfirmation(change: Change): boolean {
-  return direction(change) === "naik";
+  return direction(change) === "up";
 }
 
 export function anyNeedsConfirmation(changes: Change[]): boolean {

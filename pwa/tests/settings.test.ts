@@ -57,8 +57,8 @@ describe("settings keys", () => {
 
 describe("two-step rule mirrors raising_keys of 2b", () => {
   it("asks for confirmation when a risk limit or the capital rises, never when they fall", () => {
-    expect(direction({ key: "risk.max_daily_loss_pct", old: 1, new: 1.5 })).toBe("naik");
-    expect(direction({ key: "risk.max_open_trades", old: 3, new: 2 })).toBe("turun");
+    expect(direction({ key: "risk.max_daily_loss_pct", old: 1, new: 1.5 })).toBe("up");
+    expect(direction({ key: "risk.max_open_trades", old: 3, new: 2 })).toBe("down");
     expect(needsConfirmation({ key: "capital.initial_idr", old: 2000000, new: 3000000 })).toBe(true);
     expect(needsConfirmation({ key: "capital.initial_idr", old: 2000000, new: 1500000 })).toBe(false);
     expect(needsConfirmation({ key: "swarm.mode", old: "shadow", new: "veto" })).toBe(false);

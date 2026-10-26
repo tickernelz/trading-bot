@@ -154,7 +154,7 @@
     void voterWrite("put", id, fields);
   }
 
-  const DIRECTION_TEXT = { naik: t("cfg.dir_up"), turun: t("cfg.dir_down"), netral: "" } as const;
+  const DIRECTION_TEXT = { up: t("cfg.dir_up"), down: t("cfg.dir_down"), neutral: "" } as const;
   const ADAPTERS = ["llm_structured", "systemone", "openrouter_decisions", "openai_decisions"] as const;
   const VARIATIONS = [
     { id: "option_order", label: t("cfg.var_order") },
@@ -270,7 +270,7 @@
       {#each changes as c (c.key)}
         {@const d = direction(c)}
         <tr>
-          <td><code>{c.key}</code>{#if d !== "netral"}<br /><span class="small" class:warn-text={d === "naik"}>{DIRECTION_TEXT[d]}</span>{/if}</td>
+          <td><code>{c.key}</code>{#if d !== "neutral"}<br /><span class="small" class:warn-text={d === "up"}>{DIRECTION_TEXT[d]}</span>{/if}</td>
           <td class="num">{show(c.old)}</td>
           <td class="num"><b>{show(c.new)}</b></td>
         </tr>

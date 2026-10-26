@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { actionLabel, auditPath, changeLines, isProblem, matches } from "../src/lib/audit";
 import { decisionsPath, outcomeView } from "../src/lib/decisions";
 import type { AuditRow, DecisionOutcome } from "../src/lib/types";
+import { inLang } from "./lang";
 
 const price = (o: Partial<DecisionOutcome>): DecisionOutcome => ({
   state: "settled",
@@ -24,11 +25,11 @@ describe("outcome after a decision", () => {
     const v = outcomeView(price({}))!;
     expect(v.settled).toBe(true);
     expect(v.value).toBe(0.6);
-    expect(v.note).toMatch(/bukan trade/);
+    expect(v.note).toMatch(/not a trade/);
   });
 
   it("marks pending and missing horizons as not enough data, without a number", () => {
-    expect(outcomeView(price({ state: "pending", return_after_fees_pct: null }))).toMatchObject({ settled: false, value: null, headline: "Dilewati, belum cukup data" });
+    expect(outcomeView(price({ state: "pending", return_after_fees_pct: null }))).toMatchObject({ settled: false, value: null, headline: "Skipped, not enough data yet" });
     expect(outcomeView(price({ state: "insufficient_data", return_after_fees_pct: null }))).toMatchObject({ settled: false, value: null });
   });
 
@@ -41,7 +42,7 @@ describe("outcome after a decision", () => {
 
   it("builds paging and filter queries from the contract", () => {
     expect(decisionsPath("skip", "2026-10-25T17:02:05Z", "B", 30)).toBe("/gw/v1/decisions?limit=30&status=skip&before=2026-10-25T17%3A02%3A05Z&bot=B");
-    expect(decisionsPath("semua", null, null)).toBe("/gw/v1/decisions?limit=30");
+    expect(decisionsPath("all", null, null)).toBe("/gw/v1/decisions?limit=30");
   });
 });
 
@@ -60,7 +61,7 @@ describe("audit", () => {
 
   it("shows key changes only as set or empty", () => {
     expect(changeLines(row)).toEqual([
-      { key: "providers[nutaraline].api_key", old: "kosong", new: "terpasang" },
+      { key: "providers[nutaraline].api_key", old: "empty", new: "set" },
       { key: "risk.max_open_trades", old: "3", new: "2" },
     ]);
   });
@@ -75,10 +76,20 @@ describe("audit", () => {
   });
 
   it("names ZHA-3774 actions and flags only results that need attention", () => {
-    expect(actionLabel("control.stop_entry")).toBe("Hentikan entry baru");
-    expect(actionLabel("trade.exit_all")).toBe("Exit paksa semua");
-    expect(actionLabel("pair.unblacklist")).toBe("Hapus dari blacklist");
+    expect(actionLabel("control.stop_entry")).toBe("Stop new entries");
+    expect(actionLabel("trade.exit_all")).toBe("Force exit all");
+    expect(actionLabel("pair.unblacklist")).toBe("Remove from blacklist");
     for (const result of ["ok", "confirmation_required", "replayed"]) expect(isProblem({ ...row, result })).toBe(false);
     for (const result of ["failed", "rejected", "forbidden", "denied", "invalid"]) expect(isProblem({ ...row, result })).toBe(true);
+  });
+});
+
+describe("audit in Indonesian", () => {
+  it("labels actions and key changes from the Indonesian catalogue", async () => {
+    const audit = await inLang("id", () => import("../src/lib/audit"));
+    expect(audit.actionLabel("control.stop_entry")).toBe("Hentikan entry baru");
+    expect(audit.actionLabel("pair.unblacklist")).toBe("Hapus dari blacklist");
+    const row = { detail: { changes: [{ key: "providers[x].api_key", old: null, new: "<set>" }] } } as unknown as AuditRow;
+    expect(audit.changeLines(row)).toEqual([{ key: "providers[x].api_key", old: "kosong", new: "terpasang" }]);
   });
 });

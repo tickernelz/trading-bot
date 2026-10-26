@@ -40,7 +40,7 @@
       {[
         d.mode === "shadow" ? t("tm.mode_shadow") : t("tm.mode_gate"),
         t("tm.quorum", { answered: d.answered, total: d.voters.length, required: d.required }),
-        ...(action ? [t("tm.median", { median: decimal(action.median_probabilities?.izinkan ?? 0), iqr: decimal(action.spread.iqr) })] : []),
+        ...(action ? [t("tm.median", { median: decimal(action.median_probabilities?.allow ?? 0), iqr: decimal(action.spread.iqr) })] : []),
       ].join(" · ")}
     </p>
     <VoterDots decision={d} />
