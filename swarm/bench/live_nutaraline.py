@@ -2,7 +2,9 @@ import argparse
 import asyncio
 import json
 import os
+import random
 import statistics
+import subprocess
 import sys
 from pathlib import Path
 
@@ -63,6 +65,53 @@ def build_voter(arguments, key, mode, backend):
     return LlmStructuredProvider(**options)
 
 
+async def decide_paced(voter, request, arguments):
+    retries = 0
+    while True:
+        try:
+            response = await voter.decide(request)
+        except ProviderError as exc:
+            if exc.kind == "rate_limit" and retries < arguments.rate_limit_retries:
+                retries += 1
+                await asyncio.sleep(arguments.rate_limit_wait * retries * random.uniform(0.8, 1.2))
+                continue
+            await asyncio.sleep(arguments.interval)
+            raise
+        await asyncio.sleep(arguments.interval)
+        return response, retries
+
+
+def script_revision():
+    here = Path(__file__).resolve().parent
+    try:
+        head = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=here, capture_output=True, text=True, check=True
+        ).stdout.strip()
+        dirty = subprocess.run(
+            ["git", "status", "--porcelain", "--", str(Path(__file__).resolve())],
+            cwd=here,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return head + ("+dirty" if dirty else "")
+
+
+def run_parameters(arguments, modes, backends):
+    extra = json.loads(arguments.extra_body) if arguments.extra_body else None
+    return {
+        "interval": arguments.interval,
+        "rate_limit_retries": arguments.rate_limit_retries,
+        "rate_limit_wait": arguments.rate_limit_wait,
+        "timeout": arguments.timeout,
+        "modes": modes,
+        "backends": backends,
+        "extra_body_keys": sorted(extra) if isinstance(extra, dict) else None,
+    }
+
+
 def percentile(values, share):
     ordered = sorted(values)
     return ordered[int(share * (len(ordered) - 1))]
@@ -72,14 +121,14 @@ async def run_cell(arguments, key, mode, backend):
     voter = build_voter(arguments, key, mode, backend)
     warmup_error = None
     try:
-        await voter.decide(DecisionRequest(state=CASES[0][1], questions=QUESTIONS))
+        await decide_paced(voter, DecisionRequest(state=CASES[0][1], questions=QUESTIONS), arguments)
     except ProviderError as exc:
         warmup_error = redact(f"{exc.kind}: {exc}", voter.secrets())[:200]
     rows = []
     for name, state in CASES:
         row = {"case": name, "mode": mode, "backend": backend}
         try:
-            response = await voter.decide(DecisionRequest(state=state, questions=QUESTIONS))
+            response, retries = await decide_paced(voter, DecisionRequest(state=state, questions=QUESTIONS), arguments)
         except ProviderError as exc:
             row.update(
                 {
@@ -92,6 +141,7 @@ async def run_cell(arguments, key, mode, backend):
             row.update(
                 {
                     "valid": True,
+                    "rate_limit_retries": retries,
                     "latency_s": round(response.latency_s, 3),
                     "model": response.model,
                     "input_tokens": response.usage.input_tokens,
@@ -111,6 +161,7 @@ async def run_cell(arguments, key, mode, backend):
         "valid": len(valid),
         "valid_rate": round(len(valid) / len(rows), 3),
         "warmup_error": warmup_error,
+        "rate_limit_retries": sum(r.get("rate_limit_retries", 0) for r in valid),
         "error_kinds": sorted({r.get("error_kind") for r in rows if not r["valid"]}),
         "latency_s": {
             "median": round(statistics.median(latencies), 3) if latencies else None,
@@ -135,6 +186,9 @@ async def main():
     parser.add_argument("--extra-body", default=os.environ.get("NUTARALINE_EXTRA_BODY"))
     parser.add_argument("--modes", default="prompt,json_object,json_schema")
     parser.add_argument("--backends", default="direct,deepagents")
+    parser.add_argument("--interval", type=float, default=3.0)
+    parser.add_argument("--rate-limit-retries", type=int, default=4)
+    parser.add_argument("--rate-limit-wait", type=float, default=15.0)
     parser.add_argument("--out", type=Path)
     arguments = parser.parse_args()
 
@@ -147,7 +201,15 @@ async def main():
         return 4
     modes = [m.strip() for m in arguments.modes.split(",") if m.strip()]
     backends = [b.strip() for b in arguments.backends.split(",") if b.strip()]
-    report = {"status": "ran", "base_url": arguments.base_url, "model": MODEL, "cases": len(CASES), "results": []}
+    report = {
+        "status": "ran",
+        "base_url": arguments.base_url,
+        "model": MODEL,
+        "cases": len(CASES),
+        "script_revision": script_revision(),
+        "arguments": run_parameters(arguments, modes, backends),
+        "results": [],
+    }
     for backend in backends:
         for mode in modes if backend == "direct" else ["prompt"]:
             report["results"].append(await run_cell(arguments, key, mode, backend))
