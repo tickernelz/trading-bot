@@ -83,7 +83,7 @@ Latensi jawaban sah pembagian 4+3: nutaraline median 1,6 s maks 2,7 s; experient
 
 Mode `swarm.mode: veto` ditolak skema sampai gerbang dibangun. Trade yang dibayangi membawa custom data `shadow_decision_id`, sehingga `DecisionStore.outcomes(<tradesv3.dryrun.sqlite>)` bisa menghitung apakah entry yang akan dilewati ternyata rugi.
 
-Setiap bot menulis `heartbeat.json` tiap loop dan menambah satu baris di `starts.jsonl` tiap start. Setelah start, bot menolak semua entry sampai cek start lolos: posisi terbuka dihargai dan batas rugi harian serta drawdown dinilai; hasilnya dikirim sebagai `strategy_msg` `startup_check`.
+Setiap bot menulis `heartbeat.json` tiap loop dan menambah satu baris di `starts.jsonl` tiap start. Setelah start, bot menolak semua entry sampai cek start lolos: posisi terbuka dihargai dan batas rugi harian serta drawdown dinilai; hasilnya dikirim sebagai `strategy_msg` `startup_check`. Semua ini, ditambah pengiriman kandidat ke layanan bayangan, hanya berjalan di runmode `dry_run` dan `live`: Freqtrade juga memanggil `bot_start`, `bot_loop_start`, `confirm_trade_entry`, dan `order_filled` saat backtest, hyperopt, dan webserver, dan di sana strategi tidak menyentuh berkas bot hidup maupun voter. Launcher hanya merender alamat layanan bayangan dan mewajibkan SHADOW_TOKEN untuk perintah `trade`.
 
 Direktori jalan (di luar repo), contoh `~/Projects/trading-bot-runs/stage1`:
 
@@ -118,7 +118,7 @@ Tes berjalan di dalam image turunan Freqtrade, jadi versi Freqtrade, ccxt, dan p
 
 ## Analitik
 
-Paket analytics/ menyediakan pratinjau what-if batas risiko dan putar ulang jawaban voter, papan skor voter, uji stres turun 10 persen, ekspor CSV dan ringkasan pajak sebagai informasi, portofolio per pair, serta sinyal strategi dan backtest lewat instans Freqtrade mode webserver. Bentuk endpoint ada di bagian 13 docs/gateway-api.md; ambang dan tarif diatur di bagian analytics config.
+Paket analytics/ menyediakan pratinjau what-if batas risiko dan putar ulang jawaban voter, papan skor voter, uji stres turun 10 persen, ekspor CSV dan ringkasan pajak sebagai informasi, portofolio per pair, serta sinyal strategi dan backtest lewat instans Freqtrade mode webserver. Bentuk endpoint ada di bagian 13 docs/gateway-api.md; ambang dan tarif diatur di bagian analytics config. Rutenya belum dipasang ke gateway (ZHA-3798).
 
 Sinyal dan backtest butuh instans mode webserver dengan data OHLCV di userdir-nya (bot mode trade menjawab 503 untuk /pair_history dan /backtest):
 

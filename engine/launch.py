@@ -13,6 +13,7 @@ from engine.settings import ConfigError, Settings, load_settings
 STRATEGY = "SwingEmaRsi"
 STRATEGY_COMMANDS = {"trade", "backtesting"}
 API_COMMANDS = {"trade", "webserver"}
+SHADOW_COMMANDS = {"trade"}
 ENGINE_ROOT = Path(__file__).resolve().parent
 DRY_RUN_DB = "tradesv3.dryrun.sqlite"
 TRADABLE_BALANCE_RATIO = 0.99
@@ -22,7 +23,7 @@ class MissingSecret(Exception):
     """Raised when a required environment variable is unset or empty."""
 
 
-def freqtrade_config(settings: Settings, serve_api: bool = True) -> dict[str, Any]:
+def freqtrade_config(settings: Settings, serve_api: bool = True, shadow: bool = False) -> dict[str, Any]:
     """Translate validated settings into a Freqtrade configuration without secrets."""
     config: dict[str, Any] = {
         "bot_name": "trading-bot",
@@ -62,8 +63,8 @@ def freqtrade_config(settings: Settings, serve_api: bool = True) -> dict[str, An
         "internals": {"process_throttle_secs": 5},
         "trading_bot": {
             "bot_id": settings.bot_id,
-            "shadow_url": settings.shadow.url if settings.swarm.enabled and settings.shadow else None,
-            "shadow_token_env": settings.shadow.token_env if settings.shadow else None,
+            "shadow_url": settings.shadow.url if shadow and settings.swarm.enabled and settings.shadow else None,
+            "shadow_token_env": settings.shadow.token_env if shadow and settings.shadow else None,
             "initial_capital": settings.capital.initial_idr,
             "compounding": settings.capital.compounding,
             "risk": settings.risk.model_dump(),
@@ -82,7 +83,7 @@ def freqtrade_config(settings: Settings, serve_api: bool = True) -> dict[str, An
     return config
 
 
-def secret_env(settings: Settings, environ: dict[str, str]) -> dict[str, str]:
+def secret_env(settings: Settings, environ: dict[str, str], shadow: bool = False) -> dict[str, str]:
     """Map the API credentials named in settings onto Freqtrade environment overrides."""
     names = {
         "FREQTRADE__API_SERVER__USERNAME": settings.api.username_env,
@@ -90,7 +91,7 @@ def secret_env(settings: Settings, environ: dict[str, str]) -> dict[str, str]:
         "FREQTRADE__API_SERVER__JWT_SECRET_KEY": settings.api.jwt_secret_env,
     }
     required = list(names.values())
-    if settings.swarm.enabled and settings.shadow is not None:
+    if shadow and settings.swarm.enabled and settings.shadow is not None:
         required.append(settings.shadow.token_env)
     missing = [source for source in required if not environ.get(source)]
     if missing:
@@ -114,13 +115,14 @@ def main(argv: list[str]) -> int:
     try:
         settings = load_settings(config_file)
         serve_api = argv[0] in API_COMMANDS
-        overrides = secret_env(settings, dict(os.environ)) if serve_api else {}
+        shadow = argv[0] in SHADOW_COMMANDS
+        overrides = secret_env(settings, dict(os.environ), shadow) if serve_api else {}
     except (ConfigError, MissingSecret) as exc:
         print(f"trading-bot: refusing to start: {exc}", file=sys.stderr)
         return 2
     rendered = Path(userdir) / "trading-bot.freqtrade.json"
     rendered.parent.mkdir(parents=True, exist_ok=True)
-    config = freqtrade_config(settings, serve_api)
+    config = freqtrade_config(settings, serve_api, shadow)
     if serve_api:
         config["db_url"] = f"sqlite:///{(Path(userdir) / DRY_RUN_DB).resolve()}"
     rendered.write_text(json.dumps(config, indent=2), encoding="utf-8")

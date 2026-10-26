@@ -143,3 +143,17 @@ def test_rules_only_bot_starts_without_shadow_token(monkeypatch, tmp_path, examp
     monkeypatch.setenv("TRADING_BOT_USERDIR", str(tmp_path / "user_data"))
     launch.main(["trade"])
     assert len(exec_calls) == 1
+
+
+@pytest.mark.parametrize("command", ["webserver", "backtesting"])
+def test_only_trade_renders_the_shadow_service(monkeypatch, tmp_path, exec_calls, command):
+    for name, value in SECRETS.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.delenv("SHADOW_TOKEN")
+    monkeypatch.setenv("TRADING_BOT_CONFIG", str(EXAMPLE))
+    monkeypatch.setenv("TRADING_BOT_USERDIR", str(tmp_path / "user_data"))
+    launch.main([command])
+    assert len(exec_calls) == 1
+    rendered = json.loads((tmp_path / "user_data" / "trading-bot.freqtrade.json").read_text(encoding="utf-8"))
+    assert rendered["trading_bot"]["shadow_url"] is None
+    assert rendered["trading_bot"]["shadow_token_env"] is None

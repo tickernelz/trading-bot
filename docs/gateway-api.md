@@ -598,7 +598,7 @@ Saat `entry_fill` atau `exit_fill` tiba dari Freqtrade, gateway mencatat waktu t
 
 Semua GET dan `POST /replay` hanya membaca dan butuh sesi gateway apa pun (lingkup read cukup), seperti bagian 5. Tiga aksi mengubah sesuatu dan mengikuti bagian 1, 2, dan 6: `POST /gw/v1/analytics/scoreboard/apply` (menulis `enabled: false` ke config), `POST /gw/v1/analytics/backtest` dan `DELETE /gw/v1/analytics/backtest` (memulai dan menghentikan job di instans webserver). Ketiganya hanya diterima dari loopback dengan sesi lingkup control; selain itu `403 forbidden_local_only` dan satu baris audit `forbidden`. Setiap pemanggilan lain menulis tepat satu baris audit dengan hasil (`ok` atau `failed`), termasuk apply yang tidak mengubah apa pun. Galat memakai envelope bagian 4, ditambah kode `invalid_config` (500) bila config bot gagal divalidasi. Kode ada di `analytics/` dan dipasang ke aplikasi gateway lewat `analytics.routes.install(app, context, reader)`; `context` menyediakan: `source(bot)` (config, basis data keputusan dan trade); `trades(bot)` (SEMUA trade tertutup ditambah posisi terbuka, tanpa batas jumlah; gateway memagina seperti `/gw/v1/risk` dan gagal tertutup bila jumlahnya tidak cocok, karena ekuitas, puncak, dan pajak tahunan salah bila riwayat terpotong); `analysis()` (klien webserver atau `None`); `can_control(request)` (loopback langsung dan sesi lingkup control, fungsi yang sama dengan penjaga bagian 6); dan `audit(action, result, request=, targets=, detail=)` yang menulis baris bagian 6 (`actor` dan `ip` diambil gateway dari `request`, `idempotency_key` dari header; `request=None` berarti aktor `gateway`, dipakai loop penonaktifan otomatis). Nama aksi: `analytics.scoreboard.apply`, `analytics.scoreboard.auto_disable`, `analytics.backtest.start`, `analytics.backtest.stop`.
 
-Status: rancangan untuk gateway. Modul dan rute lulus tes dan dijalankan terhadap Freqtrade 2026.9 nyata (lihat 13.2 dan 13.6), tetapi pemasangan ke gateway menunggu ZHA-3764 masuk main.
+Status: rancangan untuk gateway. Modul dan rute lulus tes dan dijalankan terhadap Freqtrade 2026.9 nyata (lihat 13.2 dan 13.6), tetapi belum dipasang ke gateway: `gateway/` tidak memanggil `analytics.routes.install`, jadi rute `/gw/v1/analytics/*` belum ada di gateway yang berjalan. Pemasangan dikerjakan di ZHA-3798.
 
 Parameter `bot` (huruf bot, default bot pertama) berlaku di semua endpoint kecuali yang memakai instans webserver (13.2 dan 13.6), yang hanya memakai `bot` untuk membaca config.
 
@@ -683,7 +683,7 @@ Bagian `analytics` boleh tidak ada; default di atas berlaku. Kunci tak dikenal d
 
 ### 13.9 Belum terbukti dan belum dibangun
 
-- Pemasangan `install` dan `auto_disable_loop` ke gateway nyata, dan sisi PWA (N2, Agent Arif), menunggu ZHA-3764 masuk main.
+- Pemasangan `install` dan `auto_disable_loop` ke gateway nyata (ZHA-3798), dan sisi PWA (N2, Agent Arif).
 - Papan skor dan replay pada keputusan bertrade nyata: basis data bot sekarang tidak punya keputusan; yang diuji adalah data tes dan skema kolom nyata.
 - Ambang `drifting` (`max_ece`, `brier_margin`, `accuracy_margin`, `min_samples`) belum dikalibrasi.
 - Status PAKD Indodax dan teks resmi PMK 50/2025.
