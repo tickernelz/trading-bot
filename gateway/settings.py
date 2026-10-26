@@ -40,6 +40,8 @@ class GatewaySettings(Strict):
     exchange_probe_url: str | None = "https://indodax.com/api/server_time"
     models_yml: str = "~/.omp/agent/models.yml"
     analysis_url: LoopbackUrl | None = None
+    push_contact: Annotated[str, Field(pattern=r"^(mailto:\S+@\S+|https://\S+)$")] = "mailto:trading-bot@localhost"
+    push_allow_local_endpoints: bool = False
     bots: Annotated[list[BotRef], Field(min_length=1)]
 
     @model_validator(mode="after")

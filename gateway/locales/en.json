@@ -1,0 +1,38 @@
+{
+  "number": {
+    "group": ",",
+    "decimal": "."
+  },
+  "words": {
+    "buy": "Buy",
+    "sell": "Sell",
+    "daily_loss": "Daily loss",
+    "total_drawdown": "Drawdown"
+  },
+  "kinds": {
+    "fill": {
+      "title": "{side} {pair} filled",
+      "body": "Dry run: Rp {amount} at {rate}."
+    },
+    "risk_breach": {
+      "title": "{metric} limit reached",
+      "body": "{metric} is {value}% against a limit of {limit}%. New entries are held."
+    },
+    "kill_switch": {
+      "title": "Kill switch on",
+      "body": "{bot} stopped opening new positions. Open positions keep their stop loss."
+    },
+    "heartbeat_lost": {
+      "title": "Bot heartbeat lost",
+      "body": "No heartbeat from {bot} for {minutes} min. Check the PC."
+    },
+    "quorum_failed": {
+      "title": "Swarm quorum failed",
+      "body": "{pair}: {answered} of {required} voters answered. Entry skipped."
+    },
+    "daily_summary": {
+      "title": "Daily summary",
+      "body": "{bot}: {pnl_pct}% yesterday, trades closed: {closed}."
+    }
+  }
+}

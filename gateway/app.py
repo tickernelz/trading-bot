@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Annotated, Any, Literal
+from zoneinfo import ZoneInfo
 
 import httpx
 import psutil
@@ -32,7 +33,7 @@ from analytics.routes import install as install_analytics
 from engine.decisions import DecisionStore, linked_trades
 from engine.heartbeat import read_heartbeat
 from engine.launch import DRY_RUN_DB, TRADABLE_BALANCE_RATIO
-from engine.risk import day_start
+from engine.risk import DAILY_LOSS, TOTAL_DRAWDOWN, day_start
 from engine.settings import ConfigError, Settings, load_settings
 from gateway import VERSION
 from gateway.admin import Admin
@@ -45,6 +46,7 @@ from gateway.history import periods
 from gateway.ledger import Ledger, LoginThrottle, iso
 from gateway.modeapi import ModeDesk, install_mode
 from gateway.outcomes import Candle, by_open_time, explain
+from gateway.push import Courier, PushDesk, fill_params, install_push
 from gateway.redact import redact
 from gateway.settings import BotRef, GatewaySettings
 from gateway.upstream import ApiError, Upstream
@@ -199,6 +201,11 @@ class Gateway:
         )
         self.analytics = AnalyticsContext(self, analysis)
         self.confirmations = Confirmations()
+        self.push = PushDesk(
+            self.ledger,
+            Courier(Path(settings.state_dir) / "vapid_private.pem", settings.push_contact),
+            allow_local_endpoints=settings.push_allow_local_endpoints,
+        )
         self.inflight: set[str] = set()
         self.analyst = AnalystLink(self)
         self.modes = ModeDesk(self)
@@ -540,6 +547,13 @@ class Gateway:
         self.hub.emit(event_type, data, bot=bot_id)
         if kind in FILL_SIDES and isinstance(data, dict) and data.get("trade_id") is not None:
             self.spawn(self.record_fill(bot_id, int(data["trade_id"]), FILL_SIDES[kind], received_ms))
+            params = fill_params(FILL_SIDES[kind], data)
+            if params is not None:
+                self.notify(self.bot(bot_id), "fill", params)
+
+    def notify(self, bot: BotRef, kind: str, params: dict[str, Any]) -> None:
+        if self.engine_settings(bot).notify.web_push:
+            self.spawn(self.push.notify(kind, params))
 
     async def on_state(self, bot_id: str, connected: bool) -> None:
         if connected:
@@ -660,6 +674,8 @@ class Gateway:
         if action.entries_stopped is not None:
             self.ledger.set_entries_stopped(action.bot.id, action.entries_stopped)
         self.audit_control(action, "ok", ip=ip, key=key, **(action.outcome(result) if action.outcome else {}))
+        if action.entries_stopped:
+            self.notify(action.bot, "kill_switch", {"bot": action.bot.label})
         return result
 
     async def reapply_entry_stop(self, bot: BotRef) -> None:
@@ -692,9 +708,44 @@ class Gateway:
         summary = {
             key: risk[key] for key in ("equity", "daily_loss_pct", "drawdown_pct", "entries_allowed", "breaches")
         }
-        if self.last_risk.get(bot.id) != summary:
+        previous = self.last_risk.get(bot.id)
+        if previous != summary:
             self.last_risk[bot.id] = summary
+            if previous is not None:
+                self.notify_breaches(bot, set(summary["breaches"]) - set(previous["breaches"]), risk)
             self.hub.emit("gw.risk", summary, bot=bot.id)
+
+    def notify_breaches(self, bot: BotRef, fresh: set[str], risk: dict[str, Any]) -> None:
+        limits = self.engine_settings(bot).risk
+        figures = {
+            DAILY_LOSS: (risk["daily_loss_pct"], limits.max_daily_loss_pct),
+            TOTAL_DRAWDOWN: (risk["drawdown_pct"], limits.max_total_drawdown_pct),
+        }
+        for breach in sorted(fresh & set(figures)):
+            value, limit = figures[breach]
+            self.notify(bot, "risk_breach", {"metric": breach, "value": value, "limit": limit})
+
+    async def watch_daily_summary(self) -> None:
+        for bot in self.settings.bots:
+            settings = self.engine_settings(bot)
+            zone = settings.risk.daily_reset_timezone
+            today = self.clock().astimezone(ZoneInfo(zone)).date().isoformat()
+            key = f"summary_day:{bot.id}"
+            last = self.ledger.push_state(key)
+            if last == today:
+                continue
+            if last is not None:
+                try:
+                    trades = await self.closed_trades(bot)
+                except ApiError:
+                    continue
+                row = periods(trades, "day", 2, zone, settings.capital.initial_idr, self.clock())[1]
+                self.notify(
+                    bot,
+                    "daily_summary",
+                    {"bot": bot.label, "pnl_pct": round(row["rel_profit"] * 100, 2), "closed": row["trade_count"]},
+                )
+            self.ledger.set_push_state(key, today)
 
     async def candle_snapshot(self, pair: str, limit: int) -> list[list[Any]]:
         bot = self.primary()
@@ -754,6 +805,8 @@ class Gateway:
             state = self.bot_health(bot)
             previous = self.heartbeats.get(bot.id, {})
             if state["heartbeat_lost"] and not previous.get("lost"):
+                age = state["heartbeat_age_s"] or self.settings.heartbeat_lost_s
+                self.notify(bot, "heartbeat_lost", {"bot": bot.label, "minutes": max(1, round(age / 60))})
                 self.hub.emit(
                     "gw.heartbeat_lost", {k: state[k] for k in ("id", "heartbeat_at", "heartbeat_age_s")}, bot=bot.id
                 )
@@ -802,6 +855,13 @@ class Gateway:
             for (seq, _), decision in zip(settled, shown, strict=True):
                 self.decision_seq[bot.id] = seq
                 self.hub.emit("gw.decision", decision, bot=bot.id)
+                if decision["status"] == "skip" and decision["reason"] == "quorum_not_met":
+                    quorum = {
+                        "pair": decision["pair"],
+                        "answered": decision["answered"],
+                        "required": decision["required"],
+                    }
+                    self.notify(bot, "quorum_failed", quorum)
 
     async def watch_risk(self) -> None:
         for bot in self.settings.bots:
@@ -883,6 +943,7 @@ class Gateway:
             (30, self.probe_shadows),
             (10, self.sample_cpu),
             (60, self.analyst.tick),
+            (300, self.watch_daily_summary),
         ):
             self.tasks.append(asyncio.create_task(self.every(seconds, action)))
         self.spawn(self.analytics.run_auto_disable())
@@ -945,6 +1006,7 @@ def create_app(gateway: Gateway, admin: Admin | None = None) -> FastAPI:
         return token
 
     install_analytics(app, gateway.analytics, reader)
+    install_push(app, gateway.push, reader)
     app.include_router((admin or Admin(gateway)).router(reader))
 
     @app.post("/gw/v1/session")

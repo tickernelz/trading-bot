@@ -1,6 +1,6 @@
 FROM freqtrade-base AS engine
 USER ftuser
-RUN pip install --user --no-cache-dir pyyaml==6.0.3
+RUN pip install --user --no-cache-dir pyyaml==6.0.3 pywebpush==2.5.0 http_ece==1.2.1 py-vapid==1.9.6
 COPY --chown=ftuser:ftuser swarm /tmp/swarm
 RUN pip install --user --no-cache-dir -c /tmp/swarm/constraints.txt /tmp/swarm && rm -rf /tmp/swarm
 WORKDIR /opt/trading-bot

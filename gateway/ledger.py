@@ -58,6 +58,18 @@ CREATE TABLE IF NOT EXISTS entry_stops (
     stopped INTEGER NOT NULL,
     updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    endpoint TEXT PRIMARY KEY,
+    p256dh TEXT NOT NULL,
+    auth TEXT NOT NULL,
+    kinds TEXT NOT NULL,
+    lang TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS push_state (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
 CREATE TRIGGER IF NOT EXISTS audit_no_update BEFORE UPDATE ON audit
 BEGIN SELECT RAISE(ABORT, 'audit is append-only'); END;
 CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON audit
@@ -230,6 +242,44 @@ class Ledger:
             self._db.execute(
                 "INSERT INTO idempotency VALUES (?, ?, ?, ?, ?)",
                 (key, request_hash, status, json.dumps(body), iso(now)),
+            )
+
+    def save_subscription(self, endpoint: str, p256dh: str, auth: str, kinds: list[str], lang: str, limit: int) -> bool:
+        with self._db:
+            known = self._db.execute("SELECT 1 FROM push_subscriptions WHERE endpoint = ?", (endpoint,)).fetchone()
+            if not known and self._db.execute("SELECT COUNT(*) FROM push_subscriptions").fetchone()[0] >= limit:
+                return False
+            self._db.execute(
+                "INSERT INTO push_subscriptions (endpoint, p256dh, auth, kinds, lang, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+                " ON CONFLICT(endpoint) DO UPDATE SET p256dh = excluded.p256dh, auth = excluded.auth,"
+                " kinds = excluded.kinds, lang = excluded.lang",
+                (endpoint, p256dh, auth, json.dumps(kinds), lang, iso(datetime.now(UTC))),
+            )
+        return True
+
+    def delete_subscription(self, endpoint: str) -> bool:
+        with self._db:
+            return self._db.execute("DELETE FROM push_subscriptions WHERE endpoint = ?", (endpoint,)).rowcount > 0
+
+    def push_subscriptions(self, kind: str) -> list[dict[str, Any]]:
+        rows = self._db.execute(
+            "SELECT endpoint, p256dh, auth, kinds, lang FROM push_subscriptions ORDER BY created_at"
+        )
+        return [
+            {"endpoint": row["endpoint"], "p256dh": row["p256dh"], "auth": row["auth"], "lang": row["lang"]}
+            for row in rows
+            if kind in json.loads(row["kinds"])
+        ]
+
+    def push_state(self, key: str) -> str | None:
+        row = self._db.execute("SELECT value FROM push_state WHERE key = ?", (key,)).fetchone()
+        return row["value"] if row else None
+
+    def set_push_state(self, key: str, value: str) -> None:
+        with self._db:
+            self._db.execute(
+                "INSERT INTO push_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                (key, value),
             )
 
     def entries_stopped(self, bot: str) -> bool:
