@@ -21,6 +21,12 @@ def test_example_config_is_valid():
     assert len({voter.provider for voter in settings.swarm.voters if voter.enabled}) == 7
 
 
+def test_swing_strategy_stays_selectable(example_raw, write_config):
+    example_raw["strategy"] = {"name": "SwingEmaRsi"}
+    strategy = load_settings(write_config(example_raw)).strategy
+    assert (strategy.name, strategy.rule) == ("SwingEmaRsi", None)
+
+
 def test_rules_only_bot_needs_no_shadow_service(example_raw, write_config):
     example_raw["swarm"]["enabled"] = False
     del example_raw["shadow"]
@@ -127,7 +133,39 @@ def _mutations():
     def analyst_on_decision_provider(raw):
         raw["llm"]["analyst_model"] = "experientiallabs-systemone:jev-latest"
 
+    def unknown_strategy(raw):
+        raw["strategy"]["name"] = "Martingale"
+
+    def rule_strategy_without_rule(raw):
+        del raw["strategy"]["rule"]
+
+    def rule_given_to_swing_strategy(raw):
+        raw["strategy"]["name"] = "SwingEmaRsi"
+
+    def rule_with_positive_stoploss(raw):
+        raw["strategy"]["rule"]["stoploss"] = 0.1
+
+    def rule_with_unknown_entry(raw):
+        raw["strategy"]["rule"]["entry"] = "astrology"
+
+    def rule_with_unknown_key(raw):
+        raw["strategy"]["rule"]["leverage"] = 3
+
+    def rule_with_unsupported_timeframe(raw):
+        raw["strategy"]["rule"]["timeframe"] = "5m"
+
+    def missing_strategy(raw):
+        del raw["strategy"]
+
     return [
+        unknown_strategy,
+        rule_strategy_without_rule,
+        rule_given_to_swing_strategy,
+        rule_with_positive_stoploss,
+        rule_with_unknown_entry,
+        rule_with_unknown_key,
+        rule_with_unsupported_timeframe,
+        missing_strategy,
         veto_not_implemented,
         shadow_without_service,
         shadow_beyond_loopback,

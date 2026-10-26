@@ -10,6 +10,8 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 
+from engine.rules import RuleSpec
+
 LLM_PROVIDER_TYPES = ("openai-completions", "openai-responses", "anthropic-messages")
 Percent = Annotated[float, Field(gt=0, le=100)]
 EnvName = Annotated[str, Field(pattern=r"^[A-Z][A-Z0-9_]*$")]
@@ -220,12 +222,26 @@ class Analytics(Strict):
     portfolio: Portfolio = Portfolio()
 
 
+class StrategySettings(Strict):
+    name: Literal["SwingEmaRsi", "RuleStrategy"]
+    rule: RuleSpec | None = None
+
+    @model_validator(mode="after")
+    def _rule_matches_name(self) -> StrategySettings:
+        if self.name == "RuleStrategy" and self.rule is None:
+            raise ValueError("strategy.rule is required when strategy.name is RuleStrategy")
+        if self.name != "RuleStrategy" and self.rule is not None:
+            raise ValueError(f"strategy.rule is only read by RuleStrategy, not {self.name}")
+        return self
+
+
 class Settings(Strict):
     mode: Literal["dry_run"]
     bot_id: Annotated[str, Field(pattern=r"^[A-Z]$")] = "A"
     capital: Capital
     risk: RiskSettings
     exchange: Exchange
+    strategy: StrategySettings
     providers: list[Provider]
     swarm: Swarm
     llm: Llm

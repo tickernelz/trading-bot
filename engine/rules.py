@@ -46,6 +46,12 @@ class RuleSpec(BaseModel):
             raise ValueError("adx_min must be below adx_max")
         return self
 
+    def freqtrade_roi(self, fee: float) -> dict[str, float]:
+        """Freqtrade ROI table whose fee-inclusive threshold fills at the gross take-profit price."""
+        if self.take_profit is None:
+            return {}
+        return {"0": round((1 + self.take_profit) * (1 - fee) / (1 + fee) - 1, 10)}
+
     @property
     def informative_timeframes(self) -> tuple[str, ...]:
         """Timeframes above 1h whose completed candles the rule reads."""

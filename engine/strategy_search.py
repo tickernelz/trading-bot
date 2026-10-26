@@ -79,7 +79,9 @@ def regime_by_hour(btc: pd.DataFrame) -> pd.Series:
     sma = daily["close"].rolling(200).mean()
     rising = sma > sma.shift(20)
     falling = sma < sma.shift(20)
-    label = np.where((daily["close"] > sma) & rising, "bull", np.where((daily["close"] < sma) & falling, "bear", "range"))
+    label = np.where(
+        (daily["close"] > sma) & rising, "bull", np.where((daily["close"] < sma) & falling, "bear", "range")
+    )
     label = np.where(sma.isna(), "unknown", label)
     merged = merge_informative_pair(btc[["date"]], pd.DataFrame({"date": daily["date"], "regime": label}), "1h", "1d")
     return pd.Series(merged["regime_1d"].fillna("unknown").to_numpy(), index=btc["date"])
@@ -123,7 +125,10 @@ def build_signals(
             fg = merge_informative_pair(frame[["date"]], fear_greed, "1h", "1d")["fg_1d"].to_numpy(dtype=float)
             enter = enter & (np.nan_to_num(fg, nan=101.0) <= candidate.fear_greed_max)
         out[pair] = Signals(
-            frame, enter, signals["exit_signal"].to_numpy(dtype=bool), signals["atr"].to_numpy(dtype=float),
+            frame,
+            enter,
+            signals["exit_signal"].to_numpy(dtype=bool),
+            signals["atr"].to_numpy(dtype=float),
             exits_for(spec),
         )
     return out
@@ -176,14 +181,20 @@ def report(rows, start, end, stoploss, costs: Costs) -> dict:
     return {
         "all": metrics.summarize(rows, start, end, stoploss, fee),
         "folds": {
-            name: metrics.summarize(group, pd.Timestamp(fold_start, tz="UTC"), pd.Timestamp(fold_end, tz="UTC"), stoploss, fee)
+            name: metrics.summarize(
+                group, pd.Timestamp(fold_start, tz="UTC"), pd.Timestamp(fold_end, tz="UTC"), stoploss, fee
+            )
             for name, fold_start, fold_end in plan.FOLDS
             for group in [[row for row in rows if row.fold == name]]
             if start <= pd.Timestamp(fold_start, tz="UTC") < end
         },
-        "pairs": {pair: metrics.summarize(group, start, end, stoploss, fee) for pair, group in metrics.groups(rows, "pair").items()},
+        "pairs": {
+            pair: metrics.summarize(group, start, end, stoploss, fee)
+            for pair, group in metrics.groups(rows, "pair").items()
+        },
         "regimes": {
-            regime: metrics.summarize(group, start, end, stoploss, fee) for regime, group in metrics.groups(rows, "regime").items()
+            regime: metrics.summarize(group, start, end, stoploss, fee)
+            for regime, group in metrics.groups(rows, "regime").items()
         },
     }
 
@@ -231,7 +242,12 @@ def tier_on(rows: list[metrics.Row], checks: dict, null: dict | None = None) -> 
     mean = summary.get("mean", 0.0)
     ci_low = summary.get("ci95", [0.0, 0.0])[0]
     beaten = None if null is None else bool(mean > null["mean_p95"])
-    return {"tier": metrics.tier(checks["met"], mean, ci_low, beaten), "mean": mean, "ci_low": ci_low, "null_beaten": beaten}
+    return {
+        "tier": metrics.tier(checks["met"], mean, ci_low, beaten),
+        "mean": mean,
+        "ci_low": ci_low,
+        "null_beaten": beaten,
+    }
 
 
 def rank_key(entry: dict) -> tuple:
@@ -259,9 +275,15 @@ def walk_forward(args, ledger_entry: dict) -> dict:
         signals = build_signals(candidate, candles, fear_greed, by_id)
         kept_signals[candidate.id] = signals
         stoploss = stoploss_of(signals)
-        entry = {"id": candidate.id, "family": candidate.family, "kind": candidate.kind, "deployable": candidate.deployable,
-                 "spec": candidate.spec.model_dump() if candidate.spec else None, "fear_greed_max": candidate.fear_greed_max,
-                 "costs": {}}
+        entry = {
+            "id": candidate.id,
+            "family": candidate.family,
+            "kind": candidate.kind,
+            "deployable": candidate.deployable,
+            "spec": candidate.spec.model_dump() if candidate.spec else None,
+            "fear_greed_max": candidate.fear_greed_max,
+            "costs": {},
+        }
         base_trades = trades_of(signals, plan.COSTS[plan.PRIMARY_COST])
         for name, costs in plan.COSTS.items():
             trades = trades_of(signals, costs) if candidate.kind == "swing" else base_trades
@@ -274,8 +296,16 @@ def walk_forward(args, ledger_entry: dict) -> dict:
         entry["wf_tier"] = tier_on(primary_rows, checks)
         entry["open_at_end"] = sum(row.reason == "end" for row in primary_rows)
         trade_dump[candidate.id] = [
-            [row.pair, row.signal_time.isoformat(), row.entry_time.isoformat(), row.exit_time.isoformat(),
-             round(row.profit, 8), row.reason, row.regime, row.fold]
+            [
+                row.pair,
+                row.signal_time.isoformat(),
+                row.entry_time.isoformat(),
+                row.exit_time.isoformat(),
+                round(row.profit, 8),
+                row.reason,
+                row.regime,
+                row.fold,
+            ]
             for row in primary_rows
         ]
         results.append(entry)
@@ -289,14 +319,18 @@ def walk_forward(args, ledger_entry: dict) -> dict:
         "period": [start.isoformat(), end.isoformat()],
         "candidates": len(by_id),
         "results": results,
-        "buy_and_hold": {name: buy_and_hold(candles, costs, windows + [("walk_forward", start, end)])
-                         for name, costs in plan.COSTS.items()},
+        "buy_and_hold": {
+            name: buy_and_hold(candles, costs, windows + [("walk_forward", start, end)])
+            for name, costs in plan.COSTS.items()
+        },
         "eligible": [entry["id"] for entry in ranked],
         "selected": selected["id"] if selected else None,
         "selection_process": selection_process(results),
     }
     if selected:
-        out["selected_null"] = null_distribution(kept_signals[selected["id"]], plan.COSTS[plan.PRIMARY_COST], regimes, start, end)
+        out["selected_null"] = null_distribution(
+            kept_signals[selected["id"]], plan.COSTS[plan.PRIMARY_COST], regimes, start, end
+        )
     with gzip.open(args.out / "walk_forward_trades.json.gz", "wt", encoding="utf-8") as handle:
         json.dump(trade_dump, handle)
     ledger_entry["selected"] = out["selected"]
@@ -320,8 +354,16 @@ def selection_process(results: list[dict]) -> list[dict]:
                 best, best_mean = entry, mean
         if best is not None:
             fold = best["costs"][plan.PRIMARY_COST]["folds"].get(name, {})
-            out.append({"fold": name, "picked": best["id"], "in_sample_mean": best_mean, "fold_trades": fold.get("trades"),
-                        "fold_mean": fold.get("mean"), "fold_win_rate": fold.get("win_rate")})
+            out.append(
+                {
+                    "fold": name,
+                    "picked": best["id"],
+                    "in_sample_mean": best_mean,
+                    "fold_trades": fold.get("trades"),
+                    "fold_mean": fold.get("mean"),
+                    "fold_win_rate": fold.get("win_rate"),
+                }
+            )
     return out
 
 
@@ -359,7 +401,11 @@ def controls(args, ledger_entry: dict) -> dict:
         honest = build_signals(candidate, candles, fear_greed, by_id)
         tf_rows = {"1h": 1, "4h": 4, "1d": 24}[candidate.spec.timeframe if candidate.spec else "1h"]
         entry = {"id": candidate.id}
-        for label, signals in (("honest", honest), ("shift_1h", shifted(honest, 1)), ("shift_tf", shifted(honest, tf_rows))):
+        for label, signals in (
+            ("honest", honest),
+            ("shift_1h", shifted(honest, 1)),
+            ("shift_tf", shifted(honest, tf_rows)),
+        ):
             rows = rows_of(trades_of(signals, costs), costs, regimes, start, end)
             summary = metrics.summarize(rows, start, end, stoploss_of(signals), mean_fee(costs))
             entry[label] = {key: summary.get(key) for key in ("trades", "win_rate", "mean", "ci95")}
@@ -426,7 +472,9 @@ def holdout(args, ledger_entry: dict) -> dict:
     if not args.replay:
         append_ledger(args.ledger, {**ledger_entry, "kind": "holdout_started", "status": "started"})
     candles = load_candles(args.datadir, plan.DATA_END)
-    wf_candles = {pair: frame[frame["date"] < plan.HOLDOUT_START].reset_index(drop=True) for pair, frame in candles.items()}
+    wf_candles = {
+        pair: frame[frame["date"] < plan.HOLDOUT_START].reset_index(drop=True) for pair, frame in candles.items()
+    }
     fear_greed = load_fear_greed(args.fear_greed)
     regimes = regime_by_hour(candles[plan.REGIME_PAIR])
     by_id = {candidate.id: candidate for candidate in plan.candidates()}
@@ -454,8 +502,17 @@ def holdout(args, ledger_entry: dict) -> dict:
             "null_beaten": beaten,
             "checks": checks,
             "tier": metrics.tier(checks["met"], mean, ci_low, beaten),
-            "trades": [[row.pair, row.entry_time.isoformat(), row.exit_time.isoformat(), round(row.profit, 8), row.reason, row.regime]
-                       for row in rows],
+            "trades": [
+                [
+                    row.pair,
+                    row.entry_time.isoformat(),
+                    row.exit_time.isoformat(),
+                    round(row.profit, 8),
+                    row.reason,
+                    row.regime,
+                ]
+                for row in rows
+            ],
             "comparators": comparators(candles, fear_greed, regimes, by_id, start, end),
         }
     )

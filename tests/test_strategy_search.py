@@ -153,17 +153,34 @@ def test_daily_feature_is_known_only_from_the_last_hour_of_its_day():
     assert enter.iloc[24 * 20 + 23] and not enter.iloc[24 * 20 + 22]
 
 
+def gross_mean(trades) -> float:
+    return float(np.mean([trade.profit(Costs(0, 0)) for trade in trades]))
+
+
 def test_shifting_the_signal_into_the_future_is_detected_as_an_edge():
     frame = daily_walk(120, seed=7)
     rule = spec(entry="donchian", timeframe="1h", lookback=24, exit="none", max_hold_hours=12)
     signals = rule_frame(frame, rule, {})
-    honest = simulate("BTC/IDR", frame, signals["enter"].to_numpy(), signals["exit_signal"].to_numpy(),
-                      signals["atr"].to_numpy(), exits_for(rule), Costs(0, 0))
+    honest = simulate(
+        "BTC/IDR",
+        frame,
+        signals["enter"].to_numpy(),
+        signals["exit_signal"].to_numpy(),
+        signals["atr"].to_numpy(),
+        exits_for(rule),
+        Costs(0, 0),
+    )
     cheat_enter = np.concatenate([signals["enter"].to_numpy()[24:], np.zeros(24, dtype=bool)])
-    cheat = simulate("BTC/IDR", frame, cheat_enter, signals["exit_signal"].to_numpy(), signals["atr"].to_numpy(),
-                     exits_for(rule), Costs(0, 0))
-    mean = lambda trades: np.mean([trade.profit(Costs(0, 0)) for trade in trades])
-    assert mean(cheat) > mean(honest) + 0.002
+    cheat = simulate(
+        "BTC/IDR",
+        frame,
+        cheat_enter,
+        signals["exit_signal"].to_numpy(),
+        signals["atr"].to_numpy(),
+        exits_for(rule),
+        Costs(0, 0),
+    )
+    assert gross_mean(cheat) > gross_mean(honest) + 0.002
 
 
 def test_wilson_lower_bound_matches_reference_values():

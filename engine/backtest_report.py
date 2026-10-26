@@ -11,15 +11,14 @@ from typing import Any
 import numpy as np
 from freqtrade.data.btanalysis import load_backtest_stats
 
-STRATEGY = "SwingEmaRsi"
 QUANTILES = (0.05, 0.25, 0.5, 0.75, 0.95)
 RESAMPLES = 10_000
 DENIAL = re.compile(r"risk guard denied \S+: (\S+) ")
 
 
-def load_run(directory: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    """Return the trades and statistics of the latest backtest exported into directory."""
-    stats = load_backtest_stats(directory)["strategy"][STRATEGY]
+def load_run(directory: Path, strategy: str) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Return the trades and statistics of strategy in the latest backtest exported into directory."""
+    stats = load_backtest_stats(directory)["strategy"][strategy]
     return stats["trades"], stats
 
 

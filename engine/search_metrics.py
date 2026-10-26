@@ -35,7 +35,9 @@ def wilson_lower(wins: int, n: int, z: float = 1.959963984540054) -> float:
     return (centre - margin) / (1 + z * z / n)
 
 
-def bootstrap_ci(values: np.ndarray, seed: int = plan.SEED, samples: int = plan.BOOTSTRAP_SAMPLES) -> tuple[float, float]:
+def bootstrap_ci(
+    values: np.ndarray, seed: int = plan.SEED, samples: int = plan.BOOTSTRAP_SAMPLES
+) -> tuple[float, float]:
     if len(values) == 0:
         return (math.nan, math.nan)
     rng = np.random.default_rng(seed)
@@ -101,14 +103,19 @@ def summarize(rows: list[Row], start: pd.Timestamp, end: pd.Timestamp, stoploss:
             "ci95": [lo, hi],
             "median": float(np.median(profits)),
             "profit_factor": float(gains / losses) if losses > 0 else None,
-            "payoff_ratio": float(profits[wins].mean() / -profits[~wins].mean()) if wins.any() and (~wins).any() else None,
+            "payoff_ratio": float(profits[wins].mean() / -profits[~wins].mean())
+            if wins.any() and (~wins).any()
+            else None,
             "largest_loss": float(profits.min()),
             "worst5_mean": float(np.sort(profits)[:5].mean()),
             "max_drawdown": max_drawdown(rows, stoploss, fee),
             "rolling30_min_win_rate": rolling_min_win_rate(wins),
             "longest_days_without_entry": round(max(gaps), 1),
             "days_without_entry_at_end": round(gaps[-1], 1),
-            "exit_reasons": {reason: int(sum(row.reason == reason for row in rows)) for reason in sorted({row.reason for row in rows})},
+            "exit_reasons": {
+                reason: int(sum(row.reason == reason for row in rows))
+                for reason in sorted({row.reason for row in rows})
+            },
         }
     )
     return out
@@ -134,11 +141,15 @@ def target_checks(target_rows: list[Row], fold_rows: list[Row], stability_sets: 
     per_pair = {pair: len(rows) for pair, rows in groups(target_rows, "pair").items()}
     pairs_ok = sum(count >= plan.TARGET_MIN_TRADES_PER_PAIR for count in per_pair.values()) >= plan.TARGET_MIN_PAIRS
     a = (
-        n >= plan.TARGET_MIN_TRADES
-        and pairs_ok
-        and wins / n >= plan.TARGET_WIN_RATE
-        and wilson_lower(wins, n) >= plan.TARGET_WILSON_LOWER
-    ) if n else False
+        (
+            n >= plan.TARGET_MIN_TRADES
+            and pairs_ok
+            and wins / n >= plan.TARGET_WIN_RATE
+            and wilson_lower(wins, n) >= plan.TARGET_WILSON_LOWER
+        )
+        if n
+        else False
+    )
     by_fold = groups(fold_rows, "fold")
     fold_rates = [win_rate_of(by_fold.get(fold)) for fold, _, _ in plan.FOLDS]
     measured = [rate for rate in fold_rates if rate is not None]

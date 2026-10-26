@@ -85,83 +85,193 @@ def candidates() -> list[Candidate]:
     for n in (10, 20, 30, 60, 90):
         for sl in (0.10, 0.20):
             out.append(
-                _rule(f"A-don1d-{n}-sl{_pct(sl)}", "A donchian 1d", entry="donchian", timeframe="1d", lookback=n,
-                      exit="donchian_mid", exit_lookback=n, stoploss=-sl)
+                _rule(
+                    f"A-don1d-{n}-sl{_pct(sl)}",
+                    "A donchian 1d",
+                    entry="donchian",
+                    timeframe="1d",
+                    lookback=n,
+                    exit="donchian_mid",
+                    exit_lookback=n,
+                    stoploss=-sl,
+                )
             )
     for n in (20, 55):
         for adx in (20, 25):
             for exit_ in ("mid", "atr3"):
-                trail = {"exit": "none", "trail_atr": 3.0} if exit_ == "atr3" else {"exit": "donchian_mid", "exit_lookback": n}
+                trail = (
+                    {"exit": "none", "trail_atr": 3.0}
+                    if exit_ == "atr3"
+                    else {"exit": "donchian_mid", "exit_lookback": n}
+                )
                 out.append(
-                    _rule(f"B-don1d-{n}-adx{adx}-{exit_}", "B donchian 1d regime", entry="donchian", timeframe="1d",
-                          lookback=n, adx_min=adx, trend_filter="above_sma200_1d", stoploss=-0.15, **trail)
+                    _rule(
+                        f"B-don1d-{n}-adx{adx}-{exit_}",
+                        "B donchian 1d regime",
+                        entry="donchian",
+                        timeframe="1d",
+                        lookback=n,
+                        adx_min=adx,
+                        trend_filter="above_sma200_1d",
+                        stoploss=-0.15,
+                        **trail,
+                    )
                 )
     for n in (20, 55):
         for exit_ in ("mid", "atr3"):
-            trail = {"exit": "none", "trail_atr": 3.0} if exit_ == "atr3" else {"exit": "donchian_mid", "exit_lookback": n}
+            trail = (
+                {"exit": "none", "trail_atr": 3.0} if exit_ == "atr3" else {"exit": "donchian_mid", "exit_lookback": n}
+            )
             out.append(
-                _rule(f"B-don4h-{n}-{exit_}", "B donchian 4h regime", entry="donchian", timeframe="4h", lookback=n,
-                      trend_filter="above_sma200_1d", stoploss=-0.10, **trail)
+                _rule(
+                    f"B-don4h-{n}-{exit_}",
+                    "B donchian 4h regime",
+                    entry="donchian",
+                    timeframe="4h",
+                    lookback=n,
+                    trend_filter="above_sma200_1d",
+                    stoploss=-0.10,
+                    **trail,
+                )
             )
     for n in (20, 30, 60, 90):
         for sl in (0.15, 0.25):
             out.append(
-                _rule(f"C-tsmom-{n}-sl{_pct(sl)}", "C time-series momentum 1d", entry="tsmom", timeframe="1d",
-                      lookback=n, exit="tsmom_flip", stoploss=-sl)
+                _rule(
+                    f"C-tsmom-{n}-sl{_pct(sl)}",
+                    "C time-series momentum 1d",
+                    entry="tsmom",
+                    timeframe="1d",
+                    lookback=n,
+                    exit="tsmom_flip",
+                    stoploss=-sl,
+                )
             )
     for fast, slow in ((20, 50), (50, 200)):
         for adx in (20, 25):
             for exit_ in ("cross", "atr3"):
                 trail = {"exit": "none", "trail_atr": 3.0} if exit_ == "atr3" else {"exit": "ema_cross"}
                 out.append(
-                    _rule(f"D-ema4h-{fast}-{slow}-adx{adx}-{exit_}", "D EMA trend 4h", entry="ema_trend",
-                          timeframe="4h", lookback=14, fast=fast, slow=slow, adx_min=adx,
-                          trend_filter="above_sma200_1d", stoploss=-0.10, **trail)
+                    _rule(
+                        f"D-ema4h-{fast}-{slow}-adx{adx}-{exit_}",
+                        "D EMA trend 4h",
+                        entry="ema_trend",
+                        timeframe="4h",
+                        lookback=14,
+                        fast=fast,
+                        slow=slow,
+                        adx_min=adx,
+                        trend_filter="above_sma200_1d",
+                        stoploss=-0.10,
+                        **trail,
+                    )
                 )
     for fast, slow in ((20, 50), (50, 200)):
         out.append(
-            _rule(f"D-ema1d-{fast}-{slow}", "D EMA trend 1d", entry="ema_trend", timeframe="1d", lookback=14,
-                  fast=fast, slow=slow, adx_min=20, trend_filter="above_sma200_1d", exit="ema_cross", stoploss=-0.15)
+            _rule(
+                f"D-ema1d-{fast}-{slow}",
+                "D EMA trend 1d",
+                entry="ema_trend",
+                timeframe="1d",
+                lookback=14,
+                fast=fast,
+                slow=slow,
+                adx_min=20,
+                trend_filter="above_sma200_1d",
+                exit="ema_cross",
+                stoploss=-0.15,
+            )
         )
     for tf, sl in (("4h", 0.10), ("1d", 0.15)):
         for k in (1.5, 2.0):
             out.append(
-                _rule(f"E-volbreak-{tf}-x{k:g}", "E breakout with volume", entry="breakout_volume", timeframe=tf,
-                      lookback=20, threshold=k, trend_filter="above_sma200_1d", exit="none", trail_atr=3.0,
-                      stoploss=-sl)
+                _rule(
+                    f"E-volbreak-{tf}-x{k:g}",
+                    "E breakout with volume",
+                    entry="breakout_volume",
+                    timeframe=tf,
+                    lookback=20,
+                    threshold=k,
+                    trend_filter="above_sma200_1d",
+                    exit="none",
+                    trail_atr=3.0,
+                    stoploss=-sl,
+                )
             )
     bases = (
-        ("don1d20", {"entry": "donchian", "timeframe": "1d", "lookback": 20, "exit": "donchian_mid", "exit_lookback": 20}),
-        ("ema4h", {"entry": "ema_trend", "timeframe": "4h", "lookback": 14, "fast": 20, "slow": 50, "exit": "ema_cross"}),
+        (
+            "don1d20",
+            {"entry": "donchian", "timeframe": "1d", "lookback": 20, "exit": "donchian_mid", "exit_lookback": 20},
+        ),
+        (
+            "ema4h",
+            {"entry": "ema_trend", "timeframe": "4h", "lookback": 14, "fast": 20, "slow": 50, "exit": "ema_cross"},
+        ),
     )
     for name, base in bases:
         for tp, lock in ((0.03, 0.015), (0.05, 0.015), (0.05, 0.03), (0.08, 0.015), (0.08, 0.03)):
             out.append(
-                _rule(f"F-{name}-tp{_pct(tp)}-lock{_pct(lock)}", "F trend entry with asymmetric exit",
-                      trend_filter="above_sma200_1d", take_profit=tp, lock_at=lock, stoploss=-0.08, **base)
+                _rule(
+                    f"F-{name}-tp{_pct(tp)}-lock{_pct(lock)}",
+                    "F trend entry with asymmetric exit",
+                    trend_filter="above_sma200_1d",
+                    take_profit=tp,
+                    lock_at=lock,
+                    stoploss=-0.08,
+                    **base,
+                )
             )
     for thr in (5, 10, 15):
         for sl in (0.10, 0.25):
             out.append(
-                _rule(f"G-rsi2-1d-{thr}-sl{_pct(sl)}", "G RSI2 mean reversion 1d", entry="rsi_dip", timeframe="1d",
-                      lookback=2, threshold=thr, trend_filter="above_sma200_1d", exit="sma_reclaim", exit_lookback=5,
-                      max_hold_hours=240, stoploss=-sl)
+                _rule(
+                    f"G-rsi2-1d-{thr}-sl{_pct(sl)}",
+                    "G RSI2 mean reversion 1d",
+                    entry="rsi_dip",
+                    timeframe="1d",
+                    lookback=2,
+                    threshold=thr,
+                    trend_filter="above_sma200_1d",
+                    exit="sma_reclaim",
+                    exit_lookback=5,
+                    max_hold_hours=240,
+                    stoploss=-sl,
+                )
             )
     for thr in (5, 10):
         for sl in (0.06, 0.12):
             out.append(
-                _rule(f"G-rsi2-4h-{thr}-sl{_pct(sl)}", "G RSI2 mean reversion 4h", entry="rsi_dip", timeframe="4h",
-                      lookback=2, threshold=thr, trend_filter="above_sma200_1d", exit="sma_reclaim", exit_lookback=5,
-                      max_hold_hours=72, stoploss=-sl)
+                _rule(
+                    f"G-rsi2-4h-{thr}-sl{_pct(sl)}",
+                    "G RSI2 mean reversion 4h",
+                    entry="rsi_dip",
+                    timeframe="4h",
+                    lookback=2,
+                    threshold=thr,
+                    trend_filter="above_sma200_1d",
+                    exit="sma_reclaim",
+                    exit_lookback=5,
+                    max_hold_hours=72,
+                    stoploss=-sl,
+                )
             )
     for tf in ("1h", "4h"):
         for sl in (0.05, 0.10):
             for trend in ("none", "above_sma200_1d"):
                 tag = "trend" if trend != "none" else "any"
                 out.append(
-                    _rule(f"H-bb-{tf}-sl{_pct(sl)}-{tag}", "H Bollinger range reversion", entry="bollinger_range",
-                          timeframe=tf, lookback=20, adx_max=20, trend_filter=trend, exit="bb_mid",
-                          max_hold_hours=72, stoploss=-sl)
+                    _rule(
+                        f"H-bb-{tf}-sl{_pct(sl)}-{tag}",
+                        "H Bollinger range reversion",
+                        entry="bollinger_range",
+                        timeframe=tf,
+                        lookback=20,
+                        adx_max=20,
+                        trend_filter=trend,
+                        exit="bb_mid",
+                        max_hold_hours=72,
+                        stoploss=-sl,
+                    )
                 )
     dips = (
         ("rsi14-1h", {"timeframe": "1h", "lookback": 14, "threshold": 30}),
@@ -171,27 +281,102 @@ def candidates() -> list[Candidate]:
         for tp in (0.02, 0.03, 0.04):
             for sl in (0.06, 0.10):
                 out.append(
-                    _rule(f"N-{name}-tp{_pct(tp)}-sl{_pct(sl)}", "N trend dip with fixed target", entry="rsi_dip",
-                          trend_filter="above_sma200_1d", exit="none", take_profit=tp, max_hold_hours=168,
-                          stoploss=-sl, **dip)
+                    _rule(
+                        f"N-{name}-tp{_pct(tp)}-sl{_pct(sl)}",
+                        "N trend dip with fixed target",
+                        entry="rsi_dip",
+                        trend_filter="above_sma200_1d",
+                        exit="none",
+                        take_profit=tp,
+                        max_hold_hours=168,
+                        stoploss=-sl,
+                        **dip,
+                    )
                 )
     out += [
-        _rule("I-fg75-don1d-20", "I Fear and Greed filter", deployable=False, fear_greed_max=75, entry="donchian",
-              timeframe="1d", lookback=20, exit="donchian_mid", exit_lookback=20, stoploss=-0.15),
-        _rule("I-fg50-rsi2-1d-10", "I Fear and Greed filter", deployable=False, fear_greed_max=50, entry="rsi_dip",
-              timeframe="1d", lookback=2, threshold=10, trend_filter="above_sma200_1d", exit="sma_reclaim",
-              exit_lookback=5, max_hold_hours=240, stoploss=-0.10),
-        _rule("I-fg75-tsmom-30", "I Fear and Greed filter", deployable=False, fear_greed_max=75, entry="tsmom",
-              timeframe="1d", lookback=30, exit="tsmom_flip", stoploss=-0.15),
-        _rule("I-fg50-rsi14-1h-tp3", "I Fear and Greed filter", deployable=False, fear_greed_max=50, entry="rsi_dip",
-              timeframe="1h", lookback=14, threshold=30, trend_filter="above_sma200_1d", exit="none",
-              take_profit=0.03, max_hold_hours=168, stoploss=-0.10),
-        _rule("J-rsi14-1h-tp1.5-sl15", "J high win rate control", entry="rsi_dip", timeframe="1h", lookback=14,
-              threshold=30, exit="none", take_profit=0.015, stoploss=-0.15),
-        _rule("J-rsi14-1h-tp3-sl10", "J high win rate control", entry="rsi_dip", timeframe="1h", lookback=14,
-              threshold=30, exit="none", take_profit=0.03, stoploss=-0.10),
-        Candidate("J-random-tp1.5-sl15", "J high win rate control", "random", random_rate=0.004,
-                  exits_from="J-rsi14-1h-tp1.5-sl15", deployable=False),
+        _rule(
+            "I-fg75-don1d-20",
+            "I Fear and Greed filter",
+            deployable=False,
+            fear_greed_max=75,
+            entry="donchian",
+            timeframe="1d",
+            lookback=20,
+            exit="donchian_mid",
+            exit_lookback=20,
+            stoploss=-0.15,
+        ),
+        _rule(
+            "I-fg50-rsi2-1d-10",
+            "I Fear and Greed filter",
+            deployable=False,
+            fear_greed_max=50,
+            entry="rsi_dip",
+            timeframe="1d",
+            lookback=2,
+            threshold=10,
+            trend_filter="above_sma200_1d",
+            exit="sma_reclaim",
+            exit_lookback=5,
+            max_hold_hours=240,
+            stoploss=-0.10,
+        ),
+        _rule(
+            "I-fg75-tsmom-30",
+            "I Fear and Greed filter",
+            deployable=False,
+            fear_greed_max=75,
+            entry="tsmom",
+            timeframe="1d",
+            lookback=30,
+            exit="tsmom_flip",
+            stoploss=-0.15,
+        ),
+        _rule(
+            "I-fg50-rsi14-1h-tp3",
+            "I Fear and Greed filter",
+            deployable=False,
+            fear_greed_max=50,
+            entry="rsi_dip",
+            timeframe="1h",
+            lookback=14,
+            threshold=30,
+            trend_filter="above_sma200_1d",
+            exit="none",
+            take_profit=0.03,
+            max_hold_hours=168,
+            stoploss=-0.10,
+        ),
+        _rule(
+            "J-rsi14-1h-tp1.5-sl15",
+            "J high win rate control",
+            entry="rsi_dip",
+            timeframe="1h",
+            lookback=14,
+            threshold=30,
+            exit="none",
+            take_profit=0.015,
+            stoploss=-0.15,
+        ),
+        _rule(
+            "J-rsi14-1h-tp3-sl10",
+            "J high win rate control",
+            entry="rsi_dip",
+            timeframe="1h",
+            lookback=14,
+            threshold=30,
+            exit="none",
+            take_profit=0.03,
+            stoploss=-0.10,
+        ),
+        Candidate(
+            "J-random-tp1.5-sl15",
+            "J high win rate control",
+            "random",
+            random_rate=0.004,
+            exits_from="J-rsi14-1h-tp1.5-sl15",
+            deployable=False,
+        ),
         Candidate("K-SwingEmaRsi", "K benchmark", "swing"),
         Candidate("K-buy-and-hold", "K benchmark", "buy_hold", deployable=False),
     ]

@@ -97,7 +97,7 @@ def env(tmp_path, example_raw, upstream_calls):
             return httpx.Response(
                 200,
                 json={
-                    "strategy": "SwingEmaRsi",
+                    "strategy": "RuleStrategy",
                     "pair": "BTC/IDR",
                     "timeframe": "1h",
                     "columns": ["date", "open", "high", "low", "close", "enter_long", "exit_long"],
@@ -191,7 +191,7 @@ class TestSignalsRoute:
         assert body["signals"][0]["kind"] == "enter"
         params = dict(upstream_calls[0].url.params)
         assert params["timerange"] == "20261001-20261020"
-        assert params["strategy"] == "SwingEmaRsi" and params["timeframe"] == "1h"
+        assert params["strategy"] == "RuleStrategy" and params["timeframe"] == "1h"
 
     def test_a_window_longer_than_sixty_days_is_refused_before_any_upstream_call(self, env, upstream_calls):
         client, *_ = env
@@ -232,7 +232,7 @@ class TestBacktestRoute:
         import json
 
         body = json.loads(sent.content)
-        assert body["strategy"] == "SwingEmaRsi" and body["timeframe"] == "1h"
+        assert body["strategy"] == "RuleStrategy" and body["timeframe"] == "1h"
         assert body["dry_run_wallet"] == 2_000_000 and body["max_open_trades"] == 3
         assert body["enable_protections"] is False
         assert [(row["action"], row["result"]) for row in context.audits] == [("analytics.backtest.start", "ok")]
