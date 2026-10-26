@@ -1,7 +1,8 @@
 <script lang="ts">
+  import { t } from "../lib/i18n";
   import { SCREENS, type Screen } from "../lib/route.svelte";
 
-  let { current, labelled = "Navigasi utama" }: { current: Screen; labelled?: string } = $props();
+  let { current, labelled = t("nav.main") }: { current: Screen; labelled?: string } = $props();
 </script>
 
 <nav aria-label={labelled}>

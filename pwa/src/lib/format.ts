@@ -1,11 +1,13 @@
+import { locale, t } from "./i18n";
+
 export const MINUS = "\u2212";
 
-const idr = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 0 });
-const pct2 = new Intl.NumberFormat("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const pct1 = new Intl.NumberFormat("id-ID", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-const hm = new Intl.DateTimeFormat("id-ID", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
-const hms = new Intl.DateTimeFormat("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" });
-const dayHm = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+const idr = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 });
+const pct2 = new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const pct1 = new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const hm = new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+const hms = new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" });
+const dayHm = new Intl.DateTimeFormat(locale, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 
 export type Direction = "up" | "down" | "flat";
 
@@ -40,18 +42,18 @@ export function signedPercent(value: number, digits: 1 | 2 = 2): string {
 
 export function outcomeWord(value: number): string {
   const dir = direction(value);
-  if (dir === "up") return "untung";
-  if (dir === "down") return "rugi";
-  return "impas";
+  if (dir === "up") return t("outcome.up");
+  if (dir === "down") return t("outcome.down");
+  return t("outcome.flat");
 }
 
 export function price(value: number): string {
   if (value >= 1000) return idr.format(Math.round(value));
-  return new Intl.NumberFormat("id-ID", { maximumSignificantDigits: 6 }).format(value);
+  return new Intl.NumberFormat(locale, { maximumSignificantDigits: 6 }).format(value);
 }
 
 export function decimal(value: number, digits = 2): string {
-  return new Intl.NumberFormat("id-ID", { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value);
+  return new Intl.NumberFormat(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value);
 }
 
 export function parseTs(value: string | number): number {
@@ -68,22 +70,19 @@ export function dayClock(value: string | number): string {
   return dayHm.format(new Date(parseTs(value)));
 }
 
-export function age(ms: number): string {
-  if (!Number.isFinite(ms)) return "belum ada data";
+export function age(ms: number, ago = true): string {
+  if (!Number.isFinite(ms)) return t("age.none");
   const s = Math.max(0, Math.round(ms / 1000));
-  if (s < 60) return s + " dtk lalu";
   const m = Math.floor(s / 60);
-  if (m < 60) return m + " mnt lalu";
   const h = Math.floor(m / 60);
-  if (h < 48) return h + " jam lalu";
-  return Math.floor(h / 24) + " hari lalu";
+  const span = s < 60 ? t("age.s", { n: s }) : m < 60 ? t("age.m", { n: m }) : h < 48 ? t("age.h", { n: h }) : t("age.d", { n: Math.floor(h / 24) });
+  return ago ? t("age.ago", { span }) : span;
 }
 
 export function duration(ms: number): string {
   const s = Math.max(0, Math.round(ms / 1000));
-  if (s < 60) return s + " dtk";
+  if (s < 60) return t("dur.s", { n: s });
   const m = Math.floor(s / 60);
-  if (m < 60) return m + " mnt";
-  const h = Math.floor(m / 60);
-  return h + " jam " + (m % 60) + " mnt";
+  if (m < 60) return t("dur.m", { n: m });
+  return t("dur.hm", { h: Math.floor(m / 60), m: m % 60 });
 }
