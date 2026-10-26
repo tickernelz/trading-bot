@@ -9,6 +9,13 @@ from typing import Any
 Policy = Callable[[str, dict[str, Any]], dict[str, Any]]
 
 DECISION_PATHS = ("/v1/systemone", "/api/alpha/decisions")
+OPENAI_DECISIONS_PATH = "/v1/decisions"
+OPENAI_DECISIONS_ERROR = (
+    "Invalid decision request. Send model, input (text or user messages with input_text and inline base64 "
+    "input_image parts), questions of type predicate, choice (with choices), or score (with levels), each with "
+    "instructions and an optional unique name, and optionally safety_identifier. Streaming and chat controls "
+    "are not supported."
+)
 CHAT_PATH = "/v1/chat/completions"
 RESPONSES_PATH = "/v1/responses"
 MESSAGES_PATH = "/v1/messages"
@@ -84,6 +91,65 @@ def _user_text(path: str, body: dict[str, Any]) -> str:
     return content if isinstance(content, str) else "".join(part.get("text", "") for part in content)
 
 
+def _openai_questions(body: dict[str, Any]) -> dict[str, dict[str, Any]] | None:
+    """Parse an OpenAI Decisions request into policy questions; None when the wire shape is invalid."""
+    if not set(body) <= {"model", "input", "questions", "safety_identifier"}:
+        return None
+    if not isinstance(body.get("input"), str) or not isinstance(body.get("questions"), list) or not body["questions"]:
+        return None
+    parsed: dict[str, dict[str, Any]] = {}
+    for index, entry in enumerate(body["questions"]):
+        if not isinstance(entry, dict) or not isinstance(entry.get("instructions"), str):
+            return None
+        name = entry.get("name", f"question_{index}")
+        if not isinstance(name, str) or name in parsed:
+            return None
+        kind = entry.get("type")
+        keys = set(entry) - {"type", "name", "instructions"}
+        if kind == "predicate" and not keys:
+            parsed[name] = {"type": "noul", "instructions": entry["instructions"]}
+        elif kind == "choice" and keys == {"choices"} and isinstance(entry["choices"], list) and entry["choices"]:
+            if not all(isinstance(c, dict) and isinstance(c.get("value"), str) for c in entry["choices"]):
+                return None
+            parsed[name] = {
+                "type": "choice",
+                "criteria": {c["value"]: c.get("description", "") for c in entry["choices"]},
+            }
+        elif kind == "score" and keys == {"levels"} and isinstance(entry["levels"], list) and entry["levels"]:
+            if not all(isinstance(c, dict) and isinstance(c.get("label"), str) for c in entry["levels"]):
+                return None
+            parsed[name] = {"type": "score", "criteria": [c["label"] for c in entry["levels"]]}
+        else:
+            return None
+    return parsed
+
+
+def _openai_answer(name: str, question: dict[str, Any], answer: dict[str, Any]) -> dict[str, Any]:
+    if answer["type"] == "noul":
+        return {"type": "predicate", "name": name, "probability": answer["noul"]}
+    if answer["type"] == "choice":
+        options = list(question["criteria"])
+        probabilities = answer.get("probabilities") or {o: 1.0 if o == answer["choice"] else 0.0 for o in options}
+        return {
+            "type": "choice",
+            "name": name,
+            "choice": answer["choice"],
+            "probabilities": [{"value": o, "probability": probabilities[o]} for o in options],
+            "confidence": answer.get("confidence", 1.0),
+        }
+    labels = question["criteria"]
+    top = min(max(round(answer["score"]), 0), len(labels) - 1)
+    return {
+        "type": "score",
+        "name": name,
+        "score": answer["score"],
+        "probabilities": [
+            {"value": i, "label": label, "probability": 1.0 if i == top else 0.0} for i, label in enumerate(labels)
+        ],
+        "confidence": answer.get("confidence", 1.0),
+    }
+
+
 class _Handler(BaseHTTPRequestHandler):
     server: "StubServer"
 
@@ -126,6 +192,8 @@ class _Handler(BaseHTTPRequestHandler):
             return
         if path in DECISION_PATHS:
             self._decision(path, body, behavior)
+        elif path == OPENAI_DECISIONS_PATH:
+            self._openai_decision(body, behavior)
         elif path in (CHAT_PATH, RESPONSES_PATH, MESSAGES_PATH):
             self._llm(path, body, behavior)
         else:
@@ -141,6 +209,9 @@ class _Handler(BaseHTTPRequestHandler):
                 options = list(body["questions"][name]["criteria"])
                 answer.setdefault("probabilities", {o: 1.0 if o == answer["choice"] else 0.0 for o in options})
                 answer.setdefault("confidence", 1.0)
+            elif answer["type"] == "score":
+                legend = {str(i): label for i, label in enumerate(body["questions"][name]["criteria"])}
+                answer.setdefault("legend", legend)
         response: dict[str, Any] = {
             "model": body["model"],
             "answers": answers,
@@ -149,7 +220,32 @@ class _Handler(BaseHTTPRequestHandler):
         if path == "/api/alpha/decisions":
             response.update({"id": "gen-dec-stub", "provider": "Stub"})
             response["usage"]["cost"] = 0.00001
+        else:
+            response.update({"id": "decision_stub", "provider": "stub"})
+            response["usage"].update({"cost": 0.0, "is_byok": False})
         self._send(200, response)
+
+    def _openai_decision(self, body: dict[str, Any], behavior: Behavior) -> None:
+        if behavior.malformed is not None:
+            self._send(200, behavior.malformed, raw=True)
+            return
+        questions = _openai_questions(body)
+        if questions is None:
+            error = {"message": OPENAI_DECISIONS_ERROR, "type": "invalid_request_error", "param": "body"}
+            self._send(400, {"error": {**error, "code": "invalid_parameter"}})
+            return
+        answers = [
+            _openai_answer(name, question, behavior.policy(name, question)) for name, question in questions.items()
+        ]
+        usage = {
+            "input_tokens": 100,
+            "output_tokens": 0,
+            "output_tokens_details": {"reasoning_tokens": behavior.reasoning_tokens},
+            "total_tokens": 100,
+            "cost": 0.0,
+            "is_byok": False,
+        }
+        self._send(200, {"model": body["model"], "answers": answers, "usage": usage, "provider": "stub"})
 
     def _llm(self, path: str, body: dict[str, Any], behavior: Behavior) -> None:
         if behavior.malformed is not None:
