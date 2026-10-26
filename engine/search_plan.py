@@ -40,8 +40,6 @@ CROSS_SPREAD_BPS = {
     "ADA/IDR": 29.7,
     "LTC/IDR": 29.2,
     "TRX/IDR": 38.4,
-    "LINK/IDR": 86.6,
-    "DOT/IDR": 59.2,
 }
 CROSS_PAIRS = tuple(CROSS_SPREAD_BPS)
 CROSS_HALF_SPREAD = {pair: bps / 2 / 10_000 for pair, bps in CROSS_SPREAD_BPS.items()}
@@ -612,6 +610,38 @@ def candidates() -> list[Candidate]:
                 stoploss=-0.20,
             )
         )
+    for n, exit_lookback, trend, stop in (
+        (55, 20, "btc_above_sma100_1d", -0.20),
+        (55, 55, "btc_above_sma100_1d", -0.20),
+        (20, 20, "btc_above_sma100_1d", -0.20),
+        (55, 20, "btc_above_sma200_1d", -0.20),
+        (90, 20, "btc_above_sma100_1d", -0.20),
+    ):
+        out.append(
+            _rule(
+                f"F3-don1d{n}-exit{exit_lookback}-{trend.replace('_1d', '')}-sl20",
+                "F3 shortlist: Donchian with the BTC regime gate",
+                entry="donchian",
+                timeframe="1d",
+                lookback=n,
+                exit="donchian_mid",
+                exit_lookback=exit_lookback,
+                trend_filter=trend,
+                stoploss=stop,
+            )
+        )
+    out.append(
+        _rule(
+            "F3-tsmom-55-btcabove-sma100-sl20",
+            "F3 shortlist: time-series momentum with the BTC regime gate",
+            entry="tsmom",
+            timeframe="1d",
+            lookback=55,
+            exit="tsmom_flip",
+            trend_filter="btc_above_sma100_1d",
+            stoploss=-0.20,
+        )
+    )
     out += [
         Candidate(
             "R3-random-L-exits",

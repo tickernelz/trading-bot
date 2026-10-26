@@ -27,7 +27,14 @@ class RuleSpec(BaseModel):
     threshold: Annotated[float, Field(gt=0, le=100)] | None = None
     adx_min: Annotated[float, Field(gt=0, lt=100)] | None = None
     adx_max: Annotated[float, Field(gt=0, lt=100)] | None = None
-    trend_filter: Literal["none", "above_sma50_1d", "above_sma100_1d", "above_sma200_1d"] = "none"
+    trend_filter: Literal[
+        "none",
+        "above_sma50_1d",
+        "above_sma100_1d",
+        "above_sma200_1d",
+        "btc_above_sma100_1d",
+        "btc_above_sma200_1d",
+    ] = "none"
     exit: Literal["none", "donchian_mid", "tsmom_flip", "ema_cross", "sma_reclaim", "bb_mid"]
     exit_lookback: Annotated[int, Field(ge=2, le=400)] | None = None
     stoploss: Annotated[float, Field(gt=-1, lt=0)]
@@ -61,7 +68,19 @@ class RuleSpec(BaseModel):
     @property
     def trend_sma(self) -> int | None:
         """Length of the 1d SMA the trend filter compares the daily close with."""
-        return {"none": None, "above_sma50_1d": 50, "above_sma100_1d": 100, "above_sma200_1d": 200}[self.trend_filter]
+        return {
+            "none": None,
+            "above_sma50_1d": 50,
+            "above_sma100_1d": 100,
+            "above_sma200_1d": 200,
+            "btc_above_sma100_1d": 100,
+            "btc_above_sma200_1d": 200,
+        }[self.trend_filter]
+
+    @property
+    def trend_on_btc(self) -> bool:
+        """Whether the trend filter reads BTC/IDR instead of the traded pair."""
+        return self.trend_filter.startswith("btc_")
 
     def atr_target(self, entry_price: float, atr: float) -> float | None:
         """Gross take-profit price from the ATR known at the signal candle."""

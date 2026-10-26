@@ -73,7 +73,10 @@ def _edge(condition: pd.Series) -> pd.Series:
 
 
 def rule_frame(candles: pd.DataFrame, spec: RuleSpec, informative: dict[str, pd.DataFrame]) -> pd.DataFrame:
-    """Return enter, exit_signal and atr per 1h candle; informative maps timeframe to its completed candles."""
+    """Return enter, exit_signal and atr per 1h candle.
+
+    informative maps a timeframe to its completed candles; a btc trend filter reads the 1d BTC/IDR frame there.
+    """
     base = candles.reset_index(drop=True)
     sources = {BASE: base, **informative}
     main = _on_base(base, _indicators(sources[spec.timeframe], spec, spec.timeframe), spec.timeframe)
@@ -95,7 +98,10 @@ def rule_frame(candles: pd.DataFrame, spec: RuleSpec, informative: dict[str, pd.
     if spec.adx_max is not None:
         condition &= main["adx"] < spec.adx_max
     if spec.trend_sma is not None:
-        daily = main if spec.timeframe == "1d" else _on_base(base, _indicators(sources["1d"], spec, "1d"), "1d")
+        if spec.trend_on_btc:
+            daily = _on_base(base, _indicators(sources["btc"], spec, "1d"), "1d")
+        else:
+            daily = main if spec.timeframe == "1d" else _on_base(base, _indicators(sources["1d"], spec, "1d"), "1d")
         condition &= daily["close"] > daily["sma_trend"]
     condition &= base["volume"] > 0
     if spec.exit == "donchian_mid":

@@ -33,7 +33,10 @@ class RuleStrategy(RiskGated):
         super().__init__(config)
 
     def informative_pairs(self) -> list[tuple[str, str]]:
-        return [(pair, tf) for pair in self.dp.current_whitelist() for tf in self.rule.informative_timeframes]
+        pairs = list(self.dp.current_whitelist())
+        if self.rule.trend_on_btc and "BTC/IDR" not in pairs:
+            pairs.append("BTC/IDR")
+        return [(pair, tf) for pair in pairs for tf in self.rule.informative_timeframes]
 
     def populate_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         dataframe = swing_indicators(dataframe)
@@ -43,6 +46,10 @@ class RuleStrategy(RiskGated):
             ]
             for tf in self.rule.informative_timeframes
         }
+        if self.rule.trend_on_btc:
+            informative["btc"] = self.dp.get_pair_dataframe("BTC/IDR", "1d").loc[
+                :, ["date", "open", "high", "low", "close", "volume"]
+            ]
         signals = rule_frame(dataframe, self.rule, informative)
         dataframe["rule_enter"] = signals["enter"].to_numpy()
         dataframe["rule_exit"] = signals["exit_signal"].to_numpy()

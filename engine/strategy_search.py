@@ -118,6 +118,8 @@ def build_signals(
             continue
         spec = candidate.spec
         informative = {tf: resample(history, tf) for tf in spec.informative_timeframes}
+        if spec.trend_on_btc:
+            informative["btc"] = resample(candles[plan.REGIME_PAIR], "1d")
         if window is not None:
             informative = {tf: candles_tf.tail(window).reset_index(drop=True) for tf, candles_tf in informative.items()}
         signals = rule_frame(frame, spec, informative)

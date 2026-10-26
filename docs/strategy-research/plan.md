@@ -170,3 +170,17 @@ Locked in the commit that adds this section, before the first round 3 run. The Z
 | K benchmarks: SwingEmaRsi, buy-and-hold | 2 |
 
 Runs: walk-forward on the five pairs, controls, then \`cross-asset\` in research mode for the first three configurations of the walk-forward ranking (named by the ranking, not by hand). Tiers from cross-asset are provisional until forward data.
+
+### Round 3, batch B: the ZHA-3913 shortlist (locked after the batch A runs, before its own first run)
+
+Agent Laras's shortlist (ZHA-3913 documents `profit-search` and `protocol`) names five families that survived her out-of-sample test; two are expressible in this runner. Batch B adds six configurations, locked in the commit that adds this section.
+
+| Config | Family |
+| --- | --- |
+| `F3-don1d55-exit20-btcabovesma100-sl20`, `F3-don1d55-exit55-btcabovesma100-sl20`, `F3-don1d20-exit20-btcabovesma100-sl20`, `F3-don1d90-exit20-btcabovesma100-sl20` | F3: Donchian entry and exit behind the BTC/IDR daily regime gate (`btc_above_sma100_1d`), 20% stop |
+| `F3-don1d55-exit20-btcabovesma200-sl20` | the same gate on the BTC SMA200 |
+| `F3-tsmom-55-btcabove-sma100-sl20` | the gate with time-series momentum instead of the Donchian high |
+
+Her F1 (equal-weight portfolio of four pairs held while BTC is above its SMA100), F2 (56-day rotation) and F4 (Donchian ensemble) are portfolio strategies, not per-pair rules; the runner evaluates one rule per pair, so they are not in batch B and need a portfolio engine of their own. Her report measures F1 at 3.29% a month with a 61% drawdown and F3 at 2.45% a month with 46.5%, both far above every per-pair rule in batch A, which makes the portfolio engine the obvious round 4 subject.
+
+Because ZHA-3913 used LINK, DOT, UNI and AVAX for its own out-of-sample test, they are no longer unseen: the cross-asset pairs drop to BNB, NEAR, HBAR, ADA, LTC and TRX. The 8-pair cross-asset run of batch A (commit `8081f68`) stays in the ledger as a superseded comparison.
