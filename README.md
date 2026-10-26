@@ -17,9 +17,9 @@ Status: tahap 1 (dua bot dry-run, swarm bayangan, gateway). Belum ada akun atau 
 - engine/shadow.py, engine/shadow_client.py: layanan swarm bayangan bot B dan pengirim kandidat dari strategi
 - engine/decisions.py: penyimpanan SQLite keputusan swarm dan penghubung ke trade
 - gateway/: gateway antara PWA dan bot (docs/gateway-api.md bagian 12); konfigurasi, provider, key, voter (bagian 17)
-- scripts/stage1.sh: menjalankan bot A, bot B, layanan bayangan, dan gateway sebagai unit systemd user
+- scripts/stack.sh: menjalankan bot A, bot B, layanan bayangan, layanan analis, gateway, dan PWA sebagai unit systemd user
 - scripts/measure_gateway.py: ukur jeda fill dan beban klien gateway
-- scripts/stage1_report.py: ringkasan lari tahap 1
+- scripts/stack_report.py: ringkasan satu lari mesin
 - scripts/record_fixture.py: rekam jawaban Freqtrade dan keputusan swarm dari lari dry-run ke tests/data untuk tes gateway (docs/gateway-api.md bagian 13)
 - docker/Dockerfile, docker-compose.yml: image turunan dari vendor/freqtrade, jaringan host
 - docs/plan.md: plan final
@@ -87,7 +87,7 @@ Mode `swarm.mode: veto` ditolak skema sampai gerbang dibangun. Trade yang dibaya
 
 Setiap bot menulis `heartbeat.json` tiap loop dan menambah satu baris di `starts.jsonl` tiap start. Setelah start, bot menolak semua entry sampai cek start lolos: posisi terbuka dihargai dan batas rugi harian serta drawdown dinilai; hasilnya dikirim sebagai `strategy_msg` `startup_check`. Semua ini, ditambah pengiriman kandidat ke layanan bayangan, hanya berjalan di runmode `dry_run` dan `live`: Freqtrade juga memanggil `bot_start`, `bot_loop_start`, `confirm_trade_entry`, dan `order_filled` saat backtest, hyperopt, dan webserver, dan di sana strategi tidak menyentuh berkas bot hidup maupun voter. Launcher hanya merender alamat layanan bayangan dan mewajibkan SHADOW_TOKEN untuk perintah `trade`.
 
-Direktori jalan (di luar repo), contoh `~/Projects/trading-bot-runs/stage1`:
+Direktori jalan (di luar repo), contoh `~/Projects/trading-bot-runs/machine-test`:
 
     config/bot-a.yaml config/bot-b.yaml config/gateway.yaml
     secrets/ft.env        FT_API_USERNAME, FT_API_PASSWORD, FT_API_JWT_SECRET (bot-a, bot-b)
@@ -99,22 +99,26 @@ Direktori jalan (di luar repo), contoh `~/Projects/trading-bot-runs/stage1`:
 Tiap proses hanya menerima berkas rahasia yang dipakainya: gateway tidak memegang JWT secret Freqtrade, bot tidak memegang kunci provider, layanan bayangan tidak memegang kredensial Freqtrade. Kontainer hanya memasang `config/` (baca saja) dan direktori data komponennya; `secrets/` tidak pernah masuk kontainer (`--env-file` dibaca di host).
     bot-a/ bot-b/ gateway/
 
+PWA tidak punya direktori data: unit PWA melayani hasil build dari checkout repo (`pwa/`).
+
 `config/bot-*.yaml` berasal dari `config/config.example.yaml` dengan `bot_id`, `api.port`, dan `swarm.enabled` berbeda; `config/gateway.yaml` dari `config/gateway.example.yaml` dengan path di bawah `/opt/trading-bot/run`. Lalu:
 
     docker build -f docker/Dockerfile --build-context freqtrade-base=docker-image://trading-bot/freqtrade:2026.9 --target engine -t trading-bot/engine:<sha> .
-    RUN_DIR=~/Projects/trading-bot-runs/stage1 IMAGE=trading-bot/engine:<sha> scripts/stage1.sh start
-    RUN_DIR=... IMAGE=... scripts/stage1.sh status
-    RUN_DIR=... scripts/stage1.sh stop bot-b
+    RUN_DIR=~/Projects/trading-bot-runs/machine-test IMAGE=trading-bot/engine:<sha> scripts/stack.sh start
+    RUN_DIR=... IMAGE=... scripts/stack.sh status
+    RUN_DIR=... scripts/stack.sh stop bot-b
 
 Ringkasan lari (uptime dari baris `Bot heartbeat` di journald dengan celah di atas 180 detik dihitung mati, restart, order per status, baris ERROR, keputusan swarm, jam bot B sejak jawaban voter nyata pertama, token, hasil trade yang dibayangi, jeda fill):
 
-    PYTHONPATH=. python3 scripts/stage1_report.py --run-dir ~/Projects/trading-bot-runs/stage1 --unit-prefix trading-bot-stage1
+    PYTHONPATH=. python3 scripts/stack_report.py --run-dir ~/Projects/trading-bot-runs/machine-test --unit-prefix trading-bot-stack
 
 Rekam data uji gateway dari lari yang sedang jalan (butuh `secrets/ft.env` dan `RUN_STARTED_AT` di direktori lari; `show_config` disimpan hanya field yang dipakai gateway):
 
     docker run --rm --network host -v $PWD:/src:ro -v <run-dir>:/run-dir:ro -v <out>:/out -w /src -e PYTHONPATH=/src --entrypoint python trading-bot/engine:<sha> scripts/record_fixture.py --run-dir /run-dir --out /out
 
-Unit systemd user transien (`Restart=always`) bertahan saat sesi terminal atau server lain di-restart; restart dihitung dari `starts.jsonl`. Log: `journalctl --user -u trading-bot-stage1-bot-a`.
+Unit systemd user transien (`Restart=always`) bertahan saat sesi terminal atau server lain di-restart; restart dihitung dari `starts.jsonl`. Log: `journalctl --user -u trading-bot-stack-bot-a`.
+
+Dampak ke mesin dibatasi: tiap kontainer membawa `--cpus` (bot 1.0; layanan bayangan, analis, dan gateway 0.5) dan `--memory`; unit PWA berjalan di host tanpa kontainer dengan `Nice=10` dan `CPUQuota=50%`. `stack.sh start pwa` menjalankan `npm ci` bila `pwa/node_modules` belum ada, `npm run build`, lalu `npm run preview` melayani `http://127.0.0.1:4173` dan meneruskan `/gw` ke `GATEWAY_URL`.
 
 ## Tahap 2b: konfigurasi, provider, key, voter
 

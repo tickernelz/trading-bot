@@ -588,7 +588,7 @@ Berita, sentimen, dan riwayat keputusan tidak ikut refresh 30 detik (11.7). PWA 
 
 ## 12. Gateway tahap 1 (ZHA-3764)
 
-Kode: `gateway/` (FastAPI dan uvicorn dari image Freqtrade yang sama). Konfigurasi: `config/gateway.example.yaml`, skema `gateway/settings.py`. Menjalankan: `scripts/stage1.sh` (lihat README).
+Kode: `gateway/` (FastAPI dan uvicorn dari image Freqtrade yang sama). Konfigurasi: `config/gateway.example.yaml`, skema `gateway/settings.py`. Menjalankan: `scripts/stack.sh` (lihat README).
 
 ### 12.1 Yang dibangun
 

@@ -1,4 +1,4 @@
-"""Summarise a stage 1 run: uptime, restarts, orders, decisions, tokens, fill latency."""
+"""Summarise a stack run: uptime, restarts, orders, decisions, tokens, fill latency."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import json
 import sqlite3
 import subprocess
 from datetime import UTC, datetime
+from itertools import pairwise
 from pathlib import Path
 
 from engine.decisions import DecisionStore
@@ -57,7 +58,7 @@ def uptime(started: datetime, now: datetime, beats: list[datetime]) -> dict:
     edges = [started, *beats, now]
     down = sum(
         (later - earlier).total_seconds() - GAP_S
-        for earlier, later in zip(edges, edges[1:], strict=False)
+        for earlier, later in pairwise(edges)
         if (later - earlier).total_seconds() > GAP_S
     )
     span = (now - started).total_seconds()
@@ -79,7 +80,7 @@ def orders(trades_db: Path) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--run-dir", type=Path, required=True)
-    parser.add_argument("--unit-prefix", default="trading-bot-stage1")
+    parser.add_argument("--unit-prefix", default="trading-bot-stack")
     args = parser.parse_args()
     started = datetime.fromisoformat((args.run_dir / "RUN_STARTED_AT").read_text().strip())
     since = started.strftime("%Y-%m-%d %H:%M:%S UTC")
@@ -106,9 +107,7 @@ def main() -> None:
         outcomes = store.outcomes(args.run_dir / "bot-b" / "tradesv3.dryrun.sqlite")
         report["shadow"] = {
             "first_real_answer_at": first,
-            "clock_h": round((now - datetime.fromisoformat(first.replace("Z", "+00:00"))).total_seconds() / 3600, 2)
-            if first
-            else None,
+            "clock_h": round((now - datetime.fromisoformat(first)).total_seconds() / 3600, 2) if first else None,
             "decisions_by_status": store.counts(),
             "usage_total": store.usage(),
             "outcomes": [outcome.__dict__ for outcome in outcomes],
