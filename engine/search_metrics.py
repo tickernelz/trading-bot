@@ -106,6 +106,7 @@ def portfolio(
     taken: list[int] = []
     refused_slots = refused_limits = 0
     monthly: dict[str, float] = {}
+    month_start: dict[str, float] = {}
     for _, kind, i in events:
         if kind == 0:
             if len(stakes) >= slots:
@@ -120,9 +121,10 @@ def portfolio(
             taken.append(i)
         elif i in stakes:
             pnl = stakes.pop(i) * rows[i].profit
+            month = rows[i].exit_time.strftime("%Y-%m")
+            month_start.setdefault(month, equity)
             equity += pnl
             closed.append((rows[i].exit_time, pnl))
-            month = rows[i].exit_time.strftime("%Y-%m")
             monthly[month] = monthly.get(month, 0.0) + pnl
             peak = max(peak, equity)
             drawdown = max(drawdown, 1 - equity / peak)
@@ -131,7 +133,7 @@ def portfolio(
         "taken": sorted(taken),
         "refused_slots": refused_slots,
         "refused_limits": refused_limits,
-        "worst_month": min(monthly.values(), default=0.0),
+        "worst_month": min((pnl / month_start[month] for month, pnl in monthly.items()), default=0.0),
         "final_equity": equity,
     }
 

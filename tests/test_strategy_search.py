@@ -221,6 +221,13 @@ def test_donchian_low_exit_fires_below_the_lowest_low_of_earlier_candles():
     assert exit_signal == [False, False, False, False, False, True, True]
 
 
+def test_worst_month_is_a_share_of_the_equity_the_month_started_with():
+    rows = [day_row(1.0, 1, 2), day_row(-0.10, 24 * 40, 24 * 40 + 1)]
+    account = metrics.portfolio(rows, -0.5, 0.0031, fraction=1.0, slots=1)
+    assert account["final_equity"] == pytest.approx(1.8)
+    assert account["worst_month"] == pytest.approx(-0.10)
+
+
 def test_equal_weight_account_gives_each_pair_its_share_of_equity():
     pairs = ["BTC/IDR", "ETH/IDR", "SOL/IDR", "XRP/IDR"]
     rows = [day_row(0.10, 1, 5, pair) for pair in pairs]

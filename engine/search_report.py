@@ -42,6 +42,7 @@ def summary_row(summary: dict) -> list[str]:
         pct(summary.get("max_drawdown_research_risk"), 1, sign=False),
         rupiah(summary.get("monthly_profit_idr_equal_weight")),
         pct(summary.get("max_drawdown_equal_weight"), 1, sign=False),
+        rupiah(summary.get("worst_month_idr_equal_weight")),
         num(summary.get("trades_per_month"), 1),
     ]
 
@@ -61,12 +62,13 @@ SUMMARY_HEAD = [
     "Largest loss",
     "Worst 5 mean",
     "Max DD",
-    "Worst month (Rp 2M)",
+    "Worst month (share of month-start equity x Rp 2M)",
     "Profit/month 0.5% risk",
     "Profit/month 2% risk",
     "Max DD 2% risk",
     "Profit/month equal weight",
     "Max DD equal weight",
+    "Worst month equal weight",
     "Trades/month",
 ]
 
