@@ -13,15 +13,20 @@ from engine.settings import ConfigError, Settings, load_settings
 STRATEGY = "SwingEmaRsi"
 STRATEGY_COMMANDS = {"trade", "backtesting"}
 API_COMMANDS = {"trade", "webserver"}
+SHADOW_COMMANDS = {"trade"}
 TELEGRAM_COMMANDS = {"trade"}
 ENGINE_ROOT = Path(__file__).resolve().parent
+DRY_RUN_DB = "tradesv3.dryrun.sqlite"
+TRADABLE_BALANCE_RATIO = 0.99
 
 
 class MissingSecret(Exception):
     """Raised when a required environment variable is unset or empty."""
 
 
-def freqtrade_config(settings: Settings, serve_api: bool = True, telegram: bool = False) -> dict[str, Any]:
+def freqtrade_config(
+    settings: Settings, serve_api: bool = True, telegram: bool = False, shadow: bool = False
+) -> dict[str, Any]:
     """Translate validated settings into a Freqtrade configuration without secrets."""
     config: dict[str, Any] = {
         "bot_name": "trading-bot",
@@ -32,7 +37,7 @@ def freqtrade_config(settings: Settings, serve_api: bool = True, telegram: bool 
         "fee": settings.exchange.fee_pct / 100,
         "stake_currency": settings.exchange.stake_currency,
         "stake_amount": "unlimited",
-        "tradable_balance_ratio": 0.99,
+        "tradable_balance_ratio": TRADABLE_BALANCE_RATIO,
         "max_open_trades": settings.risk.max_open_trades,
         "timeframe": settings.exchange.timeframe,
         "cancel_open_orders_on_exit": False,
@@ -60,6 +65,9 @@ def freqtrade_config(settings: Settings, serve_api: bool = True, telegram: bool 
         "strategy_path": str(ENGINE_ROOT / "strategies"),
         "internals": {"process_throttle_secs": 5},
         "trading_bot": {
+            "bot_id": settings.bot_id,
+            "shadow_url": settings.shadow.url if shadow and settings.swarm.enabled and settings.shadow else None,
+            "shadow_token_env": settings.shadow.token_env if shadow and settings.shadow else None,
             "initial_capital": settings.capital.initial_idr,
             "compounding": settings.capital.compounding,
             "risk": settings.risk.model_dump(),
@@ -91,17 +99,21 @@ def telegram_enabled(settings: Settings, command: str) -> bool:
     return command in TELEGRAM_COMMANDS and settings.notify.telegram.enabled
 
 
-def secret_env(settings: Settings, environ: dict[str, str], telegram: bool = False) -> dict[str, str]:
+def secret_env(
+    settings: Settings, environ: dict[str, str], telegram: bool = False, shadow: bool = False
+) -> dict[str, str]:
     """Map the credentials named in settings onto Freqtrade environment overrides."""
     names = {
         "FREQTRADE__API_SERVER__USERNAME": settings.api.username_env,
         "FREQTRADE__API_SERVER__PASSWORD": settings.api.password_env,
         "FREQTRADE__API_SERVER__JWT_SECRET_KEY": settings.api.jwt_secret_env,
-        "FREQTRADE__API_SERVER__WS_TOKEN": settings.api.ws_token_env,
     }
     if telegram:
         names["FREQTRADE__TELEGRAM__TOKEN"] = settings.notify.telegram.token_env
-    missing = [source for source in names.values() if not environ.get(source)]
+    required = list(names.values())
+    if shadow and settings.swarm.enabled and settings.shadow is not None:
+        required.append(settings.shadow.token_env)
+    missing = [source for source in required if not environ.get(source)]
     if missing:
         raise MissingSecret(f"set environment variables: {', '.join(missing)}")
     return {target: environ[source] for target, source in names.items()}
@@ -124,13 +136,17 @@ def main(argv: list[str]) -> int:
         settings = load_settings(config_file)
         serve_api = argv[0] in API_COMMANDS
         telegram = telegram_enabled(settings, argv[0])
-        overrides = secret_env(settings, dict(os.environ), telegram) if serve_api else {}
+        shadow = argv[0] in SHADOW_COMMANDS
+        overrides = secret_env(settings, dict(os.environ), telegram, shadow) if serve_api else {}
     except (ConfigError, MissingSecret) as exc:
         print(f"trading-bot: refusing to start: {exc}", file=sys.stderr)
         return 2
     rendered = Path(userdir) / "trading-bot.freqtrade.json"
     rendered.parent.mkdir(parents=True, exist_ok=True)
-    rendered.write_text(json.dumps(freqtrade_config(settings, serve_api, telegram), indent=2), encoding="utf-8")
+    config = freqtrade_config(settings, serve_api, telegram, shadow)
+    if serve_api:
+        config["db_url"] = f"sqlite:///{(Path(userdir) / DRY_RUN_DB).resolve()}"
+    rendered.write_text(json.dumps(config, indent=2), encoding="utf-8")
     command = build_argv(argv[0], argv[1:], rendered, userdir)
     os.execvpe(command[0], command, {**os.environ, **overrides})
 

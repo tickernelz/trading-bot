@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 
+LLM_PROVIDER_TYPES = ("openai-completions", "openai-responses", "anthropic-messages")
 Percent = Annotated[float, Field(gt=0, le=100)]
 EnvName = Annotated[str, Field(pattern=r"^[A-Z][A-Z0-9_]*$")]
 
@@ -73,7 +74,14 @@ class Exchange(Strict):
 
 class Provider(Strict):
     id: Annotated[str, Field(pattern=r"^[a-z0-9][a-z0-9_-]*$")]
-    type: Literal["openai-completions", "openai-responses", "anthropic-messages"]
+    type: Literal[
+        "openai-completions",
+        "openai-responses",
+        "anthropic-messages",
+        "systemone",
+        "openai-decisions",
+        "openrouter-decisions",
+    ]
     base_url: Annotated[str, Field(pattern=r"^(from_import|https?://\S+)$")]
     api_key_env: EnvName | None = None
     api_key: SecretStr | None = None
@@ -143,8 +151,19 @@ class Api(Strict):
     username_env: EnvName = "FT_API_USERNAME"
     password_env: EnvName = "FT_API_PASSWORD"
     jwt_secret_env: EnvName = "FT_API_JWT_SECRET"
-    ws_token_env: EnvName = "FT_API_WS_TOKEN"
     force_entry: bool = False
+
+
+class Shadow(Strict):
+    listen: Literal["127.0.0.1", "::1"] = "127.0.0.1"
+    port: Annotated[int, Field(ge=1024, le=65535)] = 8091
+    database: Annotated[str, Field(pattern=r"^[A-Za-z0-9_.-]+\.sqlite$")] = "swarm_decisions.sqlite"
+    token_env: EnvName = "SHADOW_TOKEN"
+
+    @property
+    def url(self) -> str:
+        host = "[::1]" if self.listen == "::1" else self.listen
+        return f"http://{host}:{self.port}"
 
 
 class Scoreboard(Strict):
@@ -179,6 +198,7 @@ class Analytics(Strict):
 
 class Settings(Strict):
     mode: Literal["dry_run"]
+    bot_id: Annotated[str, Field(pattern=r"^[A-Z]$")] = "A"
     capital: Capital
     risk: RiskSettings
     exchange: Exchange
@@ -189,7 +209,16 @@ class Settings(Strict):
     data: Data
     notify: Notify
     api: Api = Api()
+    shadow: Shadow | None = None
     analytics: Analytics = Analytics()
+
+    @model_validator(mode="after")
+    def _swarm_mode_supported(self) -> Settings:
+        if self.swarm.enabled and self.swarm.mode == "veto":
+            raise ValueError("swarm.mode veto is not implemented yet; use shadow or disable the swarm")
+        if self.swarm.enabled and self.shadow is None:
+            raise ValueError("swarm.mode shadow needs a shadow section")
+        return self
 
     @model_validator(mode="after")
     def _references_resolve(self) -> Settings:
@@ -211,6 +240,8 @@ class Settings(Strict):
         analyst_provider, analyst_model = self.llm.analyst_model.split(":", 1)
         if analyst_provider not in providers:
             raise ValueError(f"llm.analyst_model references unknown provider {analyst_provider!r}")
+        if providers[analyst_provider].type not in LLM_PROVIDER_TYPES:
+            raise ValueError(f"llm.analyst_model provider {analyst_provider!r} is not a chat provider")
         if analyst_model not in providers[analyst_provider].models:
             raise ValueError(f"llm.analyst_model {analyst_model!r} is not listed by provider {analyst_provider}")
         return self

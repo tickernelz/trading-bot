@@ -9,6 +9,8 @@ from typing import Any
 from tb_swarm.models import ChoiceAnswer, ChoiceQuestion, DecisionRequest
 from tb_swarm.outcome import VoterRecord
 
+from engine.decisions import SHADOW_KEY
+
 DECISIONS_SCHEMA = """
 CREATE TABLE decisions (
     decision_id TEXT PRIMARY KEY, ts TEXT NOT NULL, bot TEXT NOT NULL, pair TEXT NOT NULL,
@@ -138,8 +140,8 @@ def write_trades(path: Path, outcomes: dict[str, tuple[float | None, bool]]) -> 
     for index, (decision_id, (profit, is_open)) in enumerate(outcomes.items(), start=1):
         db.execute("INSERT INTO trades (id, close_profit_abs, is_open) VALUES (?, ?, ?)", (index, profit, int(is_open)))
         db.execute(
-            "INSERT INTO trade_custom_data (ft_trade_id, cd_key, cd_value) VALUES (?, 'shadow-decision-id', ?)",
-            (index, decision_id),
+            "INSERT INTO trade_custom_data (ft_trade_id, cd_key, cd_value) VALUES (?, ?, ?)",
+            (index, SHADOW_KEY, decision_id),
         )
     db.commit()
     db.close()

@@ -353,7 +353,7 @@ Tafsiran Wira atas "live preview" (koreksi bila maksud Zhafron lain): (1) pratin
 
 ### Transport live dan performa
 
-- Gateway menjaga satu koneksi WebSocket ke Freqtrade (/api/v1/message/ws dengan ws_token, subscribe) dan mendorong delta ke PWA lewat WebSocket sendiri. Data kandle diambil hanya saat ada klien terhubung, supaya bot di PC tidak terbebani.
+- Gateway menjaga satu koneksi WebSocket ke Freqtrade (/api/v1/message/ws dengan JWT 15 menit dari /token/login, bukan ws_token, karena log Freqtrade mencatat URL WebSocket beserta query; subscribe) dan mendorong delta ke PWA lewat WebSocket sendiri. Data kandle diambil hanya saat ada klien terhubung, supaya bot di PC tidak terbebani.
 - iOS: WebSocket hanya hidup saat aplikasi terbuka di depan; saat di latar belakang kabar datang lewat Web Push. Safari tidak mendukung push tak terlihat, jadi notifikasi harus tampil (dokumen Apple).
 - Sambungan terputus: sambung ulang dengan backoff dan tampilan menandai data basi.
 - Metrik yang diukur di tahap 1: jeda dari fill di Freqtrade sampai tampil di PWA, dan beban CPU gateway saat klien terhubung. Belum ada angka.

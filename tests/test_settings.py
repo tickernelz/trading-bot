@@ -15,6 +15,16 @@ def test_example_config_is_valid():
     assert settings.risk.on_breach == "stop_new_entries"
     assert settings.compute.max_cost_idr_per_day is False
     assert settings.data.social is False
+    assert settings.bot_id == "A"
+    assert settings.shadow.url == "http://127.0.0.1:8091"
+    assert {"systemone", "openai-decisions"} <= {provider.type for provider in settings.providers}
+    assert len({voter.provider for voter in settings.swarm.voters if voter.enabled}) == 7
+
+
+def test_rules_only_bot_needs_no_shadow_service(example_raw, write_config):
+    example_raw["swarm"]["enabled"] = False
+    del example_raw["shadow"]
+    assert load_settings(write_config(example_raw)).shadow is None
 
 
 def _mutations():
@@ -72,7 +82,27 @@ def _mutations():
     def wrong_type(raw):
         raw["capital"]["initial_idr"] = "two million"
 
+    def veto_not_implemented(raw):
+        raw["swarm"]["mode"] = "veto"
+
+    def shadow_without_service(raw):
+        del raw["shadow"]
+
+    def shadow_beyond_loopback(raw):
+        raw["shadow"]["listen"] = "0.0.0.0"
+
+    def lowercase_bot_id(raw):
+        raw["bot_id"] = "b"
+
+    def analyst_on_decision_provider(raw):
+        raw["llm"]["analyst_model"] = "experientiallabs-systemone:jev-latest"
+
     return [
+        veto_not_implemented,
+        shadow_without_service,
+        shadow_beyond_loopback,
+        lowercase_bot_id,
+        analyst_on_decision_provider,
         unknown_key,
         live_mode,
         daily_above_total,

@@ -276,7 +276,7 @@ class TestAutoDisable:
     def test_apply_writes_enabled_false_and_the_file_still_loads(self, tmp_path, example_raw):
         path = tmp_path / "config.yaml"
         path.write_text(yaml.safe_dump(example_raw, sort_keys=False), encoding="utf-8")
-        target = example_raw["swarm"]["voters"][-1]["id"]
+        target = example_raw["swarm"]["voters"][0]["id"]
         assert apply_disables(path, [target]) == [target]
         reloaded = load_settings(path)
         assert {voter.id: voter.enabled for voter in reloaded.swarm.voters}[target] is False
@@ -385,7 +385,7 @@ class TestPlanEdges:
         monkeypatch.setattr(module.Settings, "model_validate", validate_then_edit)
         before = path.read_text(encoding="utf-8")
         with pytest.raises(ConfigError, match="changed while"):
-            apply_disables(path, [example_raw["swarm"]["voters"][-1]["id"]])
+            apply_disables(path, [example_raw["swarm"]["voters"][0]["id"]])
         assert path.read_text(encoding="utf-8") == before + "\n"
         assert not list(tmp_path.glob("*.tmp"))
 

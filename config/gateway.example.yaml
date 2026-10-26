@@ -1,0 +1,24 @@
+listen: 127.0.0.1
+port: 8090
+state_dir: /var/lib/trading-bot/gateway
+password_env: GW_PASSWORD
+ft_username_env: FT_API_USERNAME
+ft_password_env: FT_API_PASSWORD
+session_days: 30
+heartbeat_lost_s: 180
+exchange_probe_url: https://indodax.com/api/server_time
+bots:
+  - id: A
+    label: Bot A
+    strategy: aturan saja
+    api_url: http://127.0.0.1:8080
+    config: /opt/trading-bot/run/config/bot-a.yaml
+    userdir: /opt/trading-bot/run/bot-a
+  - id: B
+    label: Bot B
+    strategy: aturan + swarm bayangan
+    api_url: http://127.0.0.1:8081
+    config: /opt/trading-bot/run/config/bot-b.yaml
+    userdir: /opt/trading-bot/run/bot-b
+    shadow_url: http://127.0.0.1:8091
+    decisions: /opt/trading-bot/run/bot-b/swarm_decisions.sqlite

@@ -2,7 +2,7 @@
 
 Bot trading otonom 24 jam (crypto spot, dry-run dulu) dengan swarm voter dan median sebagai penyaring entry, plus panel kontrol PWA.
 
-Status: tahap 0a (mesin dasar). Belum ada akun atau uang yang terhubung, belum ada API key exchange, dan belum ada mode live. Profit tidak dijamin.
+Status: tahap 1 (dua bot dry-run, swarm bayangan, gateway). Belum ada akun atau uang yang terhubung, belum ada API key exchange, dan belum ada mode live. Profit tidak dijamin.
 
 ## Isi
 
@@ -12,7 +12,14 @@ Status: tahap 0a (mesin dasar). Belum ada akun atau uang yang terhubung, belum a
 - engine/risk.py: batas rugi harian, batas drawdown, ukuran posisi berbasis risiko
 - engine/news.py: pengambil judul RSS CoinDesk dan Cointelegraph serta Fear and Greed alternative.me untuk lapisan grafik (cache 15 menit dan 1 jam, diambil hanya saat diminta)
 - engine/strategies/swing_ema_rsi.py: strategi swing 1h (EMA 20/50 + RSI) dengan gerbang risiko
-- engine/launch.py: validasi config, render config Freqtrade, exec Freqtrade
+- engine/launch.py: validasi config, render config Freqtrade (database trade di userdir), exec Freqtrade
+- engine/heartbeat.py: berkas heartbeat dan log start per bot
+- engine/shadow.py, engine/shadow_client.py: layanan swarm bayangan bot B dan pengirim kandidat dari strategi
+- engine/decisions.py: penyimpanan SQLite keputusan swarm dan penghubung ke trade
+- gateway/: gateway antara PWA dan bot (docs/gateway-api.md bagian 12)
+- scripts/stage1.sh: menjalankan bot A, bot B, layanan bayangan, dan gateway sebagai unit systemd user
+- scripts/measure_gateway.py: ukur jeda fill dan beban klien gateway
+- scripts/stage1_report.py: ringkasan lari tahap 1
 - docker/Dockerfile, docker-compose.yml: image turunan dari vendor/freqtrade, jaringan host
 - docs/plan.md: plan final
 - docs/gateway-api.md: kontrak API gateway dan feed event untuk PWA
@@ -38,7 +45,7 @@ Butuh Docker di mesin yang sama; diuji di WSL2 dengan Docker Engine 29.9.2.
     mkdir -p user_data
     cp config/config.example.yaml config/config.yaml
 
-Isi FT_API_USERNAME, FT_API_PASSWORD, FT_API_JWT_SECRET (minimal 32 karakter), FT_API_WS_TOKEN di .env (jangan di-commit). Hanya trade dan webserver yang membuka API dan membutuhkan keempatnya; download-data, backtesting, dan show-config berjalan tanpa API server. Lalu:
+Isi FT_API_USERNAME, FT_API_PASSWORD, FT_API_JWT_SECRET (minimal 32 karakter) di .env (jangan di-commit). Hanya trade dan webserver yang membuka API dan membutuhkan ketiganya; download-data, backtesting, dan show-config berjalan tanpa API server. Config contoh menyalakan swarm bayangan, jadi trade dan webserver juga butuh SHADOW_TOKEN (minimal 32 karakter, sama dengan milik layanan bayangan); untuk bot aturan saja set `swarm.enabled: false` dan hapus bagian `shadow`. `ws_token` Freqtrade sengaja tidak dipakai: gateway menyambung WebSocket dengan JWT 15 menit (docs/gateway-api.md bagian 8). Lalu:
 
     docker compose build bot
     docker compose up -d bot
@@ -53,6 +60,55 @@ Perintah Freqtrade lain memakai launcher yang sama, sehingga validasi tetap berl
     docker run --rm --network host --env-file .env -v ./config:/opt/trading-bot/config:ro -v ./user_data:/freqtrade/user_data trading-bot/engine:dev show-config
 
 Jaringan: network_mode host dipakai supaya bot bisa menjangkau provider LLM yang hanya listen di 127.0.0.1 host (dibuktikan di WSL2: 127.0.0.1:62173 dan 127.0.0.1:20128 menjawab 401 dari dalam kontainer, sedangkan host.docker.internal dengan host-gateway hanya menghasilkan 000). Jalur Docker Desktop di Windows belum diuji. api.listen dibatasi skema ke 127.0.0.1 atau ::1, jadi REST tidak pernah terbuka ke LAN; untuk Docker Desktop rencananya jaringan bridge dengan publish 127.0.0.1:8080:8080, tetap belum diuji.
+
+## Tahap 1: dua bot, swarm bayangan, gateway
+
+Empat proses, satu image (`trading-bot/engine`), semuanya hanya mendengarkan 127.0.0.1:
+
+| Komponen | Port | Isi |
+| --- | --- | --- |
+| bot-a | 8080 | Freqtrade, aturan saja (`swarm.enabled: false`) |
+| bot-b | 8081 | Freqtrade, aturan yang sama; tiap entry yang lolos lapisan risiko dikirim ke layanan bayangan tanpa menunggu jawaban |
+| shadow-b | 8091 | `POST /candidates` hanya dengan header `X-Shadow-Token` yang sama dengan SHADOW_TOKEN. Swarm voter nyata; mencatat jawaban, median, sebaran, kuorum, dan verdict yang AKAN diambil ke `bot-b/swarm_decisions.sqlite`. Tidak pernah memengaruhi order |
+| gateway | 8090 | Sesi, endpoint baca, feed, kesehatan, biaya dan token, audit |
+
+Susunan voter contoh mengikuti tahap 0c (tujuh voter aktif di tujuh provider berbeda, docs/stage0-findings.md). Alasan tidak menaruh banyak voter pada satu key terukur 2026-10-26 02:0x UTC lewat `ShadowService` dengan voter nyata, satu kandidat BTC/IDR yang sama tiap ronde dan jeda 2 s antar ronde (keluaran mentah per keputusan dan per voter terlampir di ZHA-3764):
+
+| Susunan | Ronde | Panggilan voter | Keputusan |
+| --- | --- | --- | --- |
+| 7 voter pada satu key nutaraline | 5 | 18 sah, 17 HTTP 429 "Laju request per key melebihi batas" | kuorum 5 gagal 3 dari 5 |
+| 4 nutaraline + 3 experientiallabs | 8 | 56 dari 56 sah | 7 dari 7 menjawab di 8 dari 8; 5 `ok`, 3 `choice_tie` |
+| 3 nutaraline + 2 tiprouter + 2 experientiallabs | 5 | tiprouter 0 dari 10 (6 HTTP 503, 4 timeout 30 s) | kuorum 5 tercapai karena 5 voter lain |
+
+Latensi jawaban sah pembagian 4+3: nutaraline median 1,6 s maks 2,7 s; experientiallabs median 6,4 s maks 26,9 s. Maks experientiallabs dekat `timeout_s` 30, jadi timeout voter itu perlu dipantau. `choice_tie` adalah seri antar jawaban voter (aturan agregasi), bukan galat provider.
+
+Mode `swarm.mode: veto` ditolak skema sampai gerbang dibangun. Trade yang dibayangi membawa custom data `shadow_decision_id`, sehingga `DecisionStore.outcomes(<tradesv3.dryrun.sqlite>)` bisa menghitung apakah entry yang akan dilewati ternyata rugi.
+
+Setiap bot menulis `heartbeat.json` tiap loop dan menambah satu baris di `starts.jsonl` tiap start. Setelah start, bot menolak semua entry sampai cek start lolos: posisi terbuka dihargai dan batas rugi harian serta drawdown dinilai; hasilnya dikirim sebagai `strategy_msg` `startup_check`. Semua ini, ditambah pengiriman kandidat ke layanan bayangan, hanya berjalan di runmode `dry_run` dan `live`: Freqtrade juga memanggil `bot_start`, `bot_loop_start`, `confirm_trade_entry`, dan `order_filled` saat backtest, hyperopt, dan webserver, dan di sana strategi tidak menyentuh berkas bot hidup maupun voter. Launcher hanya merender alamat layanan bayangan dan mewajibkan SHADOW_TOKEN untuk perintah `trade`.
+
+Direktori jalan (di luar repo), contoh `~/Projects/trading-bot-runs/stage1`:
+
+    config/bot-a.yaml config/bot-b.yaml config/gateway.yaml
+    secrets/ft.env        FT_API_USERNAME, FT_API_PASSWORD, FT_API_JWT_SECRET (bot-a, bot-b)
+    secrets/shadow.env    SHADOW_TOKEN, minimal 32 karakter (bot-b, shadow-b)
+    secrets/swarm.env     kunci provider voter, mis. NUTARALINE_API_KEY, EXPERIENTIALLABS_API_KEY (shadow-b)
+    secrets/gateway.env   GW_PASSWORD (minimal 12 karakter), FT_API_USERNAME, FT_API_PASSWORD (gateway)
+
+Tiap proses hanya menerima berkas rahasia yang dipakainya: gateway tidak memegang JWT secret Freqtrade, bot tidak memegang kunci provider, layanan bayangan tidak memegang kredensial Freqtrade.
+    bot-a/ bot-b/ gateway/
+
+`config/bot-*.yaml` berasal dari `config/config.example.yaml` dengan `bot_id`, `api.port`, dan `swarm.enabled` berbeda; `config/gateway.yaml` dari `config/gateway.example.yaml` dengan path di bawah `/opt/trading-bot/run`. Lalu:
+
+    docker build -f docker/Dockerfile --build-context freqtrade-base=docker-image://trading-bot/freqtrade:2026.9 --target engine -t trading-bot/engine:<sha> .
+    RUN_DIR=~/Projects/trading-bot-runs/stage1 IMAGE=trading-bot/engine:<sha> scripts/stage1.sh start
+    RUN_DIR=... IMAGE=... scripts/stage1.sh status
+    RUN_DIR=... scripts/stage1.sh stop bot-b
+
+Ringkasan lari (uptime dari baris `Bot heartbeat` di journald dengan celah di atas 180 detik dihitung mati, restart, order per status, baris ERROR, keputusan swarm, jam bot B sejak jawaban voter nyata pertama, token, hasil trade yang dibayangi, jeda fill):
+
+    PYTHONPATH=. python3 scripts/stage1_report.py --run-dir ~/Projects/trading-bot-runs/stage1 --unit-prefix trading-bot-stage1
+
+Unit systemd user transien (`Restart=always`) bertahan saat sesi terminal atau server lain di-restart; restart dihitung dari `starts.jsonl`. Log: `journalctl --user -u trading-bot-stage1-bot-a`.
 
 ## Kanal Telegram (nonaktif bawaan)
 
@@ -80,7 +136,7 @@ Tes berjalan di dalam image turunan Freqtrade, jadi versi Freqtrade, ccxt, dan p
 
 ## Analitik
 
-Paket analytics/ menyediakan pratinjau what-if batas risiko dan putar ulang jawaban voter, papan skor voter, uji stres turun 10 persen, ekspor CSV dan ringkasan pajak sebagai informasi, portofolio per pair, serta sinyal strategi dan backtest lewat instans Freqtrade mode webserver. Bentuk endpoint ada di bagian 13 docs/gateway-api.md; ambang dan tarif diatur di bagian analytics config.
+Paket analytics/ menyediakan pratinjau what-if batas risiko dan putar ulang jawaban voter, papan skor voter, uji stres turun 10 persen, ekspor CSV dan ringkasan pajak sebagai informasi, portofolio per pair, serta sinyal strategi dan backtest lewat instans Freqtrade mode webserver. Bentuk endpoint ada di bagian 13 docs/gateway-api.md; ambang dan tarif diatur di bagian analytics config. Rutenya belum dipasang ke gateway (ZHA-3798).
 
 Sinyal dan backtest butuh instans mode webserver dengan data OHLCV di userdir-nya (bot mode trade menjawab 503 untuk /pair_history dan /backtest):
 

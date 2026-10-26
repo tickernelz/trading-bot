@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 
 import pytest
+from freqtrade.enums import RunMode
 from freqtrade.persistence import Trade, init_db
 from pandas import DataFrame
 
+from engine.decisions import SHADOW_KEY
+from engine.heartbeat import read_heartbeat
 from engine.launch import freqtrade_config
 from engine.settings import load_settings
 from engine.strategies.swing_ema_rsi import SwingEmaRsi
@@ -27,34 +31,71 @@ class CandleStub:
     def get_analyzed_dataframe(self, pair, timeframe):
         if pair not in self.closes:
             return DataFrame(), None
-        return DataFrame({"close": [self.closes[pair]]}), None
+        close = self.closes[pair]
+        dates = [NOW - timedelta(hours=hours) for hours in (2, 1)]
+        return DataFrame(
+            {
+                "date": dates,
+                "open": [close, close],
+                "high": [close, close],
+                "low": [close, close],
+                "close": [close, close],
+                "volume": [1.0, 1.0],
+                "ema_fast": [close, close],
+                "ema_slow": [close, float("nan")],
+                "rsi": [50.0, 55.0],
+            }
+        ), None
 
 
-def _make_strategy(compounding: bool = True) -> SwingEmaRsi:
-    config = freqtrade_config(load_settings(EXAMPLE))
+class ShadowRecorder:
+    def __init__(self, fail: bool = False):
+        self.candidates: list[dict] = []
+        self.fail = fail
+        self.sent = 0
+        self.failed = 0
+
+    def submit(self, candidate: dict) -> None:
+        if self.fail:
+            raise RuntimeError("shadow down")
+        self.candidates.append(candidate)
+
+
+def _unstarted(userdir, compounding: bool = True, runmode: RunMode = RunMode.DRY_RUN) -> SwingEmaRsi:
+    config = freqtrade_config(load_settings(EXAMPLE), shadow=True)
     config["trading_bot"]["compounding"] = compounding
+    config["user_data_dir"] = userdir
+    config["runmode"] = runmode
     instance = SwingEmaRsi(config)
     instance.dp = CandleStub({})
     instance.bot_start()
+    instance.shadow = None
+    return instance
+
+
+def _make_strategy(userdir, compounding: bool = True) -> SwingEmaRsi:
+    instance = _unstarted(userdir, compounding)
+    instance.bot_loop_start(NOW)
+    assert instance.startup_checked
+    instance.dp.messages.clear()
     return instance
 
 
 @pytest.fixture
-def fixed_strategy():
+def db():
     init_db("sqlite://")
-    yield _make_strategy(compounding=False)
+    yield
     Trade.session.remove()
 
 
 @pytest.fixture
-def strategy():
-    init_db("sqlite://")
-    config = freqtrade_config(load_settings(EXAMPLE))
-    instance = SwingEmaRsi(config)
-    instance.dp = CandleStub({})
-    instance.bot_start()
-    yield instance
-    Trade.session.remove()
+def fixed_strategy(db, tmp_path):
+    return _make_strategy(tmp_path, compounding=False)
+
+
+@pytest.fixture
+def strategy(db, tmp_path):
+    return _make_strategy(tmp_path)
 
 
 def _trade(pair: str, open_rate: float, stake: float, **fields) -> Trade:
@@ -178,3 +219,102 @@ def test_entry_denied_when_open_trade_price_is_nan(strategy):
 
 def test_stake_skips_when_below_exchange_minimum(strategy):
     assert _stake(strategy, min_stake=500_000.0) == 0.0
+
+
+def test_entries_denied_before_first_loop(db, tmp_path):
+    instance = _unstarted(tmp_path)
+    assert instance.risk_state(NOW).entries_allowed
+    assert not _confirm(instance)
+    instance.bot_loop_start(NOW)
+    assert _confirm(instance)
+
+
+def test_entries_wait_for_startup_check_of_open_positions(db, tmp_path):
+    instance = _unstarted(tmp_path)
+    _trade("SOL/IDR", 3_000_000.0, 400_000.0, is_open=True)
+    assert not _confirm(instance)
+    instance.bot_loop_start(NOW)
+    assert not instance.startup_checked
+    assert not _confirm(instance)
+    instance.dp.closes["SOL/IDR"] = 2_990_000.0
+    instance.bot_loop_start(NOW)
+    assert instance.startup_checked
+    [report] = instance.dp.messages
+    assert report["event"] == "startup_check"
+    assert report["open_trades"] == ["SOL/IDR"]
+    assert report["entries_allowed"] is True
+    assert _confirm(instance)
+
+
+def test_startup_check_reports_breached_limit_and_keeps_entries_denied(db, tmp_path):
+    _closed(NOW - timedelta(hours=1), -25_000.0)
+    instance = _unstarted(tmp_path)
+    instance.bot_loop_start(NOW)
+    [report] = instance.dp.messages
+    assert report["entries_allowed"] is False
+    assert report["breaches"] == ["daily_loss"]
+    assert not _confirm(instance)
+
+
+def test_heartbeat_counts_restarts(db, tmp_path):
+    _make_strategy(tmp_path)
+    second = _make_strategy(tmp_path)
+    beat = read_heartbeat(tmp_path)
+    assert second.starts == 2
+    assert beat["starts"] == 2
+    assert beat["bot"] == "A"
+    assert beat["startup_checked"] is True
+    assert beat["open_trades"] == 0
+
+
+def test_shadow_receives_allowed_entry_and_links_filled_trade(strategy):
+    strategy.dp = CandleStub({"ETH/IDR": 60_000_000.0})
+    strategy.shadow = ShadowRecorder()
+    assert _confirm(strategy)
+    [candidate] = strategy.shadow.candidates
+    assert candidate["pair"] == "ETH/IDR"
+    assert candidate["rate"] == 60_000_000.0
+    assert len(candidate["candles"]) == 2
+    assert candidate["candles"][-1][7] is None
+    assert candidate["candle"] == (NOW - timedelta(hours=1)).isoformat()
+    json.dumps(candidate, allow_nan=False)
+    trade = _trade("ETH/IDR", 60_000_000.0, 300_000.0, is_open=True)
+    strategy.order_filled("ETH/IDR", trade, SimpleNamespace(ft_order_side="sell"), NOW)
+    assert trade.get_custom_data(SHADOW_KEY) is None
+    strategy.order_filled("ETH/IDR", trade, SimpleNamespace(ft_order_side="buy"), NOW)
+    assert trade.get_custom_data(SHADOW_KEY) == candidate["decision_id"]
+    assert strategy.shadow_pending == {}
+
+
+def test_denied_entry_is_not_sent_to_shadow(strategy):
+    strategy.shadow = ShadowRecorder()
+    _closed(NOW - timedelta(hours=1), -25_000.0)
+    assert not _confirm(strategy)
+    assert strategy.shadow.candidates == []
+
+
+def test_shadow_failure_never_blocks_entry(strategy):
+    strategy.dp = CandleStub({"ETH/IDR": 60_000_000.0})
+    strategy.shadow = ShadowRecorder(fail=True)
+    assert _confirm(strategy)
+    assert strategy.shadow_pending == {}
+
+
+@pytest.mark.parametrize("runmode", [RunMode.BACKTEST, RunMode.WEBSERVER, RunMode.HYPEROPT])
+def test_non_trading_runmodes_leave_live_files_and_shadow_alone(db, tmp_path, monkeypatch, runmode):
+    monkeypatch.setenv("SHADOW_TOKEN", "s" * 32)
+    (tmp_path / "heartbeat.json").write_text('{"ts": "2026-10-25T00:00:00+00:00", "pid": 1}', encoding="utf-8")
+    (tmp_path / "starts.jsonl").write_text('{"pid": 1}\n', encoding="utf-8")
+    config = freqtrade_config(load_settings(EXAMPLE), shadow=True)
+    config["user_data_dir"] = tmp_path
+    config["runmode"] = runmode
+    instance = SwingEmaRsi(config)
+    instance.dp = CandleStub({"ETH/IDR": 60_000_000.0})
+    instance.bot_start()
+    assert instance.shadow is None
+    for _ in range(3):
+        instance.bot_loop_start(NOW)
+    assert _confirm(instance)
+    assert instance.dp.messages == []
+    assert (tmp_path / "starts.jsonl").read_text(encoding="utf-8") == '{"pid": 1}\n'
+    assert read_heartbeat(tmp_path) == {"ts": "2026-10-25T00:00:00+00:00", "pid": 1}

@@ -12,8 +12,8 @@ from tb_swarm.models import DecisionRequest
 from tb_swarm.outcome import VoterRecord
 
 from analytics.errors import AnalyticsError
+from engine.decisions import SHADOW_KEY
 
-SHADOW_KEY = "shadow-decision-id"
 DECISION_COLUMNS = "decision_id, settled_at, pair, status, reason, verdict, required, iqr_limit, request, voters"
 
 

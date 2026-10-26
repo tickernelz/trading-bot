@@ -5,7 +5,7 @@ Kontrak untuk tugas PWA (tahap 1) dan gateway tahap 2. Diturunkan dari bagian 13
 Setiap contoh JSON diberi satu dari dua label:
 
 - `tangkapan Freqtrade 2026.9`: diambil dari bot dry-run Indodax yang berjalan di PC ini pada 2026-10-25 (REST, WebSocket `/api/v1/message/ws`, dan `strategy_msg` penolakan risiko). Nilai boleh dipangkas, nama field dan bentuknya tidak diubah.
-- `rancangan`: bentuk milik gateway yang belum dibangun (sesi, konfirmasi, envelope galat, ringkasan, event `gw.*`). Belum terbukti; tahap gateway wajib menangkap ulang dan memperbarui contoh ini.
+- `rancangan`: bentuk milik gateway yang ditulis sebelum gateway ada (sesi, konfirmasi, envelope galat, ringkasan, event `gw.*`). Gateway tahap 1 (`gateway/`, ZHA-3764) sudah membangun bagian baca, sesi, envelope, dan feed; yang dibangun, yang berbeda, dan yang belum ada dicatat di bagian 12. Kontrol (bagian 3 dan 6) dan `PATCH /gw/v1/settings` belum dibangun.
 
 ## 1. Topologi dan batas kepercayaan
 
@@ -14,7 +14,7 @@ PWA (browser) --HTTPS/WebSocket--> gateway --HTTP/WebSocket 127.0.0.1:8080--> Fr
 ```
 
 - Freqtrade REST/WS hanya listen di loopback (`api.listen: 127.0.0.1`, `api.port: 8080` di `config/config.yaml`). Gateway satu-satunya klien.
-- Gateway memegang kredensial Freqtrade (`FT_API_USERNAME`, `FT_API_PASSWORD`, `FT_API_JWT_SECRET`, `FT_API_WS_TOKEN` dari `.env`) dan tidak pernah mengirimkannya ke browser.
+- Gateway memegang kredensial Freqtrade (`FT_API_USERNAME`, `FT_API_PASSWORD`) dan tidak pernah mengirimkannya ke browser. `FT_API_JWT_SECRET` hanya dipegang bot. `ws_token` Freqtrade tidak dipakai (bagian 8).
 - Gateway memelihara satu koneksi WebSocket ke Freqtrade, bukan satu per tab PWA.
 - PWA tidak boleh memanggil Freqtrade langsung, termasuk untuk candle. Semua lewat gateway supaya satu tempat menegakkan auth, audit, dan penghematan bandwidth.
 - Gateway hanya untuk satu pemilik (single owner). Tidak ada multi-tenant pada rencana ini.
@@ -143,7 +143,7 @@ Contoh: tangkapan Freqtrade 2026.9 untuk field Freqtrade (trade 1, `force_entry`
 
 ### 5.4 `GET /gw/v1/trades?limit=100&pair=BTC/IDR`
 
-Diteruskan dari `/trades` (trade terbuka dan tertutup). Bentuk sama dengan 5.3; trade tertutup membawa `close_date`, `close_rate`, `close_profit_abs`, `exit_reason`, `exit_order_status`.
+Gabungan `/status` (trade terbuka) dan `/trades` Freqtrade. `/trades` Freqtrade hanya memuat trade tertutup, maksimal 500 per halaman, dan bawaannya urut id naik; gateway mengambil semua halaman (`order_by_id=true`, `offset`), menggabungkan, lalu mengurutkan `trade_id` turun sebelum `pair` dan `limit` diterapkan. Bentuk sama dengan 5.3; trade tertutup membawa `close_date`, `close_rate`, `close_profit_abs`, `exit_reason`, `exit_order_status`.
 
 Contoh: tangkapan Freqtrade 2026.9 (dry-run Indodax di PC ini, 2026-10-25).
 
@@ -350,7 +350,7 @@ Contoh: rancangan, gateway belum ada; nilai mengikuti tangkapan Freqtrade bila a
 
 ### 7.1 Koneksi
 
-`GET /gw/v1/events` dengan header `Authorization: Bearer <token>` (atau `?token=` untuk browser yang tidak bisa menetapkan header pada WebSocket). Klien pertama yang membuka feed memicu gateway menyambung ke Freqtrade; klien terakhir yang pergi memicu gateway memutus Freqtrade setelah 30 detik tanpa klien.
+`GET /gw/v1/events` dengan header `Authorization: Bearer <token>` (atau `?token=` untuk browser yang tidak bisa menetapkan header pada WebSocket). Gateway menjaga satu koneksi WebSocket per bot ke Freqtrade sepanjang waktu, dengan atau tanpa klien, karena fill, heartbeat, dan jeda fill harus tercatat juga saat PWA tertutup. Pesan Freqtrade itu berbasis event dan murah. Yang hanya berjalan saat ada klien adalah permintaan kandel (bagian 7.4): tanpa klien yang berlangganan `gw.candles` untuk suatu pair, gateway tidak memanggil `/pair_candles`.
 
 ### 7.2 Pesan server
 
@@ -453,7 +453,7 @@ Server menjawab `{"type": "pong", "ts": "..."}`. Gateway mengirim ping setiap 20
 
 ## 8. Referensi Freqtrade 2026.9 yang dipakai
 
-Terverifikasi jalan pada bot dry-run Indodax di PC ini. Semua di bawah `/api/v1` kecuali disebut lain. Auth: HTTP Basic atau `POST /token/login` lalu `Authorization: Bearer <jwt>`; WebSocket butuh `?token=<ws_token atau jwt>`.
+Terverifikasi jalan pada bot dry-run Indodax di PC ini. Semua di bawah `/api/v1` kecuali disebut lain. Auth: HTTP Basic atau `POST /token/login` lalu `Authorization: Bearer <jwt>`; WebSocket butuh `?token=<ws_token atau jwt>`. Gateway memakai JWT 15 menit dari `/token/login`, bukan `ws_token`: log akses uvicorn Freqtrade mencetak URL WebSocket lengkap dengan query, sehingga `ws_token` statis akan tersimpan di journald (terbukti di bot dry-run 2026-10-26).
 
 | Path | Metode | Dipakai gateway untuk |
 | --- | --- | --- |
@@ -583,11 +583,51 @@ Fear and Greed Index harian dari alternative.me (`https://api.alternative.me/fng
 
 Berita, sentimen, dan riwayat keputusan tidak ikut refresh 30 detik (11.7). PWA memintanya saat lapisan atau mesin waktu dinyalakan, saat pair diganti, dan saat layar Grafik dibuka lagi. Berita (per pair) dan sentimen tidak diminta ulang dalam 15 menit; riwayat keputusan diminta sekali setiap mesin waktu dibuka.
 
+## 12. Gateway tahap 1 (ZHA-3764)
+
+Kode: `gateway/` (FastAPI dan uvicorn dari image Freqtrade yang sama). Konfigurasi: `config/gateway.example.yaml`, skema `gateway/settings.py`. Menjalankan: `scripts/stage1.sh` (lihat README).
+
+### 12.1 Yang dibangun
+
+- Sesi bagian 2: `POST` dan `DELETE /gw/v1/session`, token opaque disimpan sebagai hash SHA-256 di `gateway.sqlite`, berlaku `session_days` (bawaan 30). Kata sandi dari variabel `GW_PASSWORD` (minimal 12 karakter; gateway menolak start bila kurang). Lima kegagalan dalam 60 detik membuat sesi baru ditolak `429 rate_limited`. Lingkup hanya `read`.
+- Envelope galat bagian 4 untuk semua galat, termasuk 404 rute tak dikenal dan 400 validasi.
+- Endpoint baca bagian 5.1 sampai 5.15 (GET) dan 11.1, 11.2.
+- Feed bagian 7 dan 11.4 sampai 11.5: `gw.hello`, `subscribe` mengganti langganan, `resume` dengan buffer 200 event lalu `gw.hello` dan `gw.resync` bila terlambat, `ping`/`pong`, snapshot `gw.candles` per pair baru, delta `gw.candles` saat Freqtrade mengirim `new_candle`, snapshot `reset: true` bila jeda kandel lebih dari dua kandel, `4401` untuk token tak sah. Ping WebSocket tiap 20 detik, putus setelah 40 detik tanpa jawaban (uvicorn).
+
+### 12.2 Tambahan dan perbedaan bentuk
+
+- Dua bot: endpoint per bot menerima `?bot=A|B`; tanpa itu dipakai bot pertama di konfigurasi (Bot A). `/gw/v1/candles` selalu dari Bot A (pair dan strategi sama). Setiap event feed dari bot membawa field `bot` di tingkat atas pesan, di samping `type`, `seq`, `ts`, `data`. `gw.hello` membawa `bots: [{id, label, strategy}]`.
+- `/gw/v1/health` menambah `bots` (heartbeat, umur, jumlah start, hasil cek start, posisi terbuka, status koneksi feed, kesehatan layanan bayangan), `providers` (per provider dari 20 keputusan terakhir: panggilan, sukses, latensi p50 dan maks, status terakhir), dan `load` (CPU gateway 10 detik terakhir dan rata-rata sejak start, RSS, loadavg, jumlah klien). `exchange.latency_ms` diukur dari `GET https://indodax.com/api/server_time` tiap 60 detik.
+- `/gw/v1/equity` menambah `unavailable` (bot yang tidak menjawab).
+- `/gw/v1/decisions` dan `gw.decision` menambah `bot` dan `usage` (token dan biaya keputusan itu). `voters[].model` adalah model yang dilaporkan respons.
+- `/gw/v1/settings` hanya membaca: `providers[].api_key` selalu `null` plus `api_key_configured`. Kredensial API Freqtrade tidak ada di berkas konfigurasi (hanya nama variabel lingkungan), jadi tidak ada yang perlu disensor di bagian `api`.
+- Event turunan baru: `gw.heartbeat` (tiap 60 detik per bot), `gw.heartbeat_lost` (umur heartbeat di atas `heartbeat_lost_s`, bawaan 180 detik), `gw.bot_restart`, `gw.startup_check` (dari `strategy_msg` saat bot start), `gw.audit`.
+- Endpoint baru:
+  - `GET /gw/v1/costs?window=day|7d|total`: jumlah keputusan, panggilan voter, token masuk, keluar, dan reasoning, biaya per bot dan per provider, plus `cap` (`max_cost_idr_per_day`, `enforced: false`). Hanya informasi; tidak membatasi apa pun. `cost` adalah angka yang dilaporkan provider; nutaraline tidak melaporkan biaya, jadi `null`.
+  - `GET /gw/v1/audit?limit=50`: log audit. Isinya: `session.create` (`ok` atau `denied`) dan `session.delete` dengan IP; `config.observed` dan `config.changed` untuk berkas konfigurasi tiap bot (diperiksa tiap 10 detik dengan SHA-256; `detail.changes` berisi kunci yang berubah dengan nilai lama dan baru, `api_key` hanya `<set>` atau `null`; `result: invalid` bila berkas baru tidak lolos skema).
+  - `GET /gw/v1/metrics`: `fill_latency_ms` (n, p50, p95, min, maks, 20 sampel terakhir), beban gateway, status tiap koneksi upstream, nomor urut feed.
+
+### 12.2a Riwayat lengkap dan rahasia di log
+
+- `/gw/v1/risk`, `/gw/v1/overview`, `gw.risk`, `/gw/v1/equity`, dan `/gw/v1/trades` memakai SEMUA trade tertutup, dipaging 500 per permintaan sampai jumlahnya sama dengan `total_trades` Freqtrade. Bila halaman tidak menjumlah ke `total_trades` (misalnya trade tertutup di antara dua halaman), jawabannya `502 upstream_error` dengan `retry_after_ms`, bukan angka risiko dari riwayat sebagian.
+- Uvicorn di dalam Freqtrade mencatat URL WebSocket beserta query (`?token=`) ke logger `uvicorn.error`, dan `/api/v1/logs` Freqtrade membaca log yang sama. Strategi memasang filter pada `uvicorn.error` dan `uvicorn.access` saat dimuat (sebelum API server start) yang mengganti `token=...` menjadi `token=<redacted>`; `/gw/v1/logs` menyensor pola yang sama sebagai lapis kedua.
+- Feed mengabaikan frame biner dan `candles[].limit` yang bukan angka, tanpa memutus koneksi.
+
+### 12.3 Jeda fill
+
+Saat `entry_fill` atau `exit_fill` tiba dari Freqtrade, gateway mencatat waktu terima (ms), lalu mengambil `/trade/{id}` dan memakai `order_filled_timestamp` order sisi yang sama. Jeda = waktu terima dikurangi waktu fill yang dicatat Freqtrade. Jam yang sama (satu host). Alat ukur: `scripts/measure_gateway.py fills|clients --out <berkas.json>` dan `scripts/gateway_cpu.sh <kontainer> <detik> <label>`; keluaran mentahnya dilampirkan di ZHA-3764.
+
+### 12.4 Belum dibangun
+
+- Kontrol bagian 3 dan 6, `PATCH /gw/v1/settings`, lingkup `control` dan `owner` (tahap 2).
+- Web Push bagian 11.3: `/gw/v1/push/*` menjawab `404 not_found`; PWA hanya bisa memakai Web Push dengan gateway tiruan.
+- `sample_data` selalu `false`.
+
 ## 13. Analitik N1 (ZHA-3780)
 
 Semua GET dan `POST /replay` hanya membaca dan butuh sesi gateway apa pun (lingkup read cukup), seperti bagian 5. Tiga aksi mengubah sesuatu dan mengikuti bagian 1, 2, dan 6: `POST /gw/v1/analytics/scoreboard/apply` (menulis `enabled: false` ke config), `POST /gw/v1/analytics/backtest` dan `DELETE /gw/v1/analytics/backtest` (memulai dan menghentikan job di instans webserver). Ketiganya hanya diterima dari loopback dengan sesi lingkup control; selain itu `403 forbidden_local_only` dan satu baris audit `forbidden`. Setiap pemanggilan lain menulis tepat satu baris audit dengan hasil (`ok` atau `failed`), termasuk apply yang tidak mengubah apa pun. Galat memakai envelope bagian 4, ditambah kode `invalid_config` (500) bila config bot gagal divalidasi. Kode ada di `analytics/` dan dipasang ke aplikasi gateway lewat `analytics.routes.install(app, context, reader)`; `context` menyediakan: `source(bot)` (config, basis data keputusan dan trade); `trades(bot)` (SEMUA trade tertutup ditambah posisi terbuka, tanpa batas jumlah; gateway memagina seperti `/gw/v1/risk` dan gagal tertutup bila jumlahnya tidak cocok, karena ekuitas, puncak, dan pajak tahunan salah bila riwayat terpotong); `analysis()` (klien webserver atau `None`); `can_control(request)` (loopback langsung dan sesi lingkup control, fungsi yang sama dengan penjaga bagian 6); dan `audit(action, result, request=, targets=, detail=)` yang menulis baris bagian 6 (`actor` dan `ip` diambil gateway dari `request`, `idempotency_key` dari header; `request=None` berarti aktor `gateway`, dipakai loop penonaktifan otomatis). Nama aksi: `analytics.scoreboard.apply`, `analytics.scoreboard.auto_disable`, `analytics.backtest.start`, `analytics.backtest.stop`.
 
-Status: rancangan untuk gateway. Modul dan rute lulus tes dan dijalankan terhadap Freqtrade 2026.9 nyata (lihat 13.2 dan 13.6), tetapi pemasangan ke gateway menunggu ZHA-3764 masuk main.
+Status: rancangan untuk gateway. Modul dan rute lulus tes dan dijalankan terhadap Freqtrade 2026.9 nyata (lihat 13.2 dan 13.6), tetapi belum dipasang ke gateway: `gateway/` tidak memanggil `analytics.routes.install`, jadi rute `/gw/v1/analytics/*` belum ada di gateway yang berjalan. Pemasangan dikerjakan di ZHA-3798.
 
 Parameter `bot` (huruf bot, default bot pertama) berlaku di semua endpoint kecuali yang memakai instans webserver (13.2 dan 13.6), yang hanya memakai `bot` untuk membaca config.
 
@@ -619,7 +659,7 @@ Contoh: tangkapan instans webserver nyata (Freqtrade 2026.9, Indodax, strategi S
 
 ### 13.3 Papan skor voter
 
-`GET /gw/v1/analytics/scoreboard?bot=B&limit=2000` menilai tiap voter pada trade yang sudah tertutup (keputusan dihubungkan ke trade lewat `trade_custom_data` kunci `shadow-decision-id`, kolom yang terverifikasi ada di basis data Freqtrade nyata). Definisi (juga dikirim di `definition`): probabilitas ambil = jumlah probabilitas `izinkan` dan `kecilkan` (tanpa probabilitas: 1 bila pilihannya itu); hasil = trade tertutup dengan `profit_abs` > 0; per voter dihitung `accuracy`, `base_rate`, `majority_accuracy` (akurasi penebak kelas mayoritas, `max(base, 1 - base)`), serta `calls`, `answered`, `answer_rate`. Voter yang semua jawabannya membawa probabilitas (`kind: probabilistic`) juga dinilai dengan `brier`, `brier_baseline` (penebak konstan pada laju dasar), `ece`, dan `bins` kalibrasi. Voter yang sebagian jawabannya hanya `choice` (`kind: choice_only`; adapter `llm_structured` hanya mengirim pilihan, dan probabilitas satu-nol akan membuat Brier dan ECE menilai format jawaban, bukan mutunya) hanya dinilai dengan akurasi; `brier`, `ece`, dan `bins` bernilai `null`.
+`GET /gw/v1/analytics/scoreboard?bot=B&limit=2000` menilai tiap voter pada trade yang sudah tertutup (keputusan dihubungkan ke trade lewat `trade_custom_data` kunci `shadow_decision_id` (`engine.decisions.SHADOW_KEY`, ditulis strategi saat entry bot B terisi), kolom yang terverifikasi ada di basis data Freqtrade nyata). Definisi (juga dikirim di `definition`): probabilitas ambil = jumlah probabilitas `izinkan` dan `kecilkan` (tanpa probabilitas: 1 bila pilihannya itu); hasil = trade tertutup dengan `profit_abs` > 0; per voter dihitung `accuracy`, `base_rate`, `majority_accuracy` (akurasi penebak kelas mayoritas, `max(base, 1 - base)`), serta `calls`, `answered`, `answer_rate`. Voter yang semua jawabannya membawa probabilitas (`kind: probabilistic`) juga dinilai dengan `brier`, `brier_baseline` (penebak konstan pada laju dasar), `ece`, dan `bins` kalibrasi. Voter yang sebagian jawabannya hanya `choice` (`kind: choice_only`; adapter `llm_structured` hanya mengirim pilihan, dan probabilitas satu-nol akan membuat Brier dan ECE menilai format jawaban, bukan mutunya) hanya dinilai dengan akurasi; `brier`, `ece`, dan `bins` bernilai `null`.
 
 `status`: `insufficient` bila sampel < `analytics.scoreboard.min_samples`; selain itu `drifting` bila (`probabilistic`) `ece` > `max_ece` atau `brier` > `brier_baseline` + `brier_margin`, atau (`choice_only`) `accuracy` < `majority_accuracy` - `accuracy_margin`; selain itu `ok`. `shortfall` adalah ukuran urutan (brier - baseline, atau majority - accuracy). Ambang itu pilihan awal tugas ini, belum dikalibrasi dari data nyata (belum ada keputusan bertrade di basis data sekarang); ubah lewat config.
 
@@ -672,7 +712,7 @@ Bagian `analytics` boleh tidak ada; default di atas berlaku. Kunci tak dikenal d
 
 ### 13.9 Belum terbukti dan belum dibangun
 
-- Pemasangan `install` dan `auto_disable_loop` ke gateway nyata, dan sisi PWA (N2, Agent Arif), menunggu ZHA-3764 masuk main.
+- Pemasangan `install` dan `auto_disable_loop` ke gateway nyata (ZHA-3798), dan sisi PWA (N2, Agent Arif).
 - Papan skor dan replay pada keputusan bertrade nyata: basis data bot sekarang tidak punya keputusan; yang diuji adalah data tes dan skema kolom nyata.
 - Ambang `drifting` (`max_ece`, `brier_margin`, `accuracy_margin`, `min_samples`) belum dikalibrasi.
 - Status PAKD Indodax dan teks resmi PMK 50/2025.
