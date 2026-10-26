@@ -30,9 +30,9 @@ def final(payload, **extra):
 @pytest.fixture
 def data_dir(tmp_path):
     rows = [
-        {"decision_id": "dec_a", "ts": "2026-10-25T18:30:00Z", "pair": "BTC/IDR", "verdict": "lewati"},
-        {"decision_id": "dec_b", "ts": "2026-10-25T16:30:00Z", "pair": "BTC/IDR", "verdict": "izinkan"},
-        {"decision_id": "dec_c", "ts": "2026-10-26T03:00:00Z", "pair": "ETH/IDR", "verdict": "lewati"},
+        {"decision_id": "dec_a", "ts": "2026-10-25T18:30:00Z", "pair": "BTC/IDR", "verdict": "skip"},
+        {"decision_id": "dec_b", "ts": "2026-10-25T16:30:00Z", "pair": "BTC/IDR", "verdict": "allow"},
+        {"decision_id": "dec_c", "ts": "2026-10-26T03:00:00Z", "pair": "ETH/IDR", "verdict": "skip"},
         {"decision_id": "dec_d", "pair": "ETH/IDR"},
     ]
     (tmp_path / "voter_decisions.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
@@ -99,7 +99,7 @@ async def test_daily_report_from_a_scripted_run(data_dir):
         calls=[],
     )
     report = await runner(model, data_dir).daily_report(DAY)
-    assert report.day == DAY and report.model == "test-model" and report.language == "id"
+    assert report.day == DAY and report.model == "test-model" and report.language == "en"
     assert report.summary == GOOD["summary"]
     assert [(use.name, use.args) for use in report.tools_used] == [("get_metrics", {}), ("get_voter_log", {"day": DAY})]
     assert report.usage.input_tokens == 100 and report.usage.output_tokens == 20

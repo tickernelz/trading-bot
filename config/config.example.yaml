@@ -193,7 +193,7 @@ analyst:
   token_env: ANALYST_TOKEN
   data_dir: analyst_data
   reports_dir: analyst_reports
-  language: id
+  language: en
   report_at: "00:10"
 analytics:
   scoreboard:

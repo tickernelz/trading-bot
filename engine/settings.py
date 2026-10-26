@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
+from tb_swarm.languages import DEFAULT_LANGUAGE, LANGUAGES
 
 LLM_PROVIDER_TYPES = ("openai-completions", "openai-responses", "anthropic-messages")
 Percent = Annotated[float, Field(gt=0, le=100)]
@@ -175,7 +176,7 @@ class Analyst(Strict):
     token_env: EnvName = "ANALYST_TOKEN"
     data_dir: Annotated[str, Field(pattern=r"^[A-Za-z0-9_.-]+$")] = "analyst_data"
     reports_dir: Annotated[str, Field(pattern=r"^[A-Za-z0-9_.-]+$")] = "analyst_reports"
-    language: Literal["id", "en"] = "id"
+    language: Literal[*LANGUAGES] = DEFAULT_LANGUAGE
     report_at: Annotated[str, Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")] = "00:10"
 
     @property
