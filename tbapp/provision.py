@@ -68,9 +68,15 @@ def read_env_file(path: Path) -> dict[str, str]:
 
 def write_private(path: Path, text: str) -> None:
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-        handle.write(text)
+    temp = path.with_name(f".{path.name}.{secrets.token_hex(4)}.tmp")
+    descriptor = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(text)
+        os.replace(temp, path)
+    except BaseException:
+        temp.unlink(missing_ok=True)
+        raise
 
 
 def env_text(values: dict[str, str]) -> str:

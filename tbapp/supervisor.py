@@ -137,7 +137,7 @@ class Supervisor:
         return open(path, "ab")
 
     def rotate(self, child: Child) -> None:
-        if child.log is None or child.proc is None:
+        if child.log is None or child.proc is None or sys.platform == "win32":
             return
         path = Path(child.log.name)
         try:
