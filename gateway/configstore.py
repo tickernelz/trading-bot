@@ -162,11 +162,12 @@ def write_raw(path: str | os.PathLike[str], raw: dict[str, Any]) -> str:
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(temp, target)
-        directory = os.open(target.parent, os.O_RDONLY)
-        try:
-            os.fsync(directory)
-        finally:
-            os.close(directory)
+        if os.name != "nt":
+            directory = os.open(target.parent, os.O_RDONLY)
+            try:
+                os.fsync(directory)
+            finally:
+                os.close(directory)
     except OSError as exc:
         with suppress(FileNotFoundError):
             os.unlink(temp)

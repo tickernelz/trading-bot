@@ -107,7 +107,7 @@ jobs:
             *) tar -xzf trading-bot-*.tar.gz -C ../../../unpacked ;;
           esac
           cd ../../..
-          exe=$(ls unpacked/trading-bot-*/trading-bot*.exe unpacked/trading-bot-*/trading-bot 2>/dev/null | head -n 1)
+          exe=$(find unpacked -maxdepth 2 -type f \( -name trading-bot -o -name trading-bot.exe \) | head -n 1)
           echo "smoke: $exe"
           uv run --python 3.13 --no-project scripts/smoke.py --timeout 300 --engine-wait 150 -- "$exe" 2>&1 | tee smoke.log
           grep -q "^RESULT:" smoke.log

@@ -330,7 +330,7 @@ class Gateway:
             "gateway_cpu_pct_10s": self.cpu_recent,
             "gateway_cpu_pct_avg": round((times.user + times.system) / uptime * 100, 3) if uptime > 0 else None,
             "gateway_rss_mb": round(rss / 2**20, 1),
-            "loadavg": [round(value, 2) for value in os.getloadavg()],
+            "loadavg": [round(value, 2) for value in psutil.getloadavg()],
             "cpu_count": os.cpu_count(),
             "clients": len(self.hub.clients),
         }
