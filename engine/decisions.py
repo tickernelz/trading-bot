@@ -313,7 +313,9 @@ def linked_trades(trades_db: str | Path) -> dict[str, sqlite3.Row]:
 
 def public_decision(row: sqlite3.Row) -> dict[str, Any]:
     voters: Iterable[dict[str, Any]] = json.loads(row["voters"] or "[]")
-    state = json.loads(row["request"]).get("state") or {}
+    stored = json.loads(row["request"] or "{}")
+    state = stored.get("state")
+    state = state if isinstance(state, dict) else {}
     return {
         "decision_id": row["decision_id"],
         "ts": row["settled_at"] or row["ts"],
