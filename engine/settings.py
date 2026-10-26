@@ -112,7 +112,7 @@ class Compute(Strict):
 
 
 class Data(Strict):
-    news_rss: list[str]
+    news_rss: list[Literal["coindesk", "cointelegraph"]]
     fear_greed: bool
     social: bool
 
