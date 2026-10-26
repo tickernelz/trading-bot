@@ -195,7 +195,10 @@ def test_costs_list_analyst_tokens_in_their_own_rows_per_window(rig):
     assert rig.post("/gw/v1/analyst/ask", {"question": "Why was BTC skipped?"}).status_code == 200
     ledger = rig.gateway.ledger
     ledger.audit(actor="owner", action="analyst.ask", targets=["B"], result="error", detail={"code": "provider_error"})
-    detail = {"day": "2026-10-01", "tokens": {"input_tokens": 1000, "output_tokens": 100, "reasoning_tokens": 7}}
+    detail = {
+        "day": "2026-10-01",
+        "tokens": {"input_tokens": 1000, "output_tokens": 100, "reasoning_tokens": 7, "cost": 0.25},
+    }
     with ledger._db:
         ledger._db.execute(
             "INSERT INTO audit (ts, actor, action, targets, result, detail) VALUES (?, ?, ?, ?, ?, ?)",
@@ -204,8 +207,17 @@ def test_costs_list_analyst_tokens_in_their_own_rows_per_window(rig):
     costs = {window: rig.get(f"/gw/v1/costs?window={window}").json() for window in ("day", "7d", "total")}
     for window in ("day", "7d"):
         assert costs[window]["analyst"] == {"reports": row(1, 100, 10), "asks": row(1, 300, 30)}
-    assert costs["total"]["analyst"] == {"reports": row(2, 1100, 110, 7), "asks": row(1, 300, 30)}
+    assert costs["total"]["analyst"] == {"reports": {**row(2, 1100, 110, 7), "cost": 0.25}, "asks": row(1, 300, 30)}
     assert costs["total"]["input_tokens"] == 0
+
+
+def test_the_analyst_usage_query_is_served_by_the_audit_index(rig):
+    marks = ",".join("?" for _ in range(2))
+    plan = rig.gateway.ledger._db.execute(
+        f"EXPLAIN QUERY PLAN SELECT COUNT(*) FROM audit WHERE action IN ({marks}) AND result = 'ok' AND ts >= ?",
+        ["analyst.report", "analyst.ask", "2026-01-01T00:00:00.000Z"],
+    ).fetchall()
+    assert any("audit_action_ts" in row["detail"] for row in plan)
 
 
 def test_ask_is_rate_limited_per_minute(rig):

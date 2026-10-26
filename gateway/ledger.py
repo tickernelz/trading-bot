@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS audit (
     result TEXT NOT NULL,
     detail TEXT
 );
+CREATE INDEX IF NOT EXISTS audit_action_ts ON audit(action, ts);
 CREATE TABLE IF NOT EXISTS fills (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     bot TEXT NOT NULL,
@@ -200,14 +201,22 @@ class Ledger:
         where, params = f"action IN ({marks}) AND result = 'ok'", list(ANALYST_USAGE_ACTIONS)
         if since:
             where, params = f"{where} AND ts >= ?", [*params, since]
-        for row in self._db.execute(f"SELECT action, detail FROM audit WHERE {where}", params):
-            tokens = (json.loads(row["detail"] or "{}").get("tokens")) or {}
-            bucket = usage[ANALYST_USAGE_ACTIONS[row["action"]]]
-            bucket["calls"] += 1
-            for field in ("input_tokens", "output_tokens", "reasoning_tokens"):
-                bucket[field] += tokens.get(field) or 0
-            if tokens.get("cost") is not None:
-                bucket["cost"] = (bucket["cost"] or 0.0) + tokens["cost"]
+        sums = ", ".join(
+            f"COALESCE(SUM(json_extract(detail, '$.tokens.{field}')), 0) AS {field}"
+            for field in ("input_tokens", "output_tokens", "reasoning_tokens")
+        )
+        query = (
+            f"SELECT action, COUNT(*) AS calls, {sums}, SUM(json_extract(detail, '$.tokens.cost')) AS cost"
+            f" FROM audit WHERE {where} GROUP BY action"
+        )
+        for row in self._db.execute(query, params):
+            usage[ANALYST_USAGE_ACTIONS[row["action"]]] = {
+                "calls": row["calls"],
+                "input_tokens": row["input_tokens"],
+                "output_tokens": row["output_tokens"],
+                "reasoning_tokens": row["reasoning_tokens"],
+                "cost": row["cost"],
+            }
         return usage
 
     def stored_result(self, key: str) -> tuple[str, int, Any] | None:
