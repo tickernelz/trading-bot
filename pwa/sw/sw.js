@@ -39,7 +39,7 @@ self.addEventListener("fetch", (event) => {
     );
     return;
   }
-  if (url.pathname.startsWith("/assets/") || url.pathname.startsWith("/icons/")) {
+  if (url.pathname.startsWith("/assets/") || url.pathname.startsWith("/icons/") || url.pathname === "/manifest.webmanifest") {
     event.respondWith(
       caches.match(request).then(
         (cached) =>
@@ -55,6 +55,14 @@ self.addEventListener("fetch", (event) => {
     );
   }
 });
+
+async function refreshBadge() {
+  if (!("setAppBadge" in self.navigator)) return;
+  const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+  const shown = await self.registration.getNotifications();
+  if (windows.some((w) => w.visibilityState === "visible") || shown.length === 0) return self.navigator.clearAppBadge();
+  return self.navigator.setAppBadge(shown.length);
+}
 
 function sameOrigin(raw) {
   try {
@@ -87,20 +95,24 @@ self.addEventListener("push", (event) => {
     requireInteraction: URGENT.has(kind),
     renotify: false,
   };
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(self.registration.showNotification(title, options).then(refreshBadge));
+});
+
+self.addEventListener("notificationclose", (event) => {
+  event.waitUntil(refreshBadge());
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const target = sameOrigin(event.notification.data?.url ?? HOME);
   event.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+    refreshBadge().then(() => self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
       for (const client of list) {
         if (new URL(client.url).origin === self.location.origin && "focus" in client) {
           return client.navigate(target).then((c) => (c ?? client).focus());
         }
       }
       return self.clients.openWindow(target);
-    }),
+    })),
   );
 });

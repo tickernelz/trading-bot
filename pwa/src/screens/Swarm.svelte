@@ -2,78 +2,65 @@
   import VoterDots from "../components/VoterDots.svelte";
   import { gateway } from "../lib/gateway.svelte";
   import { clock, dayClock, decimal } from "../lib/format";
-  import type { Decision, VoterRecord } from "../lib/types";
+  import { t } from "../lib/i18n";
+  import type { Decision } from "../lib/types";
+  import { answerText, choiceText, verdictText } from "../lib/words";
 
   const g = gateway;
   let pickedId = $state<string | null>(null);
   const decision = $derived<Decision | null>(g.decisions.find((d) => d.decision_id === pickedId) ?? g.decisions[0] ?? null);
   const action = $derived(decision?.aggregate?.questions.action ?? null);
-
-  const REASON: Record<string, string> = {
-    quorum_not_met: "kuorum tidak terpenuhi",
-    spread_too_wide: "sebaran terlalu lebar, voter tidak sepakat",
-  };
-
-  function outcome(d: Decision): string {
-    if (d.status === "skip") return "dilewati: " + (REASON[d.reason ?? ""] ?? d.reason ?? "-");
-    return d.verdict;
-  }
-
-  function answerOf(v: VoterRecord): string {
-    if (v.status !== "ok") return v.status === "timeout" ? "waktu habis" : v.status === "invalid" ? "jawaban tidak sah" : "gagal";
-    return v.answers?.action?.choice ?? "-";
-  }
 </script>
 
 {#if decision}
-  <section class="verdict" class:skip={decision.status === "skip"} aria-label="Hasil keputusan">
-    <p class="small">Kandidat entry {decision.pair} · kandel {dayClock(decision.candle)}</p>
-    <p class="big">{outcome(decision)}</p>
-    <p class="small">{decision.mode === "shadow" ? "Mode bayangan: hasil hanya dicatat, order tidak berubah." : "Mode gerbang: hasil ini menentukan entry."}</p>
+  <section class="verdict" class:skip={decision.status === "skip"} aria-label={t("swarm.result")}>
+    <p class="small">{t("swarm.candidate", { pair: decision.pair, at: dayClock(decision.candle) })}</p>
+    <p class="big">{verdictText(decision)}</p>
+    <p class="small">{decision.mode === "shadow" ? t("swarm.mode_shadow") : t("swarm.mode_gate")}</p>
   </section>
 
-  <h2 class="sec">Sebaran jawaban <span class="meta">peluang izinkan per voter</span></h2>
+  <h2 class="sec">{t("swarm.spread")} <span class="meta">{t("swarm.spread_meta")}</span></h2>
   <div class="pad"><VoterDots {decision} /></div>
 
   <dl class="rows">
-    <div><dt>Kuorum</dt><dd class="num" class:warn-text={decision.answered < decision.required}>{decision.answered} dari {decision.voters.length} menjawab (min {decision.required}){decision.answered >= decision.required ? ", terpenuhi" : ", gagal"}</dd></div>
+    <div><dt>{t("ringkas.quorum")}</dt><dd class="num" class:warn-text={decision.answered < decision.required}>{t("tm.quorum", { answered: decision.answered, total: decision.voters.length, required: decision.required })}{decision.answered >= decision.required ? t("swarm.quorum_met") : t("swarm.quorum_failed")}</dd></div>
     {#if action}
-      <div><dt>Median peluang izinkan</dt><dd class="num">{decimal(action.median_probabilities?.izinkan ?? 0)}</dd></div>
-      <div><dt>Sebaran (selisih kuartil)</dt><dd class="num" class:warn-text={action.spread.iqr > decision.iqr_limit}>{decimal(action.spread.iqr)} dari batas {decimal(decision.iqr_limit)}</dd></div>
-      <div><dt>Suara</dt><dd class="num">{Object.entries(action.votes ?? {}).map(([k, n]) => k + " " + n).join(" · ")}</dd></div>
+      <div><dt>{t("swarm.median")}</dt><dd class="num">{decimal(action.median_probabilities?.izinkan ?? 0)}</dd></div>
+      <div><dt>{t("swarm.iqr")}</dt><dd class="num" class:warn-text={action.spread.iqr > decision.iqr_limit}>{t("swarm.iqr_value", { iqr: decimal(action.spread.iqr), limit: decimal(decision.iqr_limit) })}</dd></div>
+      <div><dt>{t("swarm.votes")}</dt><dd class="num">{Object.entries(action.votes ?? {}).map(([k, n]) => choiceText(k) + " " + n).join(" · ")}</dd></div>
     {/if}
   </dl>
 
-  <h2 class="sec">Jawaban voter <span class="meta">urutan opsi diacak per voter</span></h2>
+  <h2 class="sec">{t("swarm.answers")} <span class="meta">{t("swarm.answers_meta")}</span></h2>
   <table class="table">
-    <thead><tr><th>Voter</th><th>Jawaban</th><th class="n">P(izinkan)</th></tr></thead>
+    <thead><tr><th>Voter</th><th>{t("swarm.col_answer")}</th><th class="n">{t("swarm.col_p")}</th></tr></thead>
     <tbody>
       {#each decision.voters as v (v.voter_id)}
         <tr class:dropped={v.status !== "ok"}>
-          <td><b>{v.voter_id}</b> {v.provider}<br /><span class="muted small">{v.model ?? "-"} · {decimal(v.latency_s, 1)} dtk</span></td>
-          <td>{answerOf(v)}{#if v.answers?.news_aligned?.noul !== undefined}<br /><span class="muted small">searah berita {decimal(v.answers.news_aligned.noul)}</span>{/if}</td>
-          <td class="n num">{v.status === "ok" ? decimal(v.answers?.action?.probabilities?.izinkan ?? 0) : "dibuang"}</td>
+          <td><b>{v.voter_id}</b> {v.provider}<br /><span class="muted small">{v.model ?? "-"} · {t("dur.s", { n: decimal(v.latency_s, 1) })}</span></td>
+          <td>{answerText(v)}{#if v.answers?.news_aligned?.noul !== undefined}<br /><span class="muted small">{t("swarm.news_aligned", { v: decimal(v.answers.news_aligned.noul) })}</span>{/if}</td>
+          <td class="n num">{v.status === "ok" ? decimal(v.answers?.action?.probabilities?.izinkan ?? 0) : t("swarm.dropped")}</td>
         </tr>
       {/each}
     </tbody>
   </table>
 
-  <h2 class="sec">Keputusan sebelumnya</h2>
+  <h2 class="sec">{t("swarm.previous")}</h2>
   <ul class="history">
     {#each g.decisions as d (d.decision_id)}
       <li>
         <button type="button" aria-pressed={d.decision_id === decision.decision_id} onclick={() => (pickedId = d.decision_id)}>
           <span class="num muted">{clock(d.ts)}</span>
           <b>{d.pair}</b>
-          <span class:warn-text={d.status === "skip" && d.reason === "quorum_not_met"}>{outcome(d)}</span>
+          <span class:warn-text={d.status === "skip" && d.reason === "quorum_not_met"}>{verdictText(d)}</span>
         </button>
       </li>
     {/each}
   </ul>
 {:else if g.panelFaults.decisions}
-  <p class="note empty warn-text">Keputusan swarm gagal dimuat dari gateway ({g.panelFaults.decisions.code}). Dicoba lagi setiap 30 detik.</p>
+  <p class="note empty warn-text">{t("swarm.load_failed", { code: g.panelFaults.decisions.code })}</p>
 {:else}
-  <p class="note empty">Belum ada keputusan swarm. Swarm menilai kandidat entry saat kandel 1 jam tertutup dan strategi memberi sinyal masuk; hasilnya muncul di sini bersama jawaban tiap voter.</p>
+  <p class="note empty">{t("swarm.empty")}</p>
 {/if}
 
 <style>

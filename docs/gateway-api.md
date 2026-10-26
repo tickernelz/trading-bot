@@ -23,7 +23,7 @@ PWA (browser) --HTTPS/WebSocket--> gateway --HTTP/WebSocket 127.0.0.1:8080--> Fr
 ## 2. Autentikasi gateway
 
 - `POST /gw/v1/session` dengan body `{"password": "..."}` mengembalikan `{"token": "...", "expires_at": "2026-11-24T17:00:00Z"}`. Token opaque, disimpan PWA di memory atau secure storage, dikirim sebagai `Authorization: Bearer <token>`.
-- Token punya dua lingkup: `read` (semua GET) dan `control` (semua POST/DELETE trading). Lingkup `owner` hanya diberikan bila login berasal dari loopback.
+- Token punya dua lingkup: `read` (semua GET) dan `control` (GET plus semua POST/DELETE kontrol). `control` hanya diberikan bila login datang langsung dari loopback: alamat klien `127.0.0.1` atau `::1` dan tanpa header forward (`Forwarded`, `X-Forwarded-For`, `X-Forwarded-Host`, `X-Real-IP`, `CF-Connecting-IP`, `CF-Ray`, `True-Client-IP`); selain itu `read`. Respons login menambah `"scope": "control" | "read"`. Lingkup `owner` dilebur ke `control` (ZHA-3774): issue tahap 2a meminta kontrol hanya dari localhost, jadi `control` sudah seketat `owner`, dan satu lingkup lebih sedikit berarti satu cabang otorisasi lebih sedikit.
 - `DELETE /gw/v1/session` mencabut token.
 - Kesalahan auth selalu `401` dengan envelope kesalahan bagian 6, tanpa bocoran detail.
 
@@ -54,6 +54,12 @@ Contoh: rancangan, gateway belum ada; nilai mengikuti tangkapan Freqtrade bila a
 2. Ulangi request yang sama dengan header `Idempotency-Key` yang sama dan body `{"confirm": "cf_01J9Z6H0YV"}`. Gateway menjalankan aksi sekali, menyimpan hasil per kunci idempotensi, dan mengembalikan `200`.
 3. Konfirmasi berlaku 60 detik dan hanya untuk satu aksi serta satu sasaran. Aksi yang menurunkan risiko (pause, hapus entry, tutup bot) tidak butuh konfirmasi.
 
+Aturan yang dibangun di ZHA-3774 (`gateway/control.py`, `Gateway.execute` di `gateway/app.py`):
+
+- Token konfirmasi sekali pakai dan terikat pada nama aksi, bot, parameter aksi (path, query, dan body tanpa `confirm`), dan sesi yang memintanya. Token tak dikenal, sudah dipakai, untuk aksi atau parameter lain, atau dari sesi lain: `409 confirmation_invalid`. Lewat 60 detik: `409 confirmation_expired`. Freqtrade tidak dipanggil pada semua penolakan itu. Token disimpan di memori gateway, jadi restart gateway membatalkan semua token yang belum dipakai.
+- `Idempotency-Key` wajib di semua endpoint kontrol (8-128 karakter `[A-Za-z0-9_-]`); tanpa itu `400 invalid_request`. Hasil setiap eksekusi yang melewati pemeriksaan gateway (lokal, konfirmasi, pemeriksaan `trades`) disimpan 24 jam per kunci, sukses maupun galat, termasuk `503 upstream_unavailable` saat Freqtrade tidak terjangkau. Request ulang dengan kunci dan parameter yang sama mengembalikan hasil tersimpan tanpa memanggil Freqtrade lagi (audit `replayed`); kunci yang sama untuk request lain `409 invalid_request`. Langkah 1 (`confirmation_required`) tidak disimpan, jadi langkah 2 boleh memakai kunci yang sama. Mencoba lagi aksi yang gagal butuh kunci baru dan, untuk aksi berisiko, konfirmasi baru.
+- Perubahan konfigurasi: `risky_changes(old, new)` di `gateway/control.py` mengembalikan kunci yang butuh dua langkah: kenaikan `risk.max_daily_loss_pct`, `risk.max_total_drawdown_pct`, `risk.risk_per_trade_pct`, `risk.max_open_trades`, perubahan `mode` ke arah mana pun, dan `api.force_entry` dari `false` ke `true`. Daftar kosong berarti perubahan berlaku langsung (termasuk menurunkan batas). `PATCH /gw/v1/settings` milik ZHA-3775 memakai fungsi ini bersama `Confirmations` dan `is_local`; sampai itu masuk, aturan konfigurasi baru terbukti di tes unit, belum di endpoint.
+
 ## 4. Envelope respons
 
 Sukses mengembalikan data langsung (objek atau array) seperti contoh di bagian 5. Semua respons galat memakai bentuk yang sama:
@@ -70,7 +76,7 @@ Contoh: rancangan, gateway belum ada; nilai mengikuti tangkapan Freqtrade bila a
 }
 ```
 
-Kode yang dipakai: `unauthorized`, `forbidden_local_only`, `confirmation_required`, `confirmation_expired`, `invalid_request`, `upstream_error`, `upstream_unavailable`, `risk_limit_breached`, `not_found`, `rate_limited`.
+Kode yang dipakai: `unauthorized`, `forbidden_local_only`, `confirmation_required`, `confirmation_expired`, `confirmation_invalid` (ZHA-3774: token tak dikenal, sudah dipakai, atau untuk aksi, parameter, atau sesi lain; dipisah dari `confirmation_expired` supaya PWA bisa membedakan waktu habis dari token yang salah), `invalid_request`, `upstream_error`, `upstream_unavailable`, `risk_limit_breached`, `not_found`, `rate_limited`.
 
 ## 5. Endpoint baca
 
@@ -319,22 +325,25 @@ Baca: konfigurasi aktif dengan rahasia dipangkas (`api_key`, `api_key_env`, `pas
 
 ## 6. Endpoint kontrol
 
-Semua butuh `control`, dan semua menulis satu baris audit `{actor, ip, action, targets, idempotency_key, result}`.
+Semua butuh `control` dari loopback langsung (bagian 2; selain itu `403 forbidden_local_only`), header `Idempotency-Key` (bagian 3), dan menerima `?bot=A|B` (bawaan bot pertama). Semua menulis satu baris audit `{actor, ip, action, targets, idempotency_key, result, detail}` dan mengirimnya sebagai event `gw.audit` (bagian 14). Body tanpa field lain selain yang disebut; field asing `400 invalid_request`. Respons `200` adalah respons Freqtrade apa adanya.
 
 | Endpoint | Diteruskan ke | Konfirmasi | Efek |
 | --- | --- | --- | --- |
 | `POST /gw/v1/control/pause` | `POST /pause` | tidak | Berhenti memproses entry baru, trade terbuka tetap dikelola |
 | `POST /gw/v1/control/resume` | `POST /start` | tidak | Kembali memproses |
-| `POST /gw/v1/control/stop-entry` | `POST /stopentry` | tidak | Tidak ada entry baru sampai dihapus |
+| `POST /gw/v1/control/stop-entry` | `POST /stopentry` | tidak | Kill switch: tidak ada entry baru sampai `resume`; gateway mengirim ulang setelah bot restart (bagian 14) |
 | `POST /gw/v1/control/stop` | `POST /stop` | ya | Bot berhenti total, trade terbuka tidak dikelola |
 | `POST /gw/v1/control/reload-config` | `POST /reload_config` | tidak | Muat ulang config Freqtrade |
 | `POST /gw/v1/trades` | `POST /forceenter` | ya | Entry paksa; ditolak `risk_limit_breached` bila `entries_allowed` false |
-| `POST /gw/v1/trades/{id}/exit` | `POST /forceexit` | ya | Exit paksa satu trade |
-| `POST /gw/v1/locks` | `POST /locks` | tidak | Kunci pasangan sementara |
+| `POST /gw/v1/trades/{id}/exit` | `POST /forceexit` body `{"tradeid": "<id>"}` | ya | Exit paksa satu trade |
+| `POST /gw/v1/trades/exit-all` | `POST /forceexit` body `{"tradeid": "all"}` | ya | Exit paksa semua trade terbuka (ditambah ZHA-3774: issue meminta force exit semua posisi; Freqtrade menerimanya lewat `tradeid: "all"`) |
+| `POST /gw/v1/locks` body `{"pair", "until", "side", "reason"}` | `POST /locks` (array satu kunci) | tidak | Kunci pasangan sampai `until` (ISO-8601 dengan zona, harus di masa depan); `side` bawaan `*` |
 | `DELETE /gw/v1/locks/{lock_id}` | `DELETE /locks/{lockid}` | ya | Buka satu kunci |
 | `POST /gw/v1/locks/delete` | `POST /locks/delete` body `{"pair": "BTC/IDR"}` atau `{"lockid": 1}` | ya | Buka kunci per pasangan |
-| `POST /gw/v1/blacklist` | `POST /blacklist` | tidak | Tambah pasangan ke blacklist |
-| `DELETE /gw/v1/blacklist?pairs=BTC/IDR` | `DELETE /blacklist` | ya | Hapus dari blacklist |
+| `POST /gw/v1/blacklist` body `{"pairs": ["SOL/IDR"]}` | `POST /blacklist` body `{"blacklist": [...]}` | tidak | Tambah pasangan ke blacklist |
+| `DELETE /gw/v1/blacklist?pairs=BTC/IDR` | `DELETE /blacklist?pairs_to_delete=BTC/IDR` | ya | Hapus dari blacklist |
+
+Di Freqtrade 2026.9 `/pause`, `/stopentry`, dan `/stopbuy` adalah satu handler (`api_trading.py`, `RPC._rpc_pause`, state `PAUSED`), jadi `pause` dan `stop-entry` berefek sama; keduanya dipertahankan karena PWA sudah memakai dua nama itu. Pada endpoint tanpa body wajib, `confirm` dikirim sebagai body JSON `{"confirm": "..."}`, termasuk pada `DELETE`.
 
 Contoh `POST /gw/v1/trades`:
 
@@ -344,7 +353,7 @@ Contoh: rancangan, gateway belum ada; nilai mengikuti tangkapan Freqtrade bila a
 {"pair": "BTC/IDR", "side": "long", "stake_amount": null, "confirm": "cf_01J9Z6H0YV"}
 ```
 
-`stake_amount: null` berarti mesin menghitung lewat `custom_stake_amount` (0,5% risiko per trade). Respons `200` berisi objek trade hasil bagian 5.3; `422` bila pasangan tidak ada di whitelist.
+`stake_amount: null` berarti mesin menghitung lewat `custom_stake_amount` (0,5% risiko per trade). Respons `200` berisi objek trade hasil bagian 5.3; `422` bila pasangan tidak ada di whitelist. Pemeriksaan sebelum token konfirmasi diberikan dan diulang di langkah 2: `409 invalid_request` bila `api.force_entry` di konfigurasi bot `false` (bawaan), `422` bila di luar whitelist, `409 risk_limit_breached` bila `/gw/v1/risk` memberi `entries_allowed: false`. Bila Freqtrade menjawab `200` tanpa `trade_id` (misalnya `{"status": "Error entering long trade ..."}`), gateway menjawab `502 upstream_error` dengan teks status itu.
 
 ## 7. Feed event WebSocket
 
@@ -553,6 +562,35 @@ Refresh REST dibagi dua. Inti (`/health`, `/overview`, `/risk`) menentukan papan
 
 Satu PWA yang terbuka mengirim 10 GET per refresh: setiap 30 detik selama feed tersambung, saat `gw.hello` atau `gw.resync`, dan saat tab kembali terlihat. Ditambah 2 GET setelah tiap event order, dan satu `/candles` per pair yang pertama kali dibuka. Kira-kira 20 permintaan per menit per klien di samping satu WebSocket. Tahap gateway (ZHA-3764) mengukur CPU gateway dengan anggaran ini; bila terlalu mahal, `/overview` dan `/risk` bisa digantikan event `gw.risk` dan interval panel diperpanjang.
 
+## 12. Tambahan nice-to-have N2 (ZHA-3781)
+
+Semua isi bagian ini `rancangan`: dibangun di PWA dan gateway tiruan; gateway nyata (ZHA-3764) belum ada di main saat ditulis. Pengambil data berita dan Fear and Greed sudah ada dan dites (`engine/news.py`, `tests/test_news.py`); gateway nyata membuat satu `Feeds(settings.data.news_rss, <aset pair whitelist>, settings.data.fear_greed)` dan memanggilnya di dua rute di bawah lewat `await asyncio.to_thread(feeds.news, asset, limit)` dan `await asyncio.to_thread(feeds.sentiment, days)`. `Feeds` memakai urllib yang memblok (timeout 15 detik per sumber, berurutan, satu kunci), jadi memanggilnya langsung di handler async bisa menahan event loop sampai sekitar 30 detik saat cache dingin atau kedaluwarsa.
+
+Alasan perubahan kontrak: mesin waktu butuh riwayat keputusan per pair yang lebih panjang dari 20 baris terakhir, dan lapisan berita butuh data yang diambil di PC (PWA tidak boleh memanggil pihak ketiga langsung, bagian 1).
+
+### 12.1 `GET /gw/v1/decisions?pair=BTC/IDR&before=<ISO>&limit=200`
+
+Menambah dua parameter opsional ke 11.2. `pair` menyaring satu pair; `before` mengembalikan keputusan dengan `candle` sebelum waktu itu (halaman berikutnya). `limit` 1 sampai 500, bawaan 20. Urutan tetap terbaru dulu. Tanpa parameter baru, bentuk dan isi sama dengan 11.2. Mesin waktu di layar Grafik memanggil `pair` + `limit=200` hanya saat dibuka, lalu menambah `gw.decision` baru ke riwayat yang sudah dimuat; tidak ada poll tambahan.
+
+### 12.2 `GET /gw/v1/news?pair=BTC/IDR&limit=50`
+
+Judul RSS CoinDesk dan Cointelegraph yang menyebut aset dasar pair (kata utuh, tanpa beda huruf besar: simbol dan nama, misalnya BTC atau Bitcoin). Tanpa `pair`, semua judul. `limit` 1 sampai 100, bawaan 50; nilai di luar rentang dipotong ke batasnya. Deskripsi RSS tidak dikirim karena berisi HTML pihak ketiga; tautan hanya `http` atau `https`. Gateway mengambil umpan hanya saat ada permintaan dan menyimpannya 15 menit; bila satu sumber gagal, item terakhirnya tetap dipakai dan `ok: false` beserta galatnya dikirim. `enabled: false` bila `data.news_rss` kosong.
+
+```json
+{"as_of": "2026-10-26T04:46:40Z", "enabled": true, "sources": [{"id": "coindesk", "name": "CoinDesk", "url": "https://www.coindesk.com/", "feed": "https://www.coindesk.com/arc/outboundfeeds/rss/", "ok": true, "error": null, "fetched_at": "2026-10-26T04:46:40Z"}], "items": [{"id": "n_3f2a9c0d1e4b5a67", "source": "coindesk", "title": "Bitcoin slips below $60K", "url": "https://www.coindesk.com/markets/btc-slips", "published": "2026-10-25T15:00:00Z", "assets": ["BTC"]}]}
+```
+
+### 12.3 `GET /gw/v1/sentiment?days=30`
+
+Fear and Greed Index harian dari alternative.me (`https://api.alternative.me/fng/`), terlama dulu, 1 sampai 365 hari. Disimpan 1 jam. `source` wajib ditampilkan sebagai atribusi (syarat alternative.me). `classification` adalah teks asli alternative.me (`Extreme Fear`, `Fear`, `Neutral`, `Greed`, `Extreme Greed`); PWA menerjemahkannya. `enabled: false` dan `points: []` bila `data.fear_greed` false.
+
+```json
+{"as_of": "2026-10-26T04:46:40Z", "enabled": true, "source": {"name": "Fear & Greed Index", "provider": "alternative.me", "url": "https://alternative.me/crypto/fear-and-greed-index/", "ok": true, "error": null, "fetched_at": "2026-10-26T04:46:40Z"}, "points": [{"date": "2026-10-26", "value": 50, "classification": "Neutral"}]}
+```
+
+### 12.4 Anggaran poll
+
+Berita, sentimen, dan riwayat keputusan tidak ikut refresh 30 detik (11.7). PWA memintanya saat lapisan atau mesin waktu dinyalakan, saat pair diganti, dan saat layar Grafik dibuka lagi. Berita (per pair) dan sentimen tidak diminta ulang dalam 15 menit; riwayat keputusan diminta sekali setiap mesin waktu dibuka.
 
 ## 12. Gateway tahap 1 (ZHA-3764)
 
@@ -560,7 +598,7 @@ Kode: `gateway/` (FastAPI dan uvicorn dari image Freqtrade yang sama). Konfigura
 
 ### 12.1 Yang dibangun
 
-- Sesi bagian 2: `POST` dan `DELETE /gw/v1/session`, token opaque disimpan sebagai hash SHA-256 di `gateway.sqlite`, berlaku `session_days` (bawaan 30). Kata sandi dari variabel `GW_PASSWORD` (minimal 12 karakter; gateway menolak start bila kurang). Lima kegagalan dalam 60 detik membuat sesi baru ditolak `429 rate_limited`. Lingkup hanya `read`.
+- Sesi bagian 2: `POST` dan `DELETE /gw/v1/session`, token opaque disimpan sebagai hash SHA-256 di `gateway.sqlite`, berlaku `session_days` (bawaan 30). Kata sandi dari variabel `GW_PASSWORD` (minimal 12 karakter; gateway menolak start bila kurang). Lima kegagalan dalam 60 detik membuat sesi baru ditolak `429 rate_limited`. Lingkup hanya `read` (ZHA-3774 menambah `control`, bagian 2).
 - Envelope galat bagian 4 untuk semua galat, termasuk 404 rute tak dikenal dan 400 validasi.
 - Endpoint baca bagian 5.1 sampai 5.15 (GET) dan 11.1, 11.2.
 - Feed bagian 7 dan 11.4 sampai 11.5: `gw.hello`, `subscribe` mengganti langganan, `resume` dengan buffer 200 event lalu `gw.hello` dan `gw.resync` bila terlambat, `ping`/`pong`, snapshot `gw.candles` per pair baru, delta `gw.candles` saat Freqtrade mengirim `new_candle`, snapshot `reset: true` bila jeda kandel lebih dari dua kandel, `4401` untuk token tak sah. Ping WebSocket tiap 20 detik, putus setelah 40 detik tanpa jawaban (uvicorn).
@@ -590,13 +628,13 @@ Saat `entry_fill` atau `exit_fill` tiba dari Freqtrade, gateway mencatat waktu t
 
 ### 12.4 Belum dibangun
 
-- Kontrol bagian 3 dan 6, `PATCH /gw/v1/settings`, lingkup `control` dan `owner` (tahap 2).
+- `PATCH /gw/v1/settings` (ZHA-3775). Kontrol bagian 3 dan 6 dan lingkup `control` dibangun di ZHA-3774 (bagian 14).
 - Web Push bagian 11.3: `/gw/v1/push/*` menjawab `404 not_found`; PWA hanya bisa memakai Web Push dengan gateway tiruan.
 - `sample_data` selalu `false`.
 
 ## 13. Analitik N1 (ZHA-3780)
 
-Semua GET dan `POST /replay` hanya membaca dan butuh sesi gateway apa pun (lingkup read cukup), seperti bagian 5. Tiga aksi mengubah sesuatu dan mengikuti bagian 1, 2, dan 6: `POST /gw/v1/analytics/scoreboard/apply` (menulis `enabled: false` ke config), `POST /gw/v1/analytics/backtest` dan `DELETE /gw/v1/analytics/backtest` (memulai dan menghentikan job di instans webserver). Ketiganya hanya diterima dari loopback tanpa header proksi dengan sesi gateway yang sah; selain itu `403 forbidden_local_only` dan satu baris audit `forbidden`. Setiap pemanggilan lain menulis tepat satu baris audit dengan hasil (`ok` atau `failed`), termasuk apply yang tidak mengubah apa pun. Galat memakai envelope bagian 4, ditambah kode `invalid_config` (500) bila config bot gagal divalidasi. Kode ada di `analytics/` dan dipasang ke aplikasi gateway lewat `analytics.routes.install(app, context, reader)`; `context` menyediakan: `source(bot)` (config, basis data keputusan dan trade); `trades(bot)` (SEMUA trade tertutup ditambah posisi terbuka, tanpa batas jumlah; gateway memagina seperti `/gw/v1/risk` dan gagal tertutup bila jumlahnya tidak cocok, karena ekuitas, puncak, dan pajak tahunan salah bila riwayat terpotong); `analysis()` (klien webserver atau `None`); `can_control(request)` (tahap 1: koneksi langsung dari `127.0.0.1` atau `::1` tanpa header `Forwarded`, `X-Forwarded-For`, `X-Forwarded-Host`, `X-Real-IP`, `CF-Connecting-IP`, atau `True-Client-IP`, di atas sesi gateway yang sah; lingkup `control` belum ada di tahap 1 dan ZHA-3788 belum memutuskan aksi lewat sesi read jarak jauh, jadi ini penjaga paling sempit); dan `audit(action, result, request=, targets=, detail=)` yang menulis baris bagian 6 (`actor` `owner` dan `ip` diambil gateway dari `request`, `idempotency_key` dari header; uvicorn memakai `X-Forwarded-For` sebagai `ip` bila koneksi datang dari loopback; `request=None` berarti aktor `gateway`, dipakai loop penonaktifan otomatis). Nama aksi: `analytics.scoreboard.apply`, `analytics.scoreboard.auto_disable`, `analytics.backtest.start`, `analytics.backtest.stop`.
+Semua GET dan `POST /replay` hanya membaca dan butuh sesi gateway apa pun (lingkup read cukup), seperti bagian 5. Tiga aksi mengubah sesuatu dan mengikuti bagian 1, 2, dan 6: `POST /gw/v1/analytics/scoreboard/apply` (menulis `enabled: false` ke config), `POST /gw/v1/analytics/backtest` dan `DELETE /gw/v1/analytics/backtest` (memulai dan menghentikan job di instans webserver). Ketiganya hanya diterima dari koneksi loopback langsung dengan sesi lingkup control, sama dengan aksi bagian 6 (`gateway.control.is_local`); selain itu `403 forbidden_local_only` dan satu baris audit `forbidden`. Setiap pemanggilan lain menulis tepat satu baris audit dengan hasil (`ok` atau `failed`), termasuk apply yang tidak mengubah apa pun. Galat memakai envelope bagian 4, ditambah kode `invalid_config` (500) bila config bot gagal divalidasi. Kode ada di `analytics/` dan dipasang ke aplikasi gateway lewat `analytics.routes.install(app, context, reader)`; `context` menyediakan: `source(bot)` (config, basis data keputusan dan trade); `trades(bot)` (SEMUA trade tertutup ditambah posisi terbuka, tanpa batas jumlah; gateway memagina seperti `/gw/v1/risk` dan gagal tertutup bila jumlahnya tidak cocok, karena ekuitas, puncak, dan pajak tahunan salah bila riwayat terpotong); `analysis()` (klien webserver atau `None`); `can_control(request)` (`gateway.control.is_local(request)`, yaitu klien langsung dari `127.0.0.1` atau `::1` tanpa header `Forwarded`, `X-Forwarded-For`, `X-Forwarded-Host`, `X-Real-IP`, `CF-Connecting-IP`, `CF-Ray`, atau `True-Client-IP`, dan sesi bertanda `control`; satu penjaga untuk bagian 6 dan 13); dan `audit(action, result, request=, targets=, detail=)` yang menulis baris bagian 6 (`actor` `<lingkup>_session` dan `ip` diambil gateway dari `request`, `idempotency_key` dari header hanya bila memenuhi aturan bagian 6; `request=None` berarti aktor `gateway`, dipakai loop penonaktifan otomatis). Nama aksi: `analytics.scoreboard.apply`, `analytics.scoreboard.auto_disable`, `analytics.backtest.start`, `analytics.backtest.stop`.
 
 Status: terpasang di gateway tahap 1 (ZHA-3798). `gateway/analytics_context.py` menyediakan `context`, dan `gateway/app.py` memanggil `analytics.routes.install(app, gateway.analytics, reader)` dengan `reader` yang sama seperti bagian 5. `analysis_url` di config gateway (alamat loopback instans webserver, memakai kredensial `FT_API_*` yang sama dan port berbeda dari bot) mengisi `analysis()`; tanpa itu sinyal dan backtest menjawab `404 not_found`. Terbukti 2026-10-26 pada proses gateway sungguhan (image dari SHA 3412672) terhadap Freqtrade 2026.9 dry-run dengan satu trade BTC/IDR dari `forceenter` dry-run dan instans webserver: semua rute bagian ini menjawab dengan bentuk yang tertulis; `POST /backtest` menjawab 202 lalu selesai (15 trade, 2026-10-03 sampai 2026-10-25); `X-Forwarded-For` pada apply dan backtest menjawab `403 forbidden_local_only` tanpa mengubah config. Papan skor, replay, dan `auto_disable_loop` diuji pada basis data keputusan sintetis karena bot dry-run belum punya keputusan nyata (13.9).
 
@@ -684,8 +722,56 @@ Bagian `analytics` boleh tidak ada; default di atas berlaku. Kunci tak dikenal d
 ### 13.9 Belum terbukti dan belum dibangun
 
 - Sisi PWA (N2, Agent Arif).
-- Lingkup sesi `control` untuk tiga aksi analitik, dan aksi lewat sesi read jarak jauh (ZHA-3788).
+- Aksi analitik lewat sesi read jarak jauh (ZHA-3788 belum memutuskan; sekarang ditolak seperti aksi bagian 6).
 - Papan skor dan replay pada keputusan bertrade nyata: basis data bot sekarang tidak punya keputusan; yang diuji adalah data tes dan skema kolom nyata.
 - Ambang `drifting` (`max_ece`, `brier_margin`, `accuracy_margin`, `min_samples`) belum dikalibrasi.
 - Status PAKD Indodax dan teks resmi PMK 50/2025.
 - Hot reload voter yang dinonaktifkan di layanan swarm bayangan.
+
+## 14. Kontrol tahap 2a (ZHA-3774)
+
+Kode: `gateway/control.py` (aturan lokal, token konfirmasi, idempotensi, klasifikasi perubahan konfigurasi) dan `Gateway.execute` plus rute di `gateway/app.py`. Tes: `tests/test_control.py`.
+
+### 14.1 Kill switch
+
+`POST /gw/v1/control/stop-entry` (atau `pause`) memanggil `POST /stopentry` saja; trade terbuka tidak disentuh (tes menghitung panggilan ke stub Freqtrade: hanya `/stopentry`). Tercermin di feed dua kali: event `gw.audit` dari gateway segera setelah Freqtrade menjawab, dan event `status` dari Freqtrade (`{"status": "paused"}`, dikirim `worker.py` saat state berubah). Gateway mencatat kill switch per bot di tabel `entry_stops`; `resume` menghapusnya. Freqtrade start dengan `initial_state: running` (`engine/launch.py`), jadi setiap kali koneksi WebSocket ke Freqtrade tersambung lagi (bot restart atau gateway restart) dan `/show_config` melaporkan `running` sementara kill switch tercatat, gateway mengirim `POST /stopentry` lagi dan mencatat audit dengan `actor: "gateway"`. `stop` juga mencatat kill switch: Freqtrade yang di-restart setelah `stop` kembali `running`, lalu gateway mengirim `/stopentry`, jadi hasil terburuk setelah restart adalah `paused` (trade terbuka kembali dikelola, tanpa entry baru), bukan entry yang jalan lagi. Hanya `resume` yang menghapus catatan ini.
+
+### 14.2 Log audit
+
+Tabel `audit` di `gateway.sqlite` append-only: trigger SQLite menolak `UPDATE` dan `DELETE` (`audit is append-only`). Setiap aksi kontrol menulis satu baris per percobaan dengan `result`:
+
+| `result` | Arti |
+| --- | --- |
+| `ok` | Freqtrade menjalankan aksi |
+| `failed` | Freqtrade menolak atau tidak menjawab; `detail.error` dan `detail.message` |
+| `confirmation_required` | Langkah 1 aksi berisiko; token diberikan (id token tidak dicatat) |
+| `rejected` | Ditolak gateway sebelum Freqtrade: token salah atau kedaluwarsa, kunci idempotensi salah, pemeriksaan `trades` gagal; `detail.error` |
+| `replayed` | Hasil tersimpan dikembalikan untuk kunci idempotensi yang sama |
+| `forbidden` | Sesi `read` atau request lewat proxy/tunnel; `actor` `read_session` atau `control_session`; `idempotency_key` hanya dicatat bila formatnya sah, selain itu `null` |
+
+`actor` adalah `owner` untuk sesi `control` dan `gateway` untuk kill switch yang dikirim ulang. `targets[0]` adalah id bot, sisanya sasaran aksi (pair, id trade, `lock:<id>`, `all`). `detail.params` adalah parameter aksi; kunci yang namanya memuat `key`, `password`, `secret`, atau `token` diganti `<set>` (atau `null`). Request tanpa token sah ditolak `401` tanpa baris audit, supaya pihak tanpa sesi tidak bisa mengisi tabel append-only ini.
+
+`GET /gw/v1/audit` (lingkup `read`) mengembalikan array baris terbaru dulu, dengan filter opsional yang digabung AND:
+
+| Parameter | Arti |
+| --- | --- |
+| `limit` | 1-500, bawaan 50 |
+| `before_id` | Paginasi: hanya baris dengan `id` lebih kecil; isi dengan `id` baris terakhir halaman sebelumnya |
+| `action` | Awalan nama aksi, misalnya `control.`, `trade.exit`, `config.` |
+| `result` | Persis, misalnya `failed` |
+| `actor` | Persis |
+| `target` | Salah satu elemen `targets` sama persis (id bot, pair, id trade) |
+| `since`, `until` | ISO-8601 dengan zona; `ts >= since` dan `ts < until` |
+
+Nama aksi: `control.pause`, `control.stop_entry`, `control.resume`, `control.stop`, `control.reload_config`, `trade.enter`, `trade.exit`, `trade.exit_all`, `pair.lock`, `pair.unlock`, `pair.blacklist`, `pair.unblacklist`, plus `session.*` dan `config.*` dari tahap 1.
+
+### 14.3 Uji hidup (2026-10-26)
+
+Satu bot dry-run Indodax (`trading-bot/engine` dengan `api.force_entry: true` hanya untuk uji ini) dan gateway di loopback, lalu dihentikan. Terukur dari klien di mesin yang sama: `stop-entry` dijawab 17,9 ms; event `gw.audit` tiba 18,1 ms setelah request dikirim dan event Freqtrade `status: paused` 905,6 ms; `/gw/v1/health` lalu melaporkan `state: paused`. Force enter BTC/IDR: langkah 1 `409 confirmation_required`, langkah 2 `200` dalam 592 ms (trade 1 terbuka). Kill switch dengan trade terbuka: trade 1 tetap terbuka. Force exit tanpa langkah 2: `409`, trade tetap terbuka; dengan langkah 2: `200` dalam 771 ms dan trade tertutup; token yang sama dipakai lagi: `409 confirmation_invalid`. Lock, unlock (dua langkah), tambah dan hapus blacklist (dua langkah): `200` dalam 12-21 ms. Request dengan `X-Forwarded-For`: `403 forbidden_local_only`, baris audit `forbidden`. `docker restart` bot saat kill switch aktif: gateway mengirim ulang `/stopentry` 8,1 detik setelah perintah restart (audit `actor: gateway`), state kembali `paused`. Nilai `GW_PASSWORD` dan `FT_API_PASSWORD` tidak muncul di 500 baris audit.
+
+### 14.4 Belum terbukti
+
+- Jendela antara Freqtrade start dan kill switch dikirim ulang: koneksi ulang WebSocket gateway memakai backoff 1, 2, 4, ... sampai 30 detik, jadi bot bisa berjalan tanpa kill switch beberapa detik setelah restart.
+- Klasifikasi perubahan konfigurasi (`risky_changes`) belum terhubung ke endpoint; menunggu `PATCH /gw/v1/settings` (ZHA-3775).
+- Kontrol dari PWA jarak jauh sengaja tidak ada (hanya loopback); bila nanti kill switch harus bisa dari ponsel lewat tunnel, itu keputusan keamanan baru.
+- Deteksi tunnel bergantung pada header forward. Cloudflare Tunnel menambah `CF-Connecting-IP` dan `X-Forwarded-For` menurut dokumentasinya, tetapi belum diuji dengan tunnel sungguhan. Tunnel yang tidak menambah header (misalnya `ssh -L`) terlihat sebagai lokal. uvicorn juga menulis ulang alamat klien dari `X-Forwarded-For` bila koneksi datang dari 127.0.0.1 (uji hidup: baris audit mencatat IP dari header itu), jadi aturan lokal tertolak dua kali untuk request semacam itu.

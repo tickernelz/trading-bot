@@ -1,9 +1,11 @@
+import { t } from "./i18n";
+
 export const SCREENS = [
-  { id: "ringkas", label: "Ringkas" },
-  { id: "grafik", label: "Grafik" },
-  { id: "aksi", label: "Aksi" },
-  { id: "swarm", label: "Swarm" },
-  { id: "sistem", label: "Sistem" },
+  { id: "ringkas", label: t("nav.ringkas") },
+  { id: "grafik", label: t("nav.grafik") },
+  { id: "aksi", label: t("nav.aksi") },
+  { id: "swarm", label: t("nav.swarm") },
+  { id: "sistem", label: t("nav.sistem") },
 ] as const;
 
 export type Screen = (typeof SCREENS)[number]["id"];

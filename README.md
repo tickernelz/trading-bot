@@ -10,6 +10,7 @@ Status: tahap 1 (dua bot dry-run, swarm bayangan, gateway). Belum ada akun atau 
 - engine/: launcher, skema konfigurasi, lapisan risiko, strategi
 - engine/settings.py: skema tunggal config/config.yaml, divalidasi sebelum mesin start
 - engine/risk.py: batas rugi harian, batas drawdown, ukuran posisi berbasis risiko
+- engine/news.py: pengambil judul RSS CoinDesk dan Cointelegraph serta Fear and Greed alternative.me untuk lapisan grafik (cache 15 menit dan 1 jam, diambil hanya saat diminta)
 - engine/strategies/swing_ema_rsi.py: strategi swing 1h (EMA 20/50 + RSI) dengan gerbang risiko
 - engine/launch.py: validasi config, render config Freqtrade (database trade di userdir), exec Freqtrade
 - engine/heartbeat.py: berkas heartbeat dan log start per bot
@@ -71,7 +72,7 @@ Empat proses, satu image (`trading-bot/engine`), semuanya hanya mendengarkan 127
 | shadow-b | 8091 | `POST /candidates` hanya dengan header `X-Shadow-Token` yang sama dengan SHADOW_TOKEN. Swarm voter nyata; mencatat jawaban, median, sebaran, kuorum, dan verdict yang AKAN diambil ke `bot-b/swarm_decisions.sqlite`. Tidak pernah memengaruhi order |
 | gateway | 8090 | Sesi, endpoint baca, feed, kesehatan, biaya dan token, audit |
 
-Tujuh voter contoh memakai model uji yang sama (`deepseek-v4.1-flash-1017`) tetapi dibagi ke dua key: empat di nutaraline, tiga di experientiallabs. Terukur 2026-10-26 02:0x UTC lewat `ShadowService` dengan voter nyata, satu kandidat BTC/IDR yang sama tiap ronde dan jeda 2 s antar ronde (keluaran mentah per keputusan dan per voter terlampir di ZHA-3764):
+Susunan voter contoh mengikuti tahap 0c (tujuh voter aktif di tujuh provider berbeda, docs/stage0-findings.md). Alasan tidak menaruh banyak voter pada satu key terukur 2026-10-26 02:0x UTC lewat `ShadowService` dengan voter nyata, satu kandidat BTC/IDR yang sama tiap ronde dan jeda 2 s antar ronde (keluaran mentah per keputusan dan per voter terlampir di ZHA-3764):
 
 | Susunan | Ronde | Panggilan voter | Keputusan |
 | --- | --- | --- | --- |
@@ -79,7 +80,7 @@ Tujuh voter contoh memakai model uji yang sama (`deepseek-v4.1-flash-1017`) teta
 | 4 nutaraline + 3 experientiallabs | 8 | 56 dari 56 sah | 7 dari 7 menjawab di 8 dari 8; 5 `ok`, 3 `choice_tie` |
 | 3 nutaraline + 2 tiprouter + 2 experientiallabs | 5 | tiprouter 0 dari 10 (6 HTTP 503, 4 timeout 30 s) | kuorum 5 tercapai karena 5 voter lain |
 
-Latensi jawaban sah pembagian 4+3: nutaraline median 1,6 s maks 2,7 s; experientiallabs median 6,4 s maks 26,9 s. Maks experientiallabs dekat `timeout_s` 30, jadi timeout voter itu perlu dipantau. `choice_tie` adalah seri antar jawaban voter (aturan agregasi), bukan galat provider. tiprouter tidak dipakai.
+Latensi jawaban sah pembagian 4+3: nutaraline median 1,6 s maks 2,7 s; experientiallabs median 6,4 s maks 26,9 s. Maks experientiallabs dekat `timeout_s` 30, jadi timeout voter itu perlu dipantau. `choice_tie` adalah seri antar jawaban voter (aturan agregasi), bukan galat provider.
 
 Mode `swarm.mode: veto` ditolak skema sampai gerbang dibangun. Trade yang dibayangi membawa custom data `shadow_decision_id`, sehingga `DecisionStore.outcomes(<tradesv3.dryrun.sqlite>)` bisa menghitung apakah entry yang akan dilewati ternyata rugi.
 
@@ -108,6 +109,23 @@ Ringkasan lari (uptime dari baris `Bot heartbeat` di journald dengan celah di at
     PYTHONPATH=. python3 scripts/stage1_report.py --run-dir ~/Projects/trading-bot-runs/stage1 --unit-prefix trading-bot-stage1
 
 Unit systemd user transien (`Restart=always`) bertahan saat sesi terminal atau server lain di-restart; restart dihitung dari `starts.jsonl`. Log: `journalctl --user -u trading-bot-stage1-bot-a`.
+
+## Kanal Telegram (nonaktif bawaan)
+
+Kanal kontrol memakai Telegram bawaan Freqtrade (perintah /status, /profit, /balance, /daily, /stopentry, /start, /stop, /forceexit, /reload_config, /help, dan lainnya). Bawaannya mati. Untuk menyalakan, isi di config/config.yaml:
+
+    notify:
+      telegram:
+        enabled: true
+        token_env: TELEGRAM_BOT_TOKEN
+        chat_id: "<id chat>"
+        authorized_users: ["<id user Telegram>"]
+
+lalu isi TELEGRAM_BOT_TOKEN di .env. Token hanya lewat variabel lingkungan (FREQTRADE__TELEGRAM__TOKEN), tidak pernah ditulis ke config Freqtrade yang dirender. Launcher menolak start bila kanal menyala tanpa chat_id, tanpa authorized_users, atau tanpa token. Hanya perintah trade yang memuat kanal ini.
+
+Risiko yang diterima saat menyalakan: perintah Telegram dijalankan Freqtrade langsung, tanpa konfirmasi dua langkah dan tanpa log audit gateway (docs/gateway-api.md bagian 3). /forcelong tetap tertolak selama api.force_entry false. Pesan dari chat atau user lain diabaikan Freqtrade.
+
+Bukti: tests/test_telegram_channel.py menjalankan modul Telegram Freqtrade asli terhadap Bot API tiruan lokal (chat pemilik mendapat jawaban /status, /stopentry, /help; /stopentry dari chat lain tidak mengubah keadaan). Belum terbukti dengan bot Telegram sungguhan karena belum ada token.
 
 ## Tes
 
