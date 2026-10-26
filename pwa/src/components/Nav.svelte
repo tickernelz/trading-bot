@@ -1,18 +1,37 @@
 <script lang="ts">
-  import { SCREENS, type Screen } from "../lib/route.svelte";
+  import { GROUPS, inGroup, SCREENS, tabFor, type Screen } from "../lib/route.svelte";
 
-  let { current, labelled = "Navigasi utama" }: { current: Screen; labelled?: string } = $props();
+  let { current, variant = "tabs" }: { current: Screen; variant?: "tabs" | "rail" } = $props();
+  const tabs = SCREENS.filter((s) => s.tab);
 </script>
 
-<nav aria-label={labelled}>
-  {#each SCREENS as s (s.id)}
-    <a href={"#" + s.id} aria-current={current === s.id ? "page" : undefined}>{s.label}</a>
-  {/each}
-</nav>
+{#if variant === "tabs"}
+  <nav aria-label="Navigasi utama" class="tabs">
+    {#each tabs as s (s.id)}
+      <a href={"#" + s.id} aria-current={tabFor(current) === s.id ? "page" : undefined}>{s.label}</a>
+    {/each}
+  </nav>
+{:else}
+  <nav aria-label="Navigasi samping" class="rail">
+    {#each GROUPS as group (group)}
+      <p class="group" id={"nav-" + group}>{group}</p>
+      <ul aria-labelledby={"nav-" + group}>
+        {#each inGroup(group) as s (s.id)}
+          <li><a href={"#" + s.id} aria-current={current === s.id ? "page" : undefined}>{s.label}</a></li>
+        {/each}
+      </ul>
+    {/each}
+  </nav>
+{/if}
 
 <style>
-  nav {
+  nav.tabs {
     display: flex;
+  }
+  ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
   }
   a {
     display: flex;
@@ -22,13 +41,25 @@
     color: var(--ink2);
     text-decoration: none;
     font-size: var(--step-0);
-    transition: color var(--t) var(--ease), box-shadow var(--t) var(--ease);
+    transition: color var(--t) var(--ease), box-shadow var(--t) var(--ease), background-color var(--t) var(--ease);
   }
   a:hover {
     color: var(--ink);
   }
+  a:active {
+    background: var(--panel);
+  }
   a[aria-current="page"] {
     color: var(--ink);
     font-weight: 600;
+  }
+  .rail a {
+    min-height: 44px;
+  }
+  .group {
+    margin: var(--space-3) 0 0;
+    padding: 0 var(--space-4);
+    font-size: var(--step--1);
+    color: var(--ink2);
   }
 </style>

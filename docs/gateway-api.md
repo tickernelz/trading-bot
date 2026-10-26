@@ -70,7 +70,7 @@ Contoh: rancangan, gateway belum ada; nilai mengikuti tangkapan Freqtrade bila a
 }
 ```
 
-Kode yang dipakai: `unauthorized`, `forbidden_local_only`, `confirmation_required`, `confirmation_expired`, `invalid_request`, `upstream_error`, `upstream_unavailable`, `risk_limit_breached`, `not_found`, `rate_limited`.
+Kode yang dipakai: `unauthorized`, `forbidden_local_only`, `confirmation_required`, `confirmation_expired`, `invalid_request`, `stale_revision`, `upstream_error`, `upstream_unavailable`, `risk_limit_breached`, `not_found`, `rate_limited`. `stale_revision` ditambahkan untuk PWA tahap 2 (bagian 14.3).
 
 ## 5. Endpoint baca
 
@@ -553,3 +553,88 @@ Refresh REST dibagi dua. Inti (`/health`, `/overview`, `/risk`) menentukan papan
 
 Satu PWA yang terbuka mengirim 10 GET per refresh: setiap 30 detik selama feed tersambung, saat `gw.hello` atau `gw.resync`, dan saat tab kembali terlihat. Ditambah 2 GET setelah tiap event order, dan satu `/candles` per pair yang pertama kali dibuka. Kira-kira 20 permintaan per menit per klien di samping satu WebSocket. Tahap gateway (ZHA-3764) mengukur CPU gateway dengan anggaran ini; bila terlalu mahal, `/overview` dan `/risk` bisa digantikan event `gw.risk` dan interval panel diperpanjang.
 
+
+## 14. Tambahan untuk PWA tahap 2 (ZHA-3777)
+
+Semua isi bagian ini `rancangan` kecuali yang menyebut ZHA-3774. Dipakai PWA tahap 2 (`pwa/`) dan gateway tiruan (`pwa/mock-gateway`), ditulis saat gateway tahap 2 belum di `main`: kontrol dan audit (ZHA-3774, cabang `feat/stage-2a-control` d905a63, bagian 2, 3, 6, dan 13 di cabang itu), konfigurasi dan provider (ZHA-3775), swarm dan riwayat (ZHA-3776). Rujukan ke bagian 12 dan 13 menunjuk ke cabang itu sampai masuk `main`. Tugas gateway menangkap ulang bentuk nyata; PWA mengikuti hasilnya. Semua endpoint per bot menerima `?bot=A|B`.
+
+### 14.1 Lingkup sesi
+
+Mengikuti ZHA-3774: login mengembalikan `"scope": "control" | "read"`; `control` hanya untuk login langsung dari loopback tanpa header forward, selain itu `read`. PWA menyimpan `scope` di `sessionStorage` bersama token (tidak ada endpoint baru), menampilkan aksi tulis hanya untuk `control`, dan untuk `read` menulis bahwa kontrol, konfigurasi, dan key hanya dari PC bot. Gateway tetap menolak sendiri (`403 forbidden_local_only`).
+
+### 14.2 Kontrol
+
+PWA memakai tabel bagian 6 dan aturan bagian 3 dan 13 ZHA-3774 apa adanya:
+
+- Kill switch "Hentikan entry baru" memanggil `/gw/v1/control/stop-entry`, karena hanya itu yang dicatat gateway dan dikirim ulang setelah bot restart (bagian 13.1 ZHA-3774). "Lanjutkan entry" memanggil `resume`.
+- Exit semua: `POST /gw/v1/trades/exit-all`. Blacklist: body `{"pairs": [...]}`. Kunci: body `{"pair", "until", "side", "reason"}`.
+- Setiap aksi dikirim tanpa `confirm` dengan `Idempotency-Key` baru (UUID v4). `409 confirmation_required`: PWA menampilkan langkah 2 dari `error.confirmation` lalu mengulang permintaan yang sama dengan kunci yang sama dan body `{"confirm": "<id>"}` (juga pada `DELETE`). `409 confirmation_expired` dan `409 confirmation_invalid` mengembalikan PWA ke langkah 1; percobaan berikutnya memakai kunci baru.
+- Respons `200` adalah respons Freqtrade apa adanya (`status` atau `result`); PWA menampilkan teksnya lalu membaca ulang keadaan, bukan menebak dari respons.
+- Diminta untuk tugas gateway: `/gw/v1/overview?bot=` menambah `state` (`running`, `paused`, `stopped`) dari `/show_config` bot itu, supaya layar Kontrol membaca keadaan Bot B juga; `/gw/v1/health` hanya melaporkan bot pertama. Tanpa `state`, PWA memakai `/gw/v1/health` untuk bot pertama dan menulis "keadaan tidak terbaca" untuk bot lain.
+
+### 14.3 Konfigurasi
+
+`GET /gw/v1/settings` (bagian 12.2) menambah `revision`: SHA-256 berkas konfigurasi bot yang dibaca.
+
+`PATCH /gw/v1/settings?bot=A`, lingkup `control` (loopback; bagian 1: ubah config hanya dari loopback), header `Idempotency-Key`:
+
+```json
+{"revision": "9f2c…", "changes": [{"key": "risk.max_daily_loss_pct", "value": 0.8}, {"key": "swarm.voters[v3].enabled", "value": false}], "note": "Turunkan batas setelah dua hari rugi"}
+```
+
+- `key` memakai format `flatten` yang sama dengan audit `config.changed` (bagian 12.2): titik antar bagian, `[id]` untuk elemen daftar yang punya `id`. Voter yang dihapus muncul sebagai kunci-kuncinya dengan `value: null`.
+- `note` wajib (1 sampai 500 karakter) dan masuk ke `detail.note` baris audit. Itu catatan perubahan plan bagian 4.2 (siapa, kapan, nilai lama dan baru, alasan).
+- `200`: `{"revision": "<baru>", "applied": [{"key": "…", "old": 1.0, "new": 0.8}], "restart_required": false}`. Perubahan berlaku setelah `POST /gw/v1/control/reload-config` (bagian 10); PWA menawarkan tombol itu sesudah simpan.
+- `400 invalid_request` membawa `error.fields: [{"key": "…", "message": "…"}]` dari skema `engine/settings.py`. PWA memeriksa aturan yang sama lebih dulu (`pwa/src/lib/settings.ts`) supaya galat muncul di samping kolomnya, tetapi skema gateway yang menentukan.
+- `409 stale_revision` bila berkas berubah sejak `revision` dibaca. PWA memuat ulang dan meminta tinjauan ulang.
+- Dua langkah mengikuti `risky_changes` ZHA-3774: kenaikan empat batas risiko, perubahan `mode`, dan `api.force_entry` menjadi `true`. Menurunkan batas berlaku langsung (plan bagian 4.2 aturan 2).
+- `409 risk_limit_breached` tetap seperti bagian 5.15.
+- Catatan perubahan dibaca dari `GET /gw/v1/audit?action=config.&target=A`.
+
+### 14.4 Provider dan key
+
+`GET /gw/v1/providers` (lingkup `read`):
+
+```json
+[{"id": "nutaraline", "type": "openai-completions", "base_url": "from_import", "host": "api.contoh.invalid", "models": ["deepseek-v4.1-flash-1017"], "enabled": true, "api_key_configured": true, "api_key_source": "env", "api_key_env": "NUTARALINE_API_KEY", "api_key_last4": null, "used_by": {"analyst": true, "voters": ["v1", "v2"]}, "last_test": {"at": "2026-10-26T02:10:00Z", "ok": true, "latency_ms": 1840, "model": "deepseek-v4.1-flash-1017", "error_kind": null}, "health": {"calls": 140, "ok": 138, "latency_p50_s": 2.1, "latency_max_s": 9.7, "last_status": "ok"}}]
+```
+
+- `host` dari base URL yang sudah diselesaikan (termasuk hasil impor). `api_key_source`: `env`, `config`, atau `null`. `api_key_last4` hanya untuk lingkup `control`, selain itu `null`. Nilai key tidak ada di respons mana pun.
+- `health` sama dengan `/health` `providers` (bagian 12.2): 20 keputusan terakhir.
+- `enabled` butuh field `providers[].enabled` (bawaan `true`) di skema `engine/settings.py`. Voter yang provider-nya nonaktif tidak dipanggil dan tercatat `status: "failed"`, `error_kind: "provider_disabled"`.
+
+Plan bagian 4.5 menyebut PWA jarak jauh boleh melihat status, mengaktifkan atau menonaktifkan, dan menguji koneksi. Rancangan ini karena itu menerima dua endpoint berikut dari lingkup `read`; ZHA-3775 memutuskan, dan PWA hanya menampilkan `403` bila gateway menolak:
+
+- `POST /gw/v1/providers/{id}/test` body `{"model": "…"}` (opsional): satu panggilan kecil. Respons objek `last_test`. Gagal karena provider tetap `200` dengan `ok: false` dan `error_kind` (`timeout`, `auth`, `rate_limited`, `http_5xx`, `invalid`).
+- `POST /gw/v1/providers/{id}/state` body `{"enabled": false}`: respons objek provider.
+
+Lingkup `control` (loopback saja):
+
+- `POST /gw/v1/providers` dan `PUT /gw/v1/providers/{id}` body `{"id", "type", "base_url", "models", "api_key_env", "api_key"}`. Pada `PUT`, `api_key` yang tidak dikirim berarti tidak berubah dan `"api_key_clear": true` menghapusnya. Key ditulis ke `config/config.yaml` lokal (gitignored); audit mencatat `<set>` atau `null`.
+- `GET /gw/v1/providers/import`: `{"source": "~/.omp/agent/models.yml", "candidates": [{"id", "type", "base_url", "models", "has_key", "exists"}]}`, tanpa nilai key.
+- `POST /gw/v1/providers/import` body `{"items": [{"id": "nutaraline", "include_key": false}]}`: `{"imported": [<objek provider>]}`. Key hanya disalin bila `include_key` dicentang per provider (plan bagian 4.5).
+
+### 14.5 Swarm per keputusan dan hasil sesudahnya
+
+`GET /gw/v1/decisions?limit=30&before=<ts>&status=ok|skip&bot=B`: `before` adalah `ts` keputusan terakhir halaman sebelumnya. Setiap baris (juga event `gw.decision`) menambah `outcome`:
+
+```json
+{"state": "settled", "basis": "price", "horizon_h": 4, "price_at": 1463932000, "price_after": 1471200000, "return_pct": 0.5, "return_after_fees_pct": 0.1, "trade_id": null, "is_open": null, "profit_abs": null, "profit_pct": null, "settles_at": "2026-10-25T21:00:00Z"}
+```
+
+- `basis: "trade"`: bot benar-benar masuk; `trade_id`, `is_open`, `profit_abs`, `profit_pct` dari trade itu (`Outcome` di `engine/decisions.py` cabang tahap 1).
+- `basis: "price"`: entry dilewati; penutupan kandel `horizon_h` jam sesudahnya dibanding harga saat keputusan, sebelum dan sesudah biaya dua sisi (`exchange.fee_pct`). Pengandaian kasar, bukan trade.
+- `state`: `pending` (horizon belum lewat atau trade masih terbuka), `insufficient_data` (kandel sesudah horizon tidak ada), `settled`. PWA menandai dua yang pertama sebagai belum cukup data dan tidak menjumlahkannya.
+
+### 14.6 Riwayat dan statistik
+
+- `GET /gw/v1/trades?limit=50&offset=0&state=closed&bot=A`: `offset` setelah pengurutan `trade_id` turun (bagian 5.4 ZHA-3774), `state=closed` hanya trade tertutup. Halaman berikutnya ada selama jumlah baris sama dengan `limit`.
+- Harian, mingguan, bulanan: bagian 5.7 dengan `bot`. Per alasan exit dan durasi: bagian 5.8. Per pair, tag entry, alasan exit: bagian 5.9.
+
+### 14.7 Bot A vs Bot B
+
+`GET /gw/v1/equity` menambah `window=total`: sejak start dry-run, satu titik per jam. `GET /gw/v1/profit?window=total&bot=B` (bagian 5.7) per bot, meneruskan `max_drawdown` (rasio) dan `max_drawdown_abs` dari `/profit` Freqtrade.
+
+### 14.8 Audit
+
+Dibangun ZHA-3774 (bagian 13.2 di cabang itu). PWA memakai `limit`, `before_id`, `action` (awalan), `result`, dan `target`, menampilkan nama aksi dan `result` ZHA-3774 (`ok`, `failed`, `confirmation_required`, `rejected`, `replayed`, `forbidden`), dan berlangganan `gw.audit` untuk baris baru. Tambahan rancangan untuk baris dari ZHA-3775: `config.changed` membawa `detail.note`; `provider.test`, `provider.state`, `provider.create`, `provider.update`, `provider.import` dengan `detail.changes` memakai `<set>` atau `null` untuk key.

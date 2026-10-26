@@ -5,7 +5,7 @@
   import { parseTs } from "../lib/format";
   import type { Equity } from "../lib/types";
 
-  let { equity }: { equity: Equity } = $props();
+  let { equity, label = "Kurva ekuitas bot A dan bot B, tujuh hari" }: { equity: Equity; label?: string } = $props();
 
   let host: HTMLDivElement;
   let chart: IChartApi | null = null;
@@ -51,7 +51,7 @@
   });
 </script>
 
-<div class="chart" bind:this={host} role="img" aria-label="Kurva ekuitas bot A dan bot B, tujuh hari"></div>
+<div class="chart" bind:this={host} role="img" aria-label={label}></div>
 
 <style>
   .chart {

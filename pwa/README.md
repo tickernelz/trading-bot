@@ -1,8 +1,10 @@
-# PWA tahap 1 (baca-saja)
+# PWA bot trading
 
-Panel bot trading untuk ponsel dan desktop: keadaan aman, ditahan, atau berhenti; jejak untung rugi hari ini; meter risiko; posisi dan order; grafik kandel per pair; feed aksi; keputusan swarm beserta jawaban voter; kesehatan; Bot A vs Bot B; notifikasi Web Push. Tidak ada kontrol, provider dan key, atau konfigurasi (tahap 2).
+Panel bot trading untuk ponsel dan desktop. Tahap 1: keadaan aman, ditahan, atau berhenti; jejak untung rugi hari ini; meter risiko; posisi dan order; grafik kandel per pair; feed aksi; keputusan swarm; kesehatan; notifikasi Web Push. Tahap 2: Kontrol (kill switch, exit paksa, kunci pair, blacklist, hentikan bot, dengan konfirmasi dua langkah dari gateway), Konfigurasi (editor dengan validasi skema, tinjauan nilai lama dan baru, catatan wajib, catatan perubahan dari audit), Provider dan key (status, aktif atau nonaktif, uji koneksi; kolom key, tambah, ubah, dan impor models.yml hanya untuk sesi lingkup `control` dari PC bot), Swarm per keputusan dengan hasil sesudahnya, Riwayat dan statistik, Bot A vs B, dan Audit.
 
-Gateway nyata belum ada. Semua data datang dari gateway tiruan `mock-gateway/` dan PWA memberi label "contoh data" selama `/gw/v1/health` membawa `gateway.sample_data: true`. Endpoint yang dipakai: `docs/gateway-api.md` bagian 5, 7, dan 11.
+PWA ini belum memakai gateway nyata. Semua data datang dari gateway tiruan `mock-gateway/` dan PWA memberi label "contoh data" selama `/gw/v1/health` membawa `gateway.sample_data: true`. Endpoint yang dipakai: `docs/gateway-api.md` bagian 5, 7, 11 (tahap 1) dan 14 (tahap 2). Kontrol dan audit mengikuti bentuk yang dibangun ZHA-3774 (bagian 2, 3, 6, 13 di cabang `feat/stage-2a-control`); konfigurasi, provider, swarm per keputusan, dan riwayat masih rancangan sampai ZHA-3775 dan ZHA-3776 masuk `main`.
+
+Ponsel memakai tab Ringkas, Grafik, Aksi, Kontrol, Lainnya; Kontrol di tab utama supaya kill switch satu ketukan. Desktop memakai rel berkelompok Pantau, Kendali, Catatan, Sistem.
 
 ## Menjalankan
 
@@ -20,12 +22,13 @@ Gateway tiruan punya rute uji tanpa token, hanya untuk pengembangan:
 - `POST /gw/v1/dev/upstream` body `{"seconds": 30}` meniru Freqtrade mati: `gw.error` tiap 5 detik, `/health`, `/overview`, `/risk` membalas 503
 - `POST /gw/v1/dev/fail` body `{"path": "/gw/v1/decisions", "status": 404}` memaksa satu endpoint gagal; `status: 0` memulihkannya
 - `POST /gw/v1/dev/push` body `{"kind": "fill" | "risk_breach" | "kill_switch" | "heartbeat_lost" | "quorum_failed" | "daily_summary"}`
+- `POST /gw/v1/dev/remote` body `{"remote": true}` membuat login berikutnya (dan sesi yang ada) berlingkup `read`, seperti login lewat tunnel; `false` mengembalikan `control`. `MOCK_REMOTE=1` memulai dalam keadaan itu.
 
-Tes: `npm test` (backoff, klien feed, kesegaran data, keadaan keselamatan, refresh inti vs panel, klien HTTP, format angka bertanda, teks feed).
+Tes: `npm test`. Tahap 1: backoff, klien feed, kesegaran data, keadaan keselamatan, refresh inti vs panel, klien HTTP, format angka bertanda, teks feed. Tahap 2: `tests/settings.test.ts` (kunci `flatten`, arah risiko, aturan dua langkah, validasi setara `engine/settings.py`), `tests/control.test.ts` (dua langkah dengan kunci idempotensi yang sama, `confirmation_expired` dan `confirmation_invalid`), `tests/decisions.test.ts` (hasil sesudahnya, audit), dan `tests/contract.test.ts` yang menjalankan gateway tiruan dan memakai klien PWA terhadap bagian 14: lingkup, `Idempotency-Key`, putar ulang, konfirmasi untuk sasaran lain ditolak, exit-all, DELETE dengan confirm, PATCH settings (revisi basi, galat per kunci, catatan masuk audit), key hanya 4 karakter terakhir dan `<set>` di audit, paging keputusan, trade, dan audit.
 
 ## Pilihan dan alasannya
 
-- Kerangka: Svelte 5 dengan Vite 8, tanpa pustaka komponen. Runtime kecil (bundel utama 107,05 kB, gzip 38,08 kB; naik 4,62 kB dari 102,43 kB karena penanganan galat inti dan panel) dan reaktivitas rune cocok untuk aliran event WebSocket. Tidak memakai Vue atau Nuxt UI supaya tampilan bawaan FreqUI dan Nuxt UI tidak terbawa.
+- Kerangka: Svelte 5 dengan Vite 8, tanpa pustaka komponen. Reaktivitas rune cocok untuk aliran event WebSocket. Tahap 2 memuat malas tujuh layar baru beserta Swarm dan Sistem; muatan awal (`index` ditambah `format` yang dipreload) 122 kB, gzip 44,7 kB, turun dari 128,58 kB, gzip 45,70 kB di `main` 84f9536 (`vite build` yang sama). Layar terbesar Konfigurasi 36 kB, gzip 12 kB, hanya saat dibuka. Tidak memakai Vue atau Nuxt UI supaya tampilan bawaan FreqUI dan Nuxt UI tidak terbawa.
 - Grafik: TradingView Lightweight Charts 5.2.1 (Apache-2.0, atribusi ada di layar Sistem). Canvas, kandel, penanda masuk dan keluar, garis harga untuk stop loss, panel kedua untuk RSI. Dimuat malas hanya di layar Grafik (176,63 kB, gzip 57,44 kB). ECharts tidak dipakai karena itu pustaka FreqUI. Jejak harian dan sebaran voter digambar sendiri dengan SVG.
 - Huruf: Atkinson Hyperlegible Next. Bukti angka tabular dan alasan penolakan Inter ada di `DESIGN.md` bagian Typography. Hanya subset latin dan latin-ext yang dimuat (34 kB dan 19 kB woff2).
 - Service worker tulisan tangan (`sw/sw.js`), tanpa Workbox. Plugin kecil di `vite.config.ts` menulis `dist/sw.js` dengan nama cache dari hash daftar aset dan daftar aset itu untuk precache, jadi tiap build punya cache sendiri dan cache lama dihapus saat activate. `/gw/` tidak pernah di-cache, halaman navigasi hanya disimpan bila respons `ok`, URL dari push dibatasi ke origin sendiri, dan push selalu tampil sebagai notifikasi terlihat. Hanya didaftarkan di build produksi.
@@ -38,12 +41,26 @@ Tes: `npm test` (backoff, klien feed, kesegaran data, keadaan keselamatan, refre
 - Feed: jeda dari event tiba di browser sampai tampil di DOM median 1,7 ms, maks 2,1 ms (n = 8).
 - Offline: muat ulang tanpa jaringan menampilkan shell dari cache dengan "Perangkat sedang offline"; bila keadaan belum pernah dimuat, bar atas menampilkan "Mode ?" (label aksesibel "Mode belum diketahui").
 - Kontras: lihat `DESIGN.md` bagian Colors; semua pasangan teks di atas 4,5:1 di kedua tema.
-- Area sentuh: semua tombol, tab, dan tautan setinggi minimal 44 px; kotak centang lapisan 20 px di dalam label setinggi 44 px.
+- Area sentuh: semua tombol, tab, dan tautan setinggi minimal 44 px; kotak centang lapisan 20 px di dalam label setinggi 44 px. Tahap 2 diukur ulang di 390 px pada delapan layar: nol elemen interaktif di bawah 44 px.
+- Tahap 2, tanpa gulir samping di 360 px pada 12 layar (`scrollWidth` = 360). Batas kolom isian 3,93:1 (terang) dan 3,29:1 (gelap) terhadap latar; placeholder 8,41:1 dan 9,14:1. `prefers-reduced-motion: reduce`: animasi panel konfirmasi 0 s.
+- Tahap 2, dijalankan di Chromium terhadap gateway tiruan: exit paksa dua langkah (fokus pindah ke panel, trade tertutup setelah langkah 2), kill switch satu langkah, sesi `read` dengan semua tombol kontrol nonaktif dan tanpa kolom key, simpan konfigurasi yang menaikkan batas dengan langkah 2 lalu catatan muncul di log, key provider disimpan lalu hanya "berakhiran ABCD" yang tampil, dan galat 502 di tujuh endpoint tampil per bagian dengan Coba lagi.
 
 ## Belum terbukti
 
 - iOS 16.4 atau lebih baru di perangkat nyata: pasang ke Layar Utama, izin push lewat tombol, notifikasi tampil. Layar Sistem menampilkan petunjuk Layar Utama saat dibuka dari Safari biasa, tetapi alur itu belum diuji di iPhone.
 - Android dan desktop: dialog pasang dari Chrome atau Edge belum diklik oleh manusia; yang terbukti hanya syarat installability.
-- Gateway nyata, jeda fill di Freqtrade sampai tampil di PWA, dan beban CPU gateway: gateway belum dibangun (ZHA-3764).
-- Bentuk `/gw/v1/equity`, `/gw/v1/decisions`, `gw.decision`, dan `/gw/v1/push/*` masih rancangan (`docs/gateway-api.md` bagian 11).
+- Gateway nyata: PWA belum dijalankan terhadap gateway tahap 1 (ZHA-3764) atau tahap 2a (ZHA-3774), keduanya belum di `main`. Kontrol dan audit mengikuti dokumen 2a, tetapi baru diuji terhadap gateway tiruan.
+- Bentuk `/gw/v1/equity`, `/gw/v1/decisions`, `gw.decision`, dan `/gw/v1/push/*` masih rancangan (`docs/gateway-api.md` bagian 11), begitu juga semua isi bagian 14 di luar kontrol dan audit: `revision` dan `PATCH /gw/v1/settings`, `/gw/v1/providers*`, `outcome` keputusan, `offset` dan `state=closed` trade, `window=total` ekuitas, `overview.state` per bot.
+- Uji koneksi dan aktif atau nonaktif provider dari sesi `read` (jarak jauh) adalah rancangan bagian 14.4 yang menunggu keputusan ZHA-3775; aturan lingkup ZHA-3774 bisa menolaknya, dan PWA lalu menampilkan 403.
 - Pembaca layar: ARIA dan urutan fokus diperiksa di kode, belum diuji dengan VoiceOver atau TalkBack.
+
+## Audit teknis tahap 2 (impeccable audit, 2026-10-26)
+
+| # | Dimensi | Skor | Temuan utama |
+| --- | --- | --- | --- |
+| 1 | Aksesibilitas | 3 | Semua isian berlabel, tombol bernama, fokus 2 px; pembaca layar belum diuji |
+| 2 | Performa | 4 | Tujuh layar baru dan Swarm, Sistem dimuat malas; muatan awal turun |
+| 3 | Responsif | 3 | Tanpa gulir samping di 360 px pada 12 layar; Konfigurasi ponsel panjang |
+| 4 | Tema | 4 | Semua warna dari token; gelap dan terang diukur |
+| 5 | Anti-pattern | 4 | Detector `[]` dengan kontrol negatif |
+| **Total** | | **18/20** | P0 0, P1 0 |

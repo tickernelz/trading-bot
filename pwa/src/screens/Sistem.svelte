@@ -85,7 +85,7 @@
   <div><dt>Data</dt><dd>{g.sampleData ? "contoh data dari gateway tiruan" : "bot sungguhan"}</dd></div>
   <div><dt>Versi PWA</dt><dd>{version}</dd></div>
 </dl>
-<p class="note">Panel ini hanya baca. Kontrol, provider dan key, serta konfigurasi menyusul di tahap 2.</p>
+<p class="note">Lingkup sesi: {g.canControl ? "control (dari PC bot)" : "baca (jarak jauh)"}. <a class="tap" href="#kontrol">Kontrol</a> · <a class="tap" href="#provider">Provider dan key</a> · <a class="tap" href="#audit">Audit</a></p>
 <p class="note">Grafik memakai TradingView Lightweight Charts™, hak cipta TradingView, Inc. <a class="tap" href="https://www.tradingview.com/" rel="noopener" target="_blank">tradingview.com</a></p>
 <div class="actions"><button class="btn secondary" type="button" onclick={() => gateway.logout()}>Keluar dari gateway</button></div>
 
