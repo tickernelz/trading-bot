@@ -115,6 +115,9 @@ async def audited(
     except ConfigError as exc:
         ctx.audit(action, "failed", request=request, targets=targets, detail={**detail, "error": "invalid_config"})
         raise AnalyticsError(409, "invalid_request", str(exc).splitlines()[0][:300]) from exc
+    except OSError as exc:
+        ctx.audit(action, "failed", request=request, targets=targets, detail={**detail, "error": type(exc).__name__})
+        raise AnalyticsError(500, "upstream_error", f"could not write the config: {type(exc).__name__}") from exc
     ctx.audit(action, "ok", request=request, targets=targets, detail={**detail, **outcome(result)})
     return result
 
@@ -143,8 +146,12 @@ def make_router(ctx: Context, reader: Callable[..., Any]) -> APIRouter:
             "max_open_trades": max_open_trades,
         }
         overrides = {key: value for key, value in given.items() if value is not None and key in TUNABLE}
-        inputs = risk_inputs(settings, trades, datetime.now(UTC))
-        return whatif_limits(settings.risk, overrides, inputs)
+        now = datetime.now(UTC)
+
+        def compute() -> dict[str, Any]:
+            return whatif_limits(settings.risk, overrides, risk_inputs(settings, trades, now))
+
+        return await asyncio.to_thread(compute)
 
     @router.post("/replay")
     async def replay(body: ReplayBody) -> dict[str, Any]:
@@ -185,14 +192,16 @@ def make_router(ctx: Context, reader: Callable[..., Any]) -> APIRouter:
     async def board_apply(
         request: Request, bot: str | None = None, limit: Annotated[int, Query(ge=1, le=5000)] = 2000
     ) -> dict[str, Any]:
-        source = ctx.source(bot)
+        async def apply() -> dict[str, Any]:
+            return await asyncio.to_thread(evaluate, ctx.source(bot), limit, "manual")
+
         return await audited(
             ctx,
             request,
             "analytics.scoreboard.apply",
-            [source.bot_id],
+            [bot or "default"],
             {"limit": limit},
-            lambda: asyncio.to_thread(evaluate, source, limit, "manual"),
+            apply,
             lambda result: {"voters": result["applied"]},
         )
 
@@ -202,20 +211,26 @@ def make_router(ctx: Context, reader: Callable[..., Any]) -> APIRouter:
     ) -> dict[str, Any]:
         _, settings, trades = await book(bot)
         drop = drop_pct if drop_pct is not None else settings.analytics.stress.drop_pct
-        return stress(settings.risk, risk_inputs(settings, trades, datetime.now(UTC)), drop)
+        now = datetime.now(UTC)
+        return await asyncio.to_thread(lambda: stress(settings.risk, risk_inputs(settings, trades, now), drop))
 
     @router.get("/portfolio")
     async def portfolio_view(bot: str | None = None) -> dict[str, Any]:
         _, settings, trades = await book(bot)
-        inputs = risk_inputs(settings, trades, datetime.now(UTC))
-        return portfolio(settings, inputs.assess(settings.risk), inputs.positions)
+        now = datetime.now(UTC)
+
+        def compute() -> dict[str, Any]:
+            inputs = risk_inputs(settings, trades, now)
+            return portfolio(settings, inputs.assess(settings.risk), inputs.positions)
+
+        return await asyncio.to_thread(compute)
 
     @router.get("/export/trades.csv")
     async def export_trades(bot: str | None = None) -> Response:
         source, _, trades = await book(bot)
         stamp = datetime.now(UTC).strftime("%Y%m%d")
         return Response(
-            trades_csv(trades),
+            await asyncio.to_thread(trades_csv, trades),
             media_type="text/csv; charset=utf-8",
             headers={"Content-Disposition": f'attachment; filename="trades-{source.bot_id}-{stamp}.csv"'},
         )
@@ -225,27 +240,30 @@ def make_router(ctx: Context, reader: Callable[..., Any]) -> APIRouter:
         bot: str | None = None, year: Annotated[int | None, Query(ge=2025, le=2100)] = None
     ) -> dict[str, Any]:
         _, settings, trades = await book(bot)
-        return tax_summary(trades, settings.analytics.tax.pph22_final_pct, year, settings.risk.daily_reset_timezone)
+        rate = settings.analytics.tax.pph22_final_pct
+        return await asyncio.to_thread(tax_summary, trades, rate, year, settings.risk.daily_reset_timezone)
 
     @router.post("/backtest", status_code=202, dependencies=[Depends(control(ctx, "analytics.backtest.start"))])
     async def backtest_start(request: Request, body: BacktestBody) -> dict[str, Any]:
-        source = ctx.source(body.bot)
-        settings = await asyncio.to_thread(source.settings)
-        payload = {
-            "strategy": STRATEGY,
-            "timeframe": settings.exchange.timeframe,
-            "timerange": check_timerange(body.timerange),
-            "max_open_trades": body.max_open_trades or settings.risk.max_open_trades,
-            "stake_amount": "unlimited",
-            "enable_protections": False,
-            "dry_run_wallet": body.dry_run_wallet or settings.capital.initial_idr,
-            "backtest_cache": "none",
-        }
+        detail: dict[str, Any] = {}
 
         async def start() -> dict[str, Any]:
+            source = ctx.source(body.bot)
+            settings = await asyncio.to_thread(source.settings)
+            payload = {
+                "strategy": STRATEGY,
+                "timeframe": settings.exchange.timeframe,
+                "timerange": check_timerange(body.timerange),
+                "max_open_trades": body.max_open_trades or settings.risk.max_open_trades,
+                "stake_amount": "unlimited",
+                "enable_protections": False,
+                "dry_run_wallet": body.dry_run_wallet or settings.capital.initial_idr,
+                "backtest_cache": "none",
+            }
+            detail["request"] = payload
             return backtest_view(await analysis_of(ctx).backtest_start(payload), STRATEGY)
 
-        return await audited(ctx, request, "analytics.backtest.start", [source.bot_id], {"request": payload}, start)
+        return await audited(ctx, request, "analytics.backtest.start", [body.bot or "default"], detail, start)
 
     @router.get("/backtest")
     async def backtest_status() -> dict[str, Any]:

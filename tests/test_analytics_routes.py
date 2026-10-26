@@ -236,7 +236,7 @@ class TestBacktestRoute:
         assert body["dry_run_wallet"] == 2_000_000 and body["max_open_trades"] == 3
         assert body["enable_protections"] is False
         assert [(row["action"], row["result"]) for row in context.audits] == [("analytics.backtest.start", "ok")]
-        assert context.audits[0]["targets"] == ["B"] and context.audits[0]["ip"] is not None
+        assert context.audits[0]["targets"] == ["default"] and context.audits[0]["ip"] is not None
 
     @pytest.mark.parametrize("value", ["2026-10-01", "20261001", "20261001-20261020; rm", "abc-def"])
     def test_a_malformed_timerange_never_reaches_freqtrade(self, env, upstream_calls, value):
@@ -409,3 +409,75 @@ class TestCompleteHistory:
         context.book = [closed_trade(1.0, trade_id=index, close_date="2026-10-25 01:00:00") for index in range(1001)]
         assert len(client.get(f"{PREFIX}/export/trades.csv").text.strip().split("\n")) == 1002
         assert client.get(f"{PREFIX}/export/tax").json()["total"]["trades"] == 1001
+
+
+class TestOneAuditRowPerControlCall:
+    def rows(self, context):
+        return [(row["action"], row["result"]) for row in context.audits]
+
+    def test_a_malformed_timerange_is_audited_as_failed(self, env, upstream_calls):
+        client, context, *_ = env
+        assert client.post(f"{PREFIX}/backtest", json={"timerange": "abc"}).status_code == 422
+        assert self.rows(context) == [("analytics.backtest.start", "failed")]
+        assert upstream_calls == []
+
+    def test_an_unknown_bot_is_audited_as_failed_for_apply_and_backtest(self, env):
+        client, context, *_ = env
+        assert client.post(f"{PREFIX}/scoreboard/apply", params={"bot": "X"}).status_code == 404
+        assert client.post(f"{PREFIX}/backtest", json={"bot": "X", "timerange": "20261001-20261020"}).status_code == 404
+        assert self.rows(context) == [
+            ("analytics.scoreboard.apply", "failed"),
+            ("analytics.backtest.start", "failed"),
+        ]
+        assert context.audits[0]["targets"] == ["X"]
+
+    def test_a_config_that_cannot_be_written_is_audited_and_is_not_a_bare_500(self, env, monkeypatch):
+        client, context, *_ = env
+
+        def broken(path, voters):
+            raise PermissionError("read-only")
+
+        monkeypatch.setattr("analytics.service.apply_disables", broken)
+        monkeypatch.setattr(
+            "analytics.service.plan_disables",
+            lambda board, settings: {"disable": [], "recommended": ["v1"], "kept_for_quorum": []},
+        )
+        response = client.post(f"{PREFIX}/scoreboard/apply")
+        assert response.status_code == 500
+        assert response.json()["error"]["message"] == "could not write the config: PermissionError"
+        assert self.rows(context) == [("analytics.scoreboard.apply", "failed")]
+        assert context.audits[0]["detail"]["error"] == "PermissionError"
+
+
+class TestComputeStaysOffTheEventLoop:
+    def test_the_heavy_views_run_in_a_worker_thread(self, env, monkeypatch):
+        import threading
+
+        client, context, *_ = env
+        loop_threads = []
+        original_trades = context.trades
+
+        async def trades(bot):
+            loop_threads.append(threading.get_ident())
+            return await original_trades(bot)
+
+        monkeypatch.setattr(context, "trades", trades)
+        seen = {}
+        from analytics import routes
+
+        def wrap(name):
+            original = getattr(routes, name)
+
+            def inner(*args, **kwargs):
+                seen[name] = threading.get_ident()
+                return original(*args, **kwargs)
+
+            monkeypatch.setattr(routes, name, inner)
+
+        for name in ("whatif_limits", "stress", "portfolio", "trades_csv", "tax_summary"):
+            wrap(name)
+        for path in ("/limits/whatif", "/stress", "/portfolio", "/export/trades.csv", "/export/tax"):
+            assert client.get(PREFIX + path).status_code == 200
+        assert set(seen) == {"whatif_limits", "stress", "portfolio", "trades_csv", "tax_summary"}
+        assert len(set(loop_threads)) == 1
+        assert all(ident != loop_threads[0] for ident in seen.values())
