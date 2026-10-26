@@ -141,10 +141,10 @@ class TestPortfolio:
         assert rows["SOL/IDR"]["open_trades"] == 0
 
     def test_a_position_in_a_pair_that_left_the_config_is_reported(self, settings):
-        inputs = inputs_for(settings, [open_trade("DOGE/IDR", 3, stake=100_000)])
+        inputs = inputs_for(settings, [open_trade("ADA/IDR", 3, stake=100_000)])
         view = portfolio(settings, inputs.assess(settings.risk), inputs.positions)
-        assert view["pairs_not_in_config"] == ["DOGE/IDR"]
-        assert any(row["pair"] == "DOGE/IDR" and row["open_trades"] == 1 for row in view["pairs"])
+        assert view["pairs_not_in_config"] == ["ADA/IDR"]
+        assert any(row["pair"] == "ADA/IDR" and row["open_trades"] == 1 for row in view["pairs"])
 
 
 class TestExport:
