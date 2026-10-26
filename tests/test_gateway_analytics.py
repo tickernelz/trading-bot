@@ -94,8 +94,8 @@ def stack(tmp_path, example_raw):
     gateway.ledger.close()
 
 
-def token_of(gateway: Gateway) -> str:
-    return gateway.ledger.create_session("read", 1, None)[0]
+def token_of(gateway: Gateway, scope: str = "read") -> str:
+    return gateway.ledger.create_session(scope, 1, None)[0]
 
 
 def call(gateway: Gateway, method: str, path: str, host: str = "127.0.0.1", **kwargs) -> httpx.Response:
@@ -107,8 +107,8 @@ def call(gateway: Gateway, method: str, path: str, host: str = "127.0.0.1", **kw
     return asyncio.run(go())
 
 
-def bearer(gateway: Gateway) -> dict[str, str]:
-    return {"Authorization": f"Bearer {token_of(gateway)}"}
+def bearer(gateway: Gateway, scope: str = "read") -> dict[str, str]:
+    return {"Authorization": f"Bearer {token_of(gateway, scope)}"}
 
 
 def voters_enabled(config: Path) -> dict[str, bool]:
@@ -155,34 +155,41 @@ def test_without_an_analysis_url_signals_and_backtest_reads_report_not_found(sta
     assert (response.status_code, response.json()["error"]["code"]) == (404, "not_found")
 
 
-def test_apply_from_loopback_disables_the_voter_and_writes_one_audit_row(stack):
+def test_apply_from_a_control_session_on_loopback_disables_the_voter_and_writes_one_audit_row(stack):
     gateway, _, config = stack
     response = call(
-        gateway, "POST", f"{PREFIX}/scoreboard/apply?bot=B", headers={**bearer(gateway), "Idempotency-Key": "k-1"}
+        gateway,
+        "POST",
+        f"{PREFIX}/scoreboard/apply?bot=B",
+        headers={**bearer(gateway, "control"), "Idempotency-Key": "key-0001"},
     )
     assert response.status_code == 200
     assert response.json()["applied"] == ["v1"]
     assert voters_enabled(config)["v1"] is False
     rows = [row for row in gateway.ledger.audit_rows(10) if row["action"].startswith("analytics.")]
     assert [(row["action"], row["result"], row["actor"], row["ip"], row["idempotency_key"]) for row in rows] == [
-        ("analytics.scoreboard.apply", "ok", "owner", "127.0.0.1", "k-1")
+        ("analytics.scoreboard.apply", "ok", "control_session", "127.0.0.1", "key-0001")
     ]
     assert rows[0]["targets"] == ["B"]
 
 
 @pytest.mark.parametrize(
-    ("host", "extra"),
+    ("host", "extra", "scope"),
     [
-        ("192.168.1.20", {}),
-        ("127.0.0.1", {"X-Forwarded-For": "203.0.113.9"}),
-        ("127.0.0.1", {"CF-Connecting-IP": "203.0.113.9"}),
-        ("127.0.0.1", {"Forwarded": "for=203.0.113.9"}),
+        ("127.0.0.1", {}, "read"),
+        ("192.168.1.20", {}, "control"),
+        ("127.0.0.1", {"X-Forwarded-For": "203.0.113.9"}, "control"),
+        ("127.0.0.1", {"CF-Connecting-IP": "203.0.113.9"}, "control"),
+        ("127.0.0.1", {"CF-Ray": "8a1b2c3d4e5f"}, "control"),
+        ("127.0.0.1", {"Forwarded": "for=203.0.113.9"}, "control"),
     ],
 )
-def test_apply_and_backtest_are_refused_off_the_machine_and_leave_the_config_untouched(stack, host, extra):
+def test_apply_and_backtest_are_refused_without_a_local_control_session_and_leave_the_config_untouched(
+    stack, host, extra, scope
+):
     gateway, _, config = stack
     before = config.read_bytes()
-    headers = {**bearer(gateway), **extra}
+    headers = {**bearer(gateway, scope), **extra, "Idempotency-Key": "bad key with spaces"}
     apply = call(gateway, "POST", f"{PREFIX}/scoreboard/apply?bot=B", host=host, headers=headers)
     start = call(
         gateway, "POST", f"{PREFIX}/backtest", host=host, headers=headers, json={"timerange": "20261003-20261025"}
@@ -199,6 +206,32 @@ def test_apply_and_backtest_are_refused_off_the_machine_and_leave_the_config_unt
         "analytics.scoreboard.apply",
     ]
     assert {row["result"] for row in rows} == {"forbidden"}
+    assert {row["actor"] for row in rows} == {f"{scope}_session"}
+    assert {row["idempotency_key"] for row in rows} == {None}
+
+
+def test_a_forbidden_control_call_reaches_a_waiting_audit_subscriber_on_the_event_loop(stack):
+    gateway, _, _ = stack
+    headers = {**bearer(gateway, "control"), "X-Forwarded-For": "203.0.113.9"}
+    client = gateway.hub.add()
+    client.topics.add("gw.audit")
+
+    async def run():
+        waiter = asyncio.create_task(client.queue.get())
+        await asyncio.sleep(0)
+        transport = httpx.ASGITransport(app=create_app(gateway), client=("127.0.0.1", 51000))
+        async with httpx.AsyncClient(transport=transport, base_url="http://gw") as http:
+            response = await http.post(f"{PREFIX}/scoreboard/apply?bot=B", headers=headers)
+        event = await asyncio.wait_for(waiter, 2)
+        return response.status_code, event
+
+    status, event = asyncio.run(run(), debug=True)
+    assert status == 403
+    assert (event["type"], event["data"]["action"], event["data"]["result"]) == (
+        "gw.audit",
+        "analytics.scoreboard.apply",
+        "forbidden",
+    )
 
 
 def test_apply_without_a_session_is_unauthorized_and_unaudited(stack):
@@ -212,7 +245,7 @@ def test_apply_without_a_session_is_unauthorized_and_unaudited(stack):
 
 def test_failed_apply_on_a_bot_without_decisions_is_audited_as_failed(stack):
     gateway, _, _ = stack
-    response = call(gateway, "POST", f"{PREFIX}/scoreboard/apply?bot=A", headers=bearer(gateway))
+    response = call(gateway, "POST", f"{PREFIX}/scoreboard/apply?bot=A", headers=bearer(gateway, "control"))
     assert response.status_code == 404
     rows = [row for row in gateway.ledger.audit_rows(10) if row["action"].startswith("analytics.")]
     assert [(row["result"], row["detail"]["error"]) for row in rows] == [("failed", "not_found")]

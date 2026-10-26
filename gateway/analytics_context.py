@@ -12,6 +12,7 @@ from fastapi import Request
 from analytics.freqtrade import AnalysisClient
 from analytics.service import BotSource, auto_disable_loop
 from engine.launch import DRY_RUN_DB
+from gateway.control import IDEMPOTENCY_KEY, is_local
 
 if TYPE_CHECKING:
     from gateway.app import Gateway
@@ -19,8 +20,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger("trading_bot.gateway.analytics")
 
 RESTART_DELAY_S = 30
-LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1"})
-PROXY_HEADERS = ("forwarded", "x-forwarded-for", "x-forwarded-host", "x-real-ip", "cf-connecting-ip", "true-client-ip")
 
 
 class AnalyticsContext:
@@ -49,20 +48,26 @@ class AnalyticsContext:
         return self.client
 
     def can_control(self, request: Request) -> bool:
-        if request.client is None or request.client.host not in LOOPBACK_HOSTS:
-            return False
-        return not any(name in request.headers for name in PROXY_HEADERS)
+        token = self.gateway.token_of(request)
+        return is_local(request) and token is not None and self.gateway.ledger.session_scope(token) == "control"
+
+    def actor_of(self, request: Request | None) -> str:
+        if request is None:
+            return "gateway"
+        token = self.gateway.token_of(request)
+        return f"{self.gateway.ledger.session_scope(token) if token else None}_session"
 
     def audit(
         self, action: str, result: str, *, request: Request | None, targets: list[str], detail: dict[str, Any]
     ) -> None:
+        raw_key = request.headers.get("idempotency-key") if request is not None else None
         row = self.gateway.ledger.audit(
-            actor="owner" if request is not None else "gateway",
+            actor=self.actor_of(request),
             action=action,
             targets=targets,
             result=result,
             ip=request.client.host if request is not None and request.client else None,
-            idempotency_key=request.headers.get("idempotency-key") if request is not None else None,
+            idempotency_key=raw_key if raw_key is not None and IDEMPOTENCY_KEY.match(raw_key) else None,
             detail=detail,
         )
         known = {bot.id for bot in self.gateway.settings.bots}
