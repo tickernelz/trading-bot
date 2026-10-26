@@ -7,6 +7,7 @@ from typing import Any
 
 from engine.risk import ClosedTrade, RiskState, assess
 from engine.settings import Settings
+from gateway.redact import key_last4
 
 CANDLE_COLUMNS = [
     "date",
@@ -132,6 +133,7 @@ def redacted_settings(settings: Settings) -> dict[str, Any]:
     for provider, model in zip(data["providers"], settings.providers, strict=True):
         provider["api_key"] = None
         provider["api_key_configured"] = model.api_key is not None
+        provider["api_key_last4"] = key_last4(model.api_key.get_secret_value()) if model.api_key is not None else None
     return data
 
 

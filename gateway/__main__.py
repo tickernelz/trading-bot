@@ -4,9 +4,9 @@ import sys
 
 import uvicorn
 
-from engine.logredact import install as install_log_redaction
 from engine.settings import ConfigError
 from gateway.app import Gateway, create_app
+from gateway.redact import install_log_redaction
 from gateway.settings import load_gateway_settings
 
 

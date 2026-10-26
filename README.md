@@ -15,7 +15,7 @@ Status: tahap 1 (dua bot dry-run, swarm bayangan, gateway). Belum ada akun atau 
 - engine/heartbeat.py: berkas heartbeat dan log start per bot
 - engine/shadow.py, engine/shadow_client.py: layanan swarm bayangan bot B dan pengirim kandidat dari strategi
 - engine/decisions.py: penyimpanan SQLite keputusan swarm dan penghubung ke trade
-- gateway/: gateway antara PWA dan bot (docs/gateway-api.md bagian 12)
+- gateway/: gateway antara PWA dan bot (docs/gateway-api.md bagian 12); konfigurasi, provider, key, voter (bagian 14)
 - scripts/stage1.sh: menjalankan bot A, bot B, layanan bayangan, dan gateway sebagai unit systemd user
 - scripts/measure_gateway.py: ukur jeda fill dan beban klien gateway
 - scripts/stage1_report.py: ringkasan lari tahap 1
@@ -100,6 +100,10 @@ Ringkasan lari (uptime dari baris `Bot heartbeat` di journald dengan celah di at
     PYTHONPATH=. python3 scripts/stage1_report.py --run-dir ~/Projects/trading-bot-runs/stage1 --unit-prefix trading-bot-stage1
 
 Unit systemd user transien (`Restart=always`) bertahan saat sesi terminal atau server lain di-restart; restart dihitung dari `starts.jsonl`. Log: `journalctl --user -u trading-bot-stage1-bot-a`.
+
+## Tahap 2b: konfigurasi, provider, key, voter
+
+Gateway menulis konfigurasi bot lewat `PATCH /gw/v1/settings` (validasi skema `engine/settings.py`, catatan perubahan di audit, kenaikan batas risiko dua langkah), mengelola provider dan key (`/gw/v1/providers`, key hanya dari 127.0.0.1, tampilan 4 karakter terakhir, impor dari omp models.yml, uji koneksi), dan registri voter (`/gw/v1/voters`, `/gw/v1/roles`). Kontrak dan yang belum terbukti: docs/gateway-api.md bagian 14. Perubahan butuh restart mesin; gateway tidak me-restart apa pun.
 
 ## Tes
 

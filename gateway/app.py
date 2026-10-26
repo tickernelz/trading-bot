@@ -33,6 +33,7 @@ from engine.logredact import redact
 from engine.risk import day_start
 from engine.settings import ConfigError, Settings, load_settings
 from gateway import VERSION
+from gateway.admin import Admin
 from gateway.control import Confirmations, digest, idempotency_key, is_local, sanitize
 from gateway.events import FILL_SIDES, translate
 from gateway.feed import Client, Hub, now_iso
@@ -153,6 +154,7 @@ class Gateway:
         if missing:
             raise ConfigError(f"set environment variables: {', '.join(missing)}")
         self.settings = settings
+        self.env = env
         self.password = password
         self.started = time.monotonic()
         self.ledger = Ledger(Path(settings.state_dir) / "gateway.sqlite")
@@ -783,7 +785,7 @@ class Gateway:
         return request.query_params.get("token") if isinstance(request, WebSocket) else None
 
 
-def create_app(gateway: Gateway) -> FastAPI:
+def create_app(gateway: Gateway, admin: Admin | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_: FastAPI):
         await gateway.start()
@@ -816,6 +818,8 @@ def create_app(gateway: Gateway) -> FastAPI:
         if not token or gateway.ledger.session_scope(token) is None:
             raise ApiError(401, "unauthorized", "sign in again")
         return token
+
+    app.include_router((admin or Admin(gateway)).router(reader))
 
     @app.post("/gw/v1/session")
     async def login(body: Login, request: Request) -> dict[str, str]:
