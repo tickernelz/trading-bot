@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
   echo "usage: RUN_DIR=<dir> IMAGE=<image> [UNIT_PREFIX=<prefix>] $0 start|stop|status [component...]" >&2
-  echo "components: bot-a bot-b shadow-b gateway (default: all)" >&2
+  echo "components: bot-a bot-b shadow-b analyst-b gateway (default: all)" >&2
   exit 2
 }
 
@@ -11,7 +11,7 @@ usage() {
 action=$1
 shift
 components=("$@")
-[ ${#components[@]} -gt 0 ] || components=(bot-a bot-b shadow-b gateway)
+[ ${#components[@]} -gt 0 ] || components=(bot-a bot-b shadow-b analyst-b gateway)
 prefix=${UNIT_PREFIX:-trading-bot-stage1}
 run_dir=${RUN_DIR:?set RUN_DIR}
 mount=/opt/trading-bot/run
@@ -32,6 +32,11 @@ container_args() {
       echo "--memory 512m --memory-swap 512m --env-file $run_dir/secrets/swarm.env --env-file $run_dir/secrets/shadow.env"
       echo "-e TRADING_BOT_CONFIG=$mount/config/bot-b.yaml -e TRADING_BOT_USERDIR=$mount/bot-b"
       echo "--entrypoint python ${IMAGE:?set IMAGE} -m engine.shadow"
+      ;;
+    analyst-b)
+      echo "--memory 512m --memory-swap 512m --env-file $run_dir/secrets/analyst.env"
+      echo "-e TRADING_BOT_CONFIG=$mount/config/bot-b.yaml -e TRADING_BOT_USERDIR=$mount/bot-b"
+      echo "--entrypoint python ${IMAGE:?set IMAGE} -m engine.analyst_service"
       ;;
     gateway)
       echo "--memory 512m --memory-swap 512m --env-file $run_dir/secrets/gateway.env"
