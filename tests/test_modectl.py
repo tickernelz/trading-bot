@@ -7,7 +7,14 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from engine import modectl
-from engine.modectl import Confirmation, ModeController, ModeRefused, read_mode
+from engine.modectl import (
+    Confirmation,
+    ModeController,
+    ModeRefused,
+    read_exchange_key_configured,
+    read_mode,
+    write_capabilities,
+)
 
 KEY = "ix-key-0123456789"
 SECRET = "ix-secret-0123456789"
@@ -31,9 +38,14 @@ def clock():
     return Clock()
 
 
+def has_keys(environ):
+    return lambda: all((environ.get(name) or "").strip() for name in modectl.DEFAULT_KEY_ENVS)
+
+
 def controller(tmp_path, clock, environ=None, proven=True):
+    environ = ENV if environ is None else environ
     return ModeController(
-        tmp_path / "mode.json", environ=ENV if environ is None else environ, live_engine_proven=proven, clock=clock
+        tmp_path / "mode.json", exchange_key_configured=has_keys(environ), live_engine_proven=proven, clock=clock
     )
 
 
@@ -51,7 +63,7 @@ def test_default_state_is_dry_run_and_names_what_blocks_live(tmp_path, clock):
 
 
 def test_shipped_default_never_allows_live_even_with_exchange_keys(tmp_path, clock):
-    shipped = ModeController(tmp_path / "mode.json", environ=ENV, clock=clock)
+    shipped = ModeController(tmp_path / "mode.json", exchange_key_configured=has_keys(ENV), clock=clock)
     assert modectl.LIVE_ENGINE_PROVEN is False
     error = refusal(lambda: shipped.request("live", OWNER))
     assert error.code == "live_blocked" and [b["code"] for b in error.blockers] == ["live_engine_unproven"]
@@ -161,7 +173,10 @@ def test_status_never_carries_credential_values(tmp_path, clock):
     dump = json.dumps(ctl.status()) + (tmp_path / "mode.json").read_text()
     assert KEY not in dump and SECRET not in dump
     fresh = ModeController(
-        tmp_path / "fresh.json", environ={"INDODAX_API_KEY": KEY}, live_engine_proven=False, clock=clock
+        tmp_path / "fresh.json",
+        exchange_key_configured=has_keys({"INDODAX_API_KEY": KEY}),
+        live_engine_proven=False,
+        clock=clock,
     )
     leaked = refusal(lambda: fresh.request("live", OWNER))
     assert KEY not in leaked.message and KEY not in json.dumps(leaked.blockers)
@@ -176,3 +191,31 @@ def test_failed_write_leaves_the_old_mode_in_place(tmp_path, clock, monkeypatch)
             ctl.request("dry_run", OWNER)
     assert read_mode(tmp_path / "mode.json")[0] == "live"
     assert [p.name for p in tmp_path.iterdir()] == ["mode.json"]
+
+
+def test_capabilities_file_records_only_whether_the_keys_are_set(tmp_path, clock):
+    write_capabilities(tmp_path, ENV, clock=clock)
+    text = (tmp_path / "capabilities.json").read_text()
+    assert read_exchange_key_configured(tmp_path) is True
+    assert KEY not in text and SECRET not in text
+    write_capabilities(tmp_path, {"INDODAX_API_KEY": KEY}, clock=clock)
+    assert read_exchange_key_configured(tmp_path) is False
+
+
+@pytest.mark.parametrize(
+    "content", [None, "{broken", "[]", '{"exchange_key_configured": "yes"}', '{"exchange_key_configured": 1}']
+)
+def test_a_missing_or_malformed_capabilities_file_reads_as_no_keys(tmp_path, content):
+    if content is not None:
+        (tmp_path / "capabilities.json").write_text(content)
+    assert read_exchange_key_configured(tmp_path) is False
+
+
+def test_the_probe_is_asked_again_at_every_check(tmp_path, clock):
+    state = {"keys": True}
+    ctl = ModeController(
+        tmp_path / "mode.json", exchange_key_configured=lambda: state["keys"], live_engine_proven=True, clock=clock
+    )
+    assert ctl.status()["live_allowed"] is True
+    state["keys"] = False
+    assert ctl.status()["live_allowed"] is False
