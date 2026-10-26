@@ -2,7 +2,7 @@ FROM freqtrade-base AS engine
 USER ftuser
 RUN pip install --user --no-cache-dir pyyaml==6.0.3
 COPY --chown=ftuser:ftuser swarm /tmp/swarm
-RUN pip install --user --no-cache-dir /tmp/swarm && rm -rf /tmp/swarm
+RUN pip install --user --no-cache-dir -c /tmp/swarm/constraints.txt /tmp/swarm && rm -rf /tmp/swarm
 WORKDIR /opt/trading-bot
 COPY --chown=ftuser:ftuser engine ./engine
 COPY --chown=ftuser:ftuser gateway ./gateway
