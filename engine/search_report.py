@@ -40,6 +40,8 @@ def summary_row(summary: dict) -> list[str]:
         rupiah(summary.get("monthly_profit_idr")),
         rupiah(summary.get("monthly_profit_idr_research_risk")),
         pct(summary.get("max_drawdown_research_risk"), 1, sign=False),
+        rupiah(summary.get("monthly_profit_idr_equal_weight")),
+        pct(summary.get("max_drawdown_equal_weight"), 1, sign=False),
         num(summary.get("trades_per_month"), 1),
     ]
 
@@ -63,6 +65,8 @@ SUMMARY_HEAD = [
     "Profit/month 0.5% risk",
     "Profit/month 2% risk",
     "Max DD 2% risk",
+    "Profit/month equal weight",
+    "Max DD equal weight",
     "Trades/month",
 ]
 

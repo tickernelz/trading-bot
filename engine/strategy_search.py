@@ -266,7 +266,7 @@ def tier_on(rows: list[metrics.Row], checks: dict, null: dict | None = None) -> 
 
 def rank_key(entry: dict) -> tuple:
     primary = entry["costs"][plan.PRIMARY_COST]["all"]
-    return (entry["wf_tier"]["tier"], -(primary.get("monthly_profit_idr") or -1e18), primary.get("max_drawdown", 1.0))
+    return (entry["wf_tier"]["tier"], -(primary.get(plan.PROFIT_KEY) or -1e18), primary.get("max_drawdown", 1.0))
 
 
 def eligible(entry: dict) -> bool:
@@ -736,7 +736,7 @@ def cross_asset(args, ledger_entry: dict) -> dict:
 def cross_rank_key(entry: dict) -> tuple:
     """Tier first, then the higher compounded monthly profit, then the lower drawdown."""
     primary = entry["costs"][plan.PRIMARY_COST]["all"]
-    return (entry["tier"], -(primary.get("monthly_profit_idr") or -1e18), primary.get("max_drawdown", 1.0))
+    return (entry["tier"], -(primary.get(plan.PROFIT_KEY) or -1e18), primary.get("max_drawdown", 1.0))
 
 
 def comparators(candles, fear_greed, regimes, by_id, start, end) -> dict:

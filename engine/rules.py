@@ -19,7 +19,7 @@ def fee_inclusive_roi(gross_ratio: float, fee: float) -> float:
 class RuleSpec(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    entry: Literal["donchian", "tsmom", "ema_trend", "breakout_volume", "rsi_dip", "bollinger_range"]
+    entry: Literal["donchian", "tsmom", "ema_trend", "breakout_volume", "rsi_dip", "bollinger_range", "regime"]
     timeframe: Timeframe
     lookback: Annotated[int, Field(ge=2, le=400)]
     fast: Annotated[int, Field(ge=2, le=400)] | None = None
@@ -32,10 +32,13 @@ class RuleSpec(BaseModel):
         "above_sma50_1d",
         "above_sma100_1d",
         "above_sma200_1d",
+        "btc_above_sma50_1d",
         "btc_above_sma100_1d",
         "btc_above_sma200_1d",
     ] = "none"
-    exit: Literal["none", "donchian_mid", "tsmom_flip", "ema_cross", "sma_reclaim", "bb_mid"]
+    exit: Literal[
+        "none", "donchian_mid", "donchian_low", "tsmom_flip", "ema_cross", "sma_reclaim", "bb_mid", "regime_off"
+    ]
     exit_lookback: Annotated[int, Field(ge=2, le=400)] | None = None
     stoploss: Annotated[float, Field(gt=-1, lt=0)]
     take_profit: Ratio | None = None
@@ -53,7 +56,9 @@ class RuleSpec(BaseModel):
             raise ValueError("exit ema_cross needs fast and slow")
         if self.entry in ("breakout_volume", "rsi_dip") and self.threshold is None:
             raise ValueError(f"entry {self.entry} needs threshold")
-        if self.exit in ("donchian_mid", "sma_reclaim") and self.exit_lookback is None:
+        if (self.entry == "regime" or self.exit == "regime_off") and self.trend_sma is None:
+            raise ValueError("entry regime and exit regime_off need a trend_filter")
+        if self.exit in ("donchian_mid", "donchian_low", "sma_reclaim") and self.exit_lookback is None:
             raise ValueError(f"exit {self.exit} needs exit_lookback")
         if self.lock_at is not None and self.take_profit is not None and self.lock_at >= self.take_profit:
             raise ValueError("lock_at must be below take_profit")
@@ -73,6 +78,7 @@ class RuleSpec(BaseModel):
             "above_sma50_1d": 50,
             "above_sma100_1d": 100,
             "above_sma200_1d": 200,
+            "btc_above_sma50_1d": 50,
             "btc_above_sma100_1d": 100,
             "btc_above_sma200_1d": 200,
         }[self.trend_filter]

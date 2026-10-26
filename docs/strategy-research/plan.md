@@ -189,4 +189,26 @@ Because ZHA-3913 used LINK, DOT, UNI and AVAX for its own out-of-sample test, th
 
 Cross-asset choice in round 4: the three configurations ranked first among the round 4 walk-forward results by the ranking key, eligible or not (round 3 used the first three eligible ones). This rule was not written before the run; it is recorded here as it was applied.
 
+# Round 5: portfolio versions of the ZHA-3913 shortlist (the last round)
+
+Locked in the commit that adds this section, before the first round 5 run. Laras's report (ZHA-3913 `profit-search`) found that the only families with a positive monthly profit on her unseen pairs were portfolio strategies sized as one equal share of the account per pair: F1 (hold every pair while BTC/IDR closes above its SMA100; 3.29% a month, 61% drawdown on LINK, DOT, UNI, AVAX) and F3 (Donchian 55/20 with a 2 x ATR20 stop and the BTC gate; 2.45% a month, 46.5% drawdown). This round runs both families in this runner, with her grids, on the five selection pairs, and checks the selection on the six pairs nobody has used (BNB, NEAR, HBAR, ADA, LTC, TRX).
+
+## What the runner adds
+
+- Entry `regime` (true on every candle; with a trend filter it fires once when the filter turns on) and exit `regime_off` (the trend filter is off). With `btc_above_smaN_1d` this is F1: hold the pair while the daily BTC/IDR close is above its SMA. New filter `btc_above_sma50_1d`.
+- Exit `donchian_low`: close below the lowest low of the last m completed candles. With `entry: donchian`, `stop_atr: 2.0` this is F3 with a channel exit.
+- An equal-weight account next to the risk-sized one: each trade gets 99% / N of equity (N = pairs with trades), N slots, the same compounding and month bookkeeping. Laras's F1 and F3 are sized this way; the 0.5% risk sizing is too small for a strategy that holds the market.
+- Ranking from round 5 on: tier, then compounded profit per month of the equal-weight account, then drawdown. Equal-weight buy-and-hold of the same pairs stays next to it.
+
+## Round 5 matrix: 12 configurations (cumulative 186 of 1,500)
+
+| Family | Configurations |
+| --- | --- |
+| F1 hold every pair while BTC/IDR closes above SMA 50, 100 or 200; exit when it closes below; no stop besides a 95% hard stop | 3 |
+| F3 Donchian 1d entry above the n-day high, exit below the m-day low, stop 2 x ATR(14) of the daily candles (hard stop 50%); (n, m) in {(20, 10), (55, 20), (100, 50)}, BTC SMA100 gate on or off | 6 |
+| R random entries with the exits of `F1-regime-btc-sma100` (control, not deployable) | 1 |
+| K benchmarks: SwingEmaRsi, buy-and-hold | 2 |
+
+Differences from Laras's simulator, stated before the run: taker entries only (her maker variant needs limit orders this runner does not model), ATR(14) instead of ATR(20), one signal per pair with this runner's 1h fill model, and no volatility targeting (it never won in her report). Runs: walk-forward on the five pairs (`--label walk-forward-r5`), controls for every configuration (`--label controls-r5`), then `cross-asset` for the first three configurations by the ranking key among the eligible ones (`--label cross-asset-r5`). Every tier is provisional until forward data. If round 5 does not reach T1, the task ends with five rounds spent; the closing report lists every family tried and three next directions, and Wira decides whether to continue.
+
 Sizing note: the "2% risk" columns are research sizing only. The bot refuses `risk.risk_per_trade_pct` above `risk.max_daily_loss_pct` (1% in the example config), so 2% per trade needs a daily limit of at least 2% or research mode.

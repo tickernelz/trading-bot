@@ -87,6 +87,8 @@ def portfolio(
     limits: Limits | None = None,
     mark: Mark | None = None,
     risk: float = plan.RISK_PER_TRADE,
+    fraction: float | None = None,
+    slots: int = plan.MAX_OPEN_TRADES,
 ) -> dict:
     """One account over all rows with the risk layer's sizing and slot cap, and the loss limits when given.
 
@@ -106,14 +108,15 @@ def portfolio(
     monthly: dict[str, float] = {}
     for _, kind, i in events:
         if kind == 0:
-            if len(stakes) >= plan.MAX_OPEN_TRADES:
+            if len(stakes) >= slots:
                 refused_slots += 1
                 continue
             if limits is not None and _breached(rows[i].signal_time, equity, peak, closed, stakes, rows, limits, mark):
                 refused_limits += 1
                 continue
             free = equity - sum(stakes.values())
-            stakes[i] = max(0.0, min(equity * risk / per_stake, free))
+            wanted = equity * fraction if fraction is not None else equity * risk / per_stake
+            stakes[i] = max(0.0, min(wanted, free))
             taken.append(i)
         elif i in stakes:
             pnl = stakes.pop(i) * rows[i].profit
@@ -171,6 +174,8 @@ def summarize(rows: list[Row], start: pd.Timestamp, end: pd.Timestamp, stoploss:
     lo, hi = bootstrap_ci(profits)
     account = portfolio(rows, stoploss, fee)
     bold = portfolio(rows, stoploss, fee, risk=plan.RESEARCH_RISK_PER_TRADE)
+    pairs = len({row.pair for row in rows})
+    even = portfolio(rows, stoploss, fee, fraction=plan.ALLOCATION / pairs, slots=pairs)
     out.update(
         {
             "win_rate": float(wins.mean()),
@@ -190,6 +195,9 @@ def summarize(rows: list[Row], start: pd.Timestamp, end: pd.Timestamp, stoploss:
             "monthly_profit_idr_research_risk": monthly_profit_idr(bold["final_equity"], months),
             "max_drawdown_research_risk": bold["max_drawdown"],
             "worst_month_idr_research_risk": bold["worst_month"] * plan.CAPITAL_IDR,
+            "monthly_profit_idr_equal_weight": monthly_profit_idr(even["final_equity"], months),
+            "max_drawdown_equal_weight": even["max_drawdown"],
+            "worst_month_idr_equal_weight": even["worst_month"] * plan.CAPITAL_IDR,
             "rolling30_min_win_rate": rolling_min_win_rate(wins),
             "longest_days_without_entry": round(max(gaps), 1),
             "days_without_entry_at_end": round(gaps[-1], 1),

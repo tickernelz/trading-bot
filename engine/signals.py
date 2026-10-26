@@ -53,6 +53,7 @@ def _indicators(candles: pd.DataFrame, spec: RuleSpec, timeframe: str) -> pd.Dat
             highs = candles["high"].rolling(spec.exit_lookback).max()
             lows = candles["low"].rolling(spec.exit_lookback).min()
             out["dc_mid"] = ((highs + lows) / 2).shift(shift)
+            out["dc_low"] = lows.shift(shift)
             out["sma_exit"] = ta.SMA(candles, timeperiod=spec.exit_lookback)
     if timeframe == "1d" and spec.trend_sma is not None:
         out["sma_trend"] = ta.SMA(candles, timeperiod=spec.trend_sma)
@@ -91,21 +92,29 @@ def rule_frame(candles: pd.DataFrame, spec: RuleSpec, informative: dict[str, pd.
         condition = (close > main["dc_high"]) & (main["vol_ratio"] > spec.threshold)
     elif spec.entry == "rsi_dip":
         condition = main["rsi"] < spec.threshold
+    elif spec.entry == "regime":
+        condition = pd.Series(True, index=base.index)
     else:
         condition = main["close"] < main["bb_lower"]
     if spec.adx_min is not None:
         condition &= main["adx"] > spec.adx_min
     if spec.adx_max is not None:
         condition &= main["adx"] < spec.adx_max
+    regime_on = pd.Series(True, index=base.index)
     if spec.trend_sma is not None:
         if spec.trend_on_btc:
             daily = _on_base(base, _indicators(sources["btc"], spec, "1d"), "1d")
         else:
             daily = main if spec.timeframe == "1d" else _on_base(base, _indicators(sources["1d"], spec, "1d"), "1d")
-        condition &= daily["close"] > daily["sma_trend"]
+        regime_on = daily["close"] > daily["sma_trend"]
+        condition &= regime_on
     condition &= base["volume"] > 0
     if spec.exit == "donchian_mid":
         exit_signal = close < main["dc_mid"]
+    elif spec.exit == "donchian_low":
+        exit_signal = close < main["dc_low"]
+    elif spec.exit == "regime_off":
+        exit_signal = ~regime_on.fillna(False).astype(bool)
     elif spec.exit == "tsmom_flip":
         exit_signal = main["ret"] < 0
     elif spec.exit == "ema_cross":

@@ -10,7 +10,7 @@ import pandas as pd
 from engine.rules import RuleSpec
 from engine.simulate import Costs
 
-ROUND = 4
+ROUND = 5
 SEED = 3872
 BOOTSTRAP_SAMPLES = 10_000
 NULL_SHUFFLES = 1_000
@@ -60,6 +60,8 @@ RISK_PER_TRADE = 0.005
 MAX_OPEN_TRADES = 3
 CAPITAL_IDR = 2_000_000
 RESEARCH_RISK_PER_TRADE = 0.02
+ALLOCATION = 0.99
+PROFIT_KEY = "monthly_profit_idr_equal_weight"
 MAX_DAILY_LOSS = 0.01
 MAX_TOTAL_DRAWDOWN = 0.10
 DAILY_RESET_TIMEZONE = "Asia/Jakarta"
@@ -625,7 +627,7 @@ def round3_candidates() -> list[Candidate]:
     return out
 
 
-def candidates() -> list[Candidate]:
+def round4_candidates() -> list[Candidate]:
     """The locked round 4 matrix, run on PAIRS: trend entries behind the BTC/IDR regime gate (ZHA-3913)."""
     out: list[Candidate] = []
     for n, exit_lookback, trend, stop in (
@@ -663,12 +665,60 @@ def candidates() -> list[Candidate]:
     return out
 
 
+def candidates() -> list[Candidate]:
+    """The locked round 5 matrix, run on PAIRS: ZHA-3913 F1 and F3, each pair one equal share of the account."""
+    out: list[Candidate] = []
+    for n in (50, 100, 200):
+        out.append(
+            _rule(
+                f"F1-regime-btc-sma{n}",
+                "F1 hold every pair while BTC/IDR closes above its SMA",
+                entry="regime",
+                timeframe="1d",
+                lookback=2,
+                trend_filter=f"btc_above_sma{n}_1d",
+                exit="regime_off",
+                stoploss=-0.95,
+            )
+        )
+    for n, m in ((20, 10), (55, 20), (100, 50)):
+        for tag, trend in (("btc100", "btc_above_sma100_1d"), ("nofilter", "none")):
+            out.append(
+                _rule(
+                    f"F3L-don1d{n}-low{m}-{tag}-st2atr",
+                    "F3 Donchian high entry, Donchian low exit, 2 ATR stop",
+                    entry="donchian",
+                    timeframe="1d",
+                    lookback=n,
+                    exit="donchian_low",
+                    exit_lookback=m,
+                    trend_filter=trend,
+                    stop_atr=2.0,
+                    stoploss=-0.50,
+                )
+            )
+    out += [
+        Candidate(
+            "R5-random-F1-exits",
+            "R random entry control",
+            "random",
+            random_rate=0.0005,
+            exits_from="F1-regime-btc-sma100",
+            deployable=False,
+        ),
+        Candidate("K-SwingEmaRsi", "K benchmark", "swing"),
+        Candidate("K-buy-and-hold", "K benchmark", "buy_hold", deployable=False),
+    ]
+    return out
+
+
 def all_candidates() -> dict[str, Candidate]:
     """Every configuration of every round by id; a later round wins for the shared benchmarks."""
-    rounds = (round1_candidates(), round2_candidates(), round3_candidates(), candidates())
+    rounds = (round1_candidates(), round2_candidates(), round3_candidates(), round4_candidates(), candidates())
     return {c.id: c for matrix in rounds for c in matrix}
 
 
 def cumulative_trials() -> int:
     """Configurations tried over every round so far, the count the multiple-testing correction uses."""
-    return len(round1_candidates()) + len(round2_candidates()) + len(round3_candidates()) + len(candidates())
+    rounds = (round1_candidates(), round2_candidates(), round3_candidates(), round4_candidates(), candidates())
+    return sum(len(matrix) for matrix in rounds)

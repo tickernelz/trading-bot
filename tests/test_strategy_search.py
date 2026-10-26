@@ -194,6 +194,43 @@ def test_signals_never_change_when_later_candles_are_added(rule):
         pd.testing.assert_frame_equal(cut_frame.tail(48), full.iloc[:cut].tail(48))
 
 
+def test_regime_rule_holds_while_btc_is_above_its_sma_and_exits_when_it_falls_below():
+    pair = daily_walk(320, seed=4)
+    btc = pair.copy()
+    path = np.r_[np.linspace(100, 300, 24 * 220), np.linspace(300, 100, len(pair) - 24 * 220)]
+    btc["open"] = btc["close"] = path
+    btc["high"], btc["low"] = path * 1.002, path * 0.998
+    rule = spec(entry="regime", timeframe="1d", lookback=2, exit="regime_off", trend_filter="btc_above_sma50_1d")
+    frame = rule_frame(pair, rule, {"1d": resample(pair, "1d"), "btc": resample(btc, "1d")})
+    entries, exits = np.flatnonzero(frame["enter"]), np.flatnonzero(frame["exit_signal"])
+    assert len(entries) >= 1 and 24 * 50 - 1 <= entries[0] < 24 * 60
+    assert not frame["exit_signal"].iloc[entries[0] : 24 * 220].any()
+    assert exits[exits > entries[0]].min() > 24 * 220
+
+
+def test_regime_entry_needs_a_trend_filter():
+    with pytest.raises(ValueError):
+        spec(entry="regime", timeframe="1d", lookback=2, exit="regime_off")
+
+
+def test_donchian_low_exit_fires_below_the_lowest_low_of_earlier_candles():
+    closes = [100, 101, 102, 103, 104, 99, 98]
+    frame = candles(closes, lows=[c - 0.5 for c in closes])
+    rule = spec(exit="donchian_low", exit_lookback=3)
+    exit_signal = rule_frame(frame, rule, {})["exit_signal"].tolist()
+    assert exit_signal == [False, False, False, False, False, True, True]
+
+
+def test_equal_weight_account_gives_each_pair_its_share_of_equity():
+    pairs = ["BTC/IDR", "ETH/IDR", "SOL/IDR", "XRP/IDR"]
+    rows = [day_row(0.10, 1, 5, pair) for pair in pairs]
+    even = metrics.portfolio(rows, -0.5, 0.0031, fraction=0.99 / 4, slots=4)
+    assert even["taken"] == [0, 1, 2, 3]
+    assert even["final_equity"] == pytest.approx(1 + 0.99 * 0.10)
+    capped = metrics.portfolio(rows, -0.5, 0.0031)
+    assert capped["taken"] == [0, 1, 2]
+
+
 def test_btc_regime_gate_reads_btc_not_the_traded_pair():
     pair = daily_walk(260, seed=4)
     rising, falling = pair.copy(), pair.copy()
@@ -372,7 +409,7 @@ def test_monthly_profit_compounds_the_final_equity_over_the_months():
 
 def test_cross_asset_ranking_puts_tier_before_monthly_profit_before_drawdown():
     def entry(cid, tier, monthly, drawdown):
-        summary = {"monthly_profit_idr": monthly, "max_drawdown": drawdown}
+        summary = {plan.PROFIT_KEY: monthly, "max_drawdown": drawdown}
         return {"id": cid, "tier": tier, "costs": {plan.PRIMARY_COST: {"all": summary}}}
 
     entries = [
@@ -385,7 +422,13 @@ def test_cross_asset_ranking_puts_tier_before_monthly_profit_before_drawdown():
 
 
 def test_rounds_stay_within_the_search_budget_and_ids_are_unique():
-    rounds = [plan.round1_candidates(), plan.round2_candidates(), plan.round3_candidates(), plan.candidates()]
+    rounds = [
+        plan.round1_candidates(),
+        plan.round2_candidates(),
+        plan.round3_candidates(),
+        plan.round4_candidates(),
+        plan.candidates(),
+    ]
     ids = [[candidate.id for candidate in matrix] for matrix in rounds]
     benchmarks = {"K-SwingEmaRsi", "K-buy-and-hold"}
     assert all(len(matrix) == len(set(matrix)) for matrix in ids)
