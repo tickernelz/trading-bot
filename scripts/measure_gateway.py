@@ -46,7 +46,7 @@ async def login(gateway: str) -> str:
         return response.json()["token"]
 
 
-async def fills(args: argparse.Namespace) -> None:
+async def fills(args: argparse.Namespace) -> dict:
     token = await login(args.gateway)
     auth = (os.environ["FT_API_USERNAME"], os.environ["FT_API_PASSWORD"])
     seen: list[dict] = []
@@ -83,7 +83,7 @@ async def fills(args: argparse.Namespace) -> None:
         listener.cancel()
     async with httpx.AsyncClient(base_url=args.gateway, headers={"Authorization": f"Bearer {token}"}) as client:
         metrics = (await client.get("/gw/v1/metrics")).json()
-    print(json.dumps(metrics["fill_latency_ms"], indent=2))
+    return {"cycles": args.cycles, "pair": args.pair, "feed_seen": seen, "metrics": metrics}
 
 
 async def wait_for(seen: list[dict], kind: str, trade_id: int, timeout: float) -> None:
@@ -127,31 +127,31 @@ async def pwa_client(gateway: str, token: str, pairs: list[str], until: float, s
         reader.cancel()
 
 
-async def clients(args: argparse.Namespace) -> None:
+async def clients(args: argparse.Namespace) -> dict:
     token = await login(args.gateway)
     stats: dict = {"events": 0, "latencies": [], "status": {}}
     until = time.monotonic() + args.seconds
     await asyncio.gather(*(pwa_client(args.gateway, token, args.pairs, until, stats) for _ in range(args.count)))
     latencies = sorted(stats["latencies"])
-    print(
-        json.dumps(
-            {
-                "clients": args.count,
-                "seconds": args.seconds,
-                "requests": len(latencies),
-                "status": stats["status"],
-                "events": stats["events"],
-                "request_ms_p50": round(statistics.median(latencies), 1) if latencies else None,
-                "request_ms_p95": round(latencies[int(0.95 * len(latencies))], 1) if latencies else None,
-            },
-            indent=2,
-        )
-    )
+    async with httpx.AsyncClient(base_url=args.gateway, headers={"Authorization": f"Bearer {token}"}) as client:
+        metrics = (await client.get("/gw/v1/metrics")).json()
+    return {
+        "clients": args.count,
+        "seconds": args.seconds,
+        "requests": len(latencies),
+        "status": stats["status"],
+        "events": stats["events"],
+        "request_ms_p50": round(statistics.median(latencies), 1) if latencies else None,
+        "request_ms_p95": round(latencies[int(0.95 * len(latencies))], 1) if latencies else None,
+        "request_ms": [round(value, 2) for value in stats["latencies"]],
+        "metrics": metrics,
+    }
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--gateway", default="http://127.0.0.1:8090")
+    parser.add_argument("--out", help="also write the JSON result to this file")
     sub = parser.add_subparsers(dest="command", required=True)
     fill = sub.add_parser("fills")
     fill.add_argument("--bot", default="http://127.0.0.1:8082")
@@ -163,7 +163,12 @@ def main() -> None:
     load.add_argument("--seconds", type=int, default=600)
     load.add_argument("--pairs", nargs="+", default=["BTC/IDR", "ETH/IDR", "SOL/IDR"])
     args = parser.parse_args()
-    asyncio.run(fills(args) if args.command == "fills" else clients(args))
+    result = asyncio.run(fills(args) if args.command == "fills" else clients(args))
+    text = json.dumps(result, indent=2)
+    print(text)
+    if args.out:
+        with open(args.out, "w", encoding="utf-8") as handle:
+            handle.write(text + "\n")
 
 
 if __name__ == "__main__":
