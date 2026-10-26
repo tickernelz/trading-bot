@@ -652,7 +652,10 @@ def cross_asset(args, ledger_entry: dict) -> dict:
     results = []
     for cid in args.candidate:
         candidate = by_id[cid]
-        signals = build_signals(candidate, cross, fear_greed, by_id)
+        gated = {**cross, plan.REGIME_PAIR: wf_candles[plan.REGIME_PAIR]}
+        signals = {
+            pair: item for pair, item in build_signals(candidate, gated, fear_greed, by_id).items() if pair in cross
+        }
         wf_signals = build_signals(candidate, wf_candles, fear_greed, by_id)
         stoploss = stoploss_of(signals)
         trades = trades_of(signals, primary)
