@@ -451,7 +451,9 @@ def controls(args, ledger_entry: dict) -> dict:
                 dates = item.candles["date"].tail(COMPARE_ROWS)
                 if not frame_equal(item, honest[pair], dates):
                     truncation_failures += 1
-                alone = {pair: cut_candles[pair], plan.REGIME_PAIR: cut_candles[plan.REGIME_PAIR]}
+                alone = {pair: cut_candles[pair]}
+                if candidate.spec is not None and candidate.spec.trend_on_btc:
+                    alone[plan.REGIME_PAIR] = cut_candles[plan.REGIME_PAIR]
                 live = build_signals(candidate, alone, fear_greed, by_id, window=plan.LIVE_WINDOW_CANDLES)[pair]
                 compared += 1
                 if not frame_equal(_entries_only(live), _entries_only(item), dates):
@@ -809,8 +811,8 @@ def main(argv: list[str]) -> int:
     if args.replay:
         kind = f"{kind}_replay"
     args.out.mkdir(parents=True, exist_ok=True)
-    if args.label and (args.out / f"{args.label}.json").exists():
-        parser.error(f"output {args.label}.json already exists in --out")
+    if (args.out / f"{args.label or args.command}.json").exists():
+        parser.error(f"output {args.label or args.command}.json already exists in --out; pass a new --label")
     entry = {
         "run_id": uuid.uuid4().hex,
         "round": plan.ROUND,

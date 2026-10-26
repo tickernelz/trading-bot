@@ -431,6 +431,36 @@ def test_a_run_writes_its_started_line_before_reading_any_data(tmp_path, monkeyp
     assert line["status"] == "started" and set(line["data_sha256"]) == {*plan.PAIRS, "fear_greed"}
 
 
+def test_controls_run_for_a_btc_gated_rule(tmp_path, monkeypatch):
+    btc, eth = daily_walk(330, seed=2), daily_walk(330, seed=5)
+    rule = spec(timeframe="1d", lookback=5, exit="donchian_mid", exit_lookback=5, trend_filter="btc_above_sma100_1d")
+    gated = plan.Candidate("btc-gated", "test", "rule", rule)
+    monkeypatch.setattr(plan, "candidates", lambda: [gated])
+    monkeypatch.setattr(plan, "WALK_FORWARD_START", btc["date"].iloc[24 * 220])
+    monkeypatch.setattr(plan, "HOLDOUT_START", btc["date"].iloc[-1] + pd.Timedelta(hours=1))
+    monkeypatch.setattr(plan, "LOOKAHEAD_CUTS", 2)
+    monkeypatch.setattr(strategy_search, "load_candles", lambda *a, **k: {"BTC/IDR": btc, "ETH/IDR": eth})
+    monkeypatch.setattr(strategy_search, "load_fear_greed", lambda path: pd.DataFrame(columns=["date", "fg"]))
+    [result] = strategy_search.controls(type("Args", (), {"datadir": tmp_path, "fear_greed": tmp_path})(), {})[
+        "results"
+    ]
+    assert result["truncation_cuts"] == 4
+    assert result["truncation_failures"] == 0 and result["live_window_entry_mismatches"] == 0
+
+
+def test_a_second_run_with_the_same_output_name_is_refused_before_the_ledger(tmp_path):
+    datadir, fear_greed = search_dirs(tmp_path, plan.PAIRS)
+    out, ledger = tmp_path / "o", tmp_path / "ledger.jsonl"
+    out.mkdir()
+    (out / "walk-forward.json").write_text("{}", encoding="utf-8")
+    argv = ["walk-forward", "--datadir", str(datadir), "--fear-greed", str(fear_greed), "--out", str(out)]
+    with pytest.raises(SystemExit):
+        strategy_search.main([*argv, "--ledger", str(ledger)])
+    with pytest.raises(SystemExit):
+        strategy_search.main([*argv, "--ledger", str(ledger), "--label", "walk-forward"])
+    assert not ledger.exists()
+
+
 @pytest.mark.parametrize("command,kind", [("holdout", "holdout_started"), ("presample", "presample")])
 def test_second_run_on_an_untouched_period_is_refused_before_any_data_is_read(tmp_path, monkeypatch, command, kind):
     datadir, fear_greed = search_dirs(tmp_path, {*plan.PAIRS, *plan.ROUND1_PAIRS, *plan.PRESAMPLE_PAIRS})
