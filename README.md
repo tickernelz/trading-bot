@@ -60,12 +60,29 @@ Jaringan: network_mode host dipakai supaya bot bisa menjangkau provider LLM yang
 
 Tes berjalan di dalam image turunan Freqtrade, jadi versi Freqtrade, ccxt, dan pandas sama dengan produksi. Kontrol negatif: matikan pemeriksaan batas di engine/risk.py (ganti kedua if batas menjadi if False:) lalu jalankan tes; tes batas wajib gagal.
 
+## Analitik
+
+Paket analytics/ menyediakan pratinjau what-if batas risiko dan putar ulang jawaban voter, papan skor voter, uji stres turun 10 persen, ekspor CSV dan ringkasan pajak sebagai informasi, portofolio per pair, serta sinyal strategi dan backtest lewat instans Freqtrade mode webserver. Bentuk endpoint ada di bagian 13 docs/gateway-api.md; ambang dan tarif diatur di bagian analytics config.
+
+Sinyal dan backtest butuh instans mode webserver dengan data OHLCV di userdir-nya (bot mode trade menjawab 503 untuk /pair_history dan /backtest):
+
+    docker run --rm --network host --env-file .env -v ./config:/opt/trading-bot/config:ro -v ./user_data:/freqtrade/user_data trading-bot/engine:dev download-data --days 25 --timeframes 1h
+    docker run -d --network host --env-file .env -v ./config:/opt/trading-bot/config:ro -v ./user_data:/freqtrade/user_data trading-bot/engine:dev webserver
+
+Pair tambahan cukup ditulis di exchange.pairs (dan risk.max_open_trades dinaikkan); setiap pair menambah panggilan voter per kandidat entry.
+
 ## Batasan Indodax yang terukur
 
 - Freqtrade 2026.9 mencetak peringatan bahwa indodax tidak didukung resmi dan memakai kelas exchange generik, tetapi OHLCV 1h BTC/IDR, ETH/IDR, SOL/IDR terambil.
 - ccxt 4.5.84 melaporkan biaya taker Indodax 0.2 sebagai rasio (bukan 0,2%), sehingga Freqtrade akan memakai biaya 20% bila tidak ditimpa. Karena itu exchange.fee_pct: 0.2 wajib di config dan dirender menjadi fee: 0.002.
 - ccxt melaporkan fetchMyTrades dan watchOHLCV tidak tersedia (dilaporkan Freqtrade sebagai missing opt).
-- Riwayat OHLCV 1h hanya sekitar 649 candle terakhir (27 hari) walaupun diminta 120 hari; permintaan 1d mengembalikan 1000 candle dalam satu panggilan. Backtest 1h karena itu terbatas pada sekitar 27 hari.
+- Satu permintaan OHLCV dengan rentang panjang hanya mengembalikan candle terbaru (1h: 649 candle, 27 hari), sehingga download-data Freqtrade berhenti di 27 hari. Riwayat 1h sendiri tersedia minimal sejak 2023-10-01: engine/history.py mengambilnya per jendela 500 candle (docs/stage2-backtest.md).
+
+## Backtest tahap 2
+
+    IMAGE=trading-bot/engine:dev scripts/stage2_backtest.sh user_data/stage2
+
+Mengunduh riwayat 1h tiga pair sejak 2023-10-01, lalu menjalankan delapan backtest yang matriksnya dikunci di engine/backtest_suite.py (in-sample dan out-of-sample, fee 0,2% dan pajak 0,21% per sisi, pembanding fee saja dan tanpa biaya, batas risiko apa adanya dan dimatikan). Hasil: report.json dan report.md di direktori keluaran. Temuan: docs/stage2-backtest.md.
 
 ## Memperbarui Freqtrade
 

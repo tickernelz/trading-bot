@@ -1,6 +1,11 @@
 *
+!analytics
 !engine
+!swarm
 !tests
 !pyproject.toml
 !config/config.example.yaml
 **/__pycache__
+**/.venv
+**/.ruff_cache
+swarm/bench

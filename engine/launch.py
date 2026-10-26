@@ -11,7 +11,7 @@ from typing import Any
 from engine.settings import ConfigError, Settings, load_settings
 
 STRATEGY = "SwingEmaRsi"
-STRATEGY_COMMANDS = {"trade", "backtesting", "webserver"}
+STRATEGY_COMMANDS = {"trade", "backtesting"}
 API_COMMANDS = {"trade", "webserver"}
 ENGINE_ROOT = Path(__file__).resolve().parent
 
@@ -56,6 +56,7 @@ def freqtrade_config(settings: Settings, serve_api: bool = True) -> dict[str, An
             "pair_blacklist": [],
         },
         "pairlists": [{"method": "StaticPairList"}],
+        "strategy_path": str(ENGINE_ROOT / "strategies"),
         "internals": {"process_throttle_secs": 5},
         "trading_bot": {
             "initial_capital": settings.capital.initial_idr,
