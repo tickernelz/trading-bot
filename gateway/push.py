@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-import ipaddress
+import base64
 import json
 import logging
 import os
@@ -12,11 +12,13 @@ from pathlib import Path
 from typing import Annotated, Any, Literal
 from urllib.parse import urlsplit
 
+import requests
 from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec
 from fastapi import Depends, FastAPI
 from py_vapid import Vapid02
 from py_vapid.utils import b64urlencode
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pywebpush import WebPushException, webpush
 
 from gateway.feed import now_iso
@@ -26,7 +28,7 @@ from gateway.upstream import ApiError
 logger = logging.getLogger("trading_bot.gateway")
 
 KINDS = ("fill", "risk_breach", "kill_switch", "heartbeat_lost", "quorum_failed", "daily_summary")
-Kind = Literal["fill", "risk_breach", "kill_switch", "heartbeat_lost", "quorum_failed", "daily_summary"]
+Kind = Literal[*KINDS]
 URLS = {
     "fill": "/#activity",
     "risk_breach": "/#summary",
@@ -42,6 +44,9 @@ TTL_S = 600
 SEND_TIMEOUT_S = 10.0
 CONCURRENT_SENDS = 4
 GONE = (404, 410)
+PUSH_HOSTS = ("fcm.googleapis.com",)
+PUSH_HOST_SUFFIXES = (".push.services.mozilla.com", ".push.apple.com", ".notify.windows.com")
+AUTH_SECRET_BYTES = 16
 SIGNED = frozenset({"pnl_pct"})
 Base64Url = Annotated[str, Field(min_length=1, max_length=256, pattern=r"^[A-Za-z0-9_-]+={0,2}$")]
 
@@ -112,19 +117,22 @@ def render(
     return {"title": entry["title"].format_map(values), "body": entry["body"].format_map(values), "lang": code}
 
 
-def public_host_only(endpoint: str) -> None:
+def push_service_only(endpoint: str) -> None:
+    """Accept only https endpoints on the standard port that belong to a known browser push service."""
     parts = urlsplit(endpoint)
     host = (parts.hostname or "").lower()
-    if parts.scheme != "https" or not host or parts.username or parts.password:
-        raise ApiError(400, "invalid_request", "push endpoint must be an https URL without credentials")
-    if host == "localhost" or host.endswith(".localhost"):
-        raise ApiError(400, "invalid_request", "push endpoint must not point at this machine")
     try:
-        address = ipaddress.ip_address(host)
+        port = parts.port
     except ValueError:
-        return
-    if not address.is_global:
-        raise ApiError(400, "invalid_request", "push endpoint must not be a private or loopback address")
+        port = -1
+    if parts.scheme != "https" or not host or parts.username or parts.password or port not in (None, 443):
+        raise ApiError(400, "invalid_request", "push endpoint must be an https URL without credentials")
+    if host not in PUSH_HOSTS and not host.endswith(PUSH_HOST_SUFFIXES):
+        raise ApiError(400, "invalid_request", "push endpoint is not a known browser push service")
+
+
+def _b64url_bytes(value: str) -> bytes:
+    return base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
 
 
 class Courier:
@@ -138,29 +146,49 @@ class Courier:
             key_path.parent.mkdir(parents=True, exist_ok=True)
             self._vapid = Vapid02()
             self._vapid.generate_keys()
-            self._vapid.save_key(str(key_path))
-            os.chmod(key_path, 0o600)
+            descriptor = os.open(key_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(descriptor, "wb") as handle:
+                handle.write(self._vapid.private_pem())
         raw = self._vapid.public_key.public_bytes(
             serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint
         )
         self.public_key = b64urlencode(raw)
 
     def send(self, subscription: dict[str, Any], payload: str, urgency: str) -> None:
-        webpush(
-            subscription_info=subscription,
-            data=payload,
-            vapid_private_key=self._vapid,
-            vapid_claims={"sub": self.subject},
-            ttl=TTL_S,
-            headers={"Urgency": urgency},
-            timeout=SEND_TIMEOUT_S,
-        )
+        with requests.Session() as session:
+            session.max_redirects = 0
+            webpush(
+                subscription_info=subscription,
+                data=payload,
+                vapid_private_key=self._vapid,
+                vapid_claims={"sub": self.subject},
+                ttl=TTL_S,
+                headers={"Urgency": urgency},
+                timeout=SEND_TIMEOUT_S,
+                requests_session=session,
+            )
 
 
 class Keys(BaseModel):
     model_config = ConfigDict(extra="ignore")
     p256dh: Base64Url
     auth: Base64Url
+
+    @field_validator("p256dh")
+    @classmethod
+    def _p256dh_is_a_curve_point(cls, value: str) -> str:
+        try:
+            ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), _b64url_bytes(value))
+        except ValueError as exc:
+            raise ValueError("p256dh must be an uncompressed P-256 point") from exc
+        return value
+
+    @field_validator("auth")
+    @classmethod
+    def _auth_has_the_secret_length(cls, value: str) -> str:
+        if len(_b64url_bytes(value)) != AUTH_SECRET_BYTES:
+            raise ValueError(f"auth must be {AUTH_SECRET_BYTES} bytes")
+        return value
 
 
 class PushSubscription(BaseModel):
@@ -194,7 +222,7 @@ class PushDesk:
 
     def subscribe(self, body: Subscribe) -> dict[str, Any]:
         if not self.allow_local_endpoints:
-            public_host_only(body.subscription.endpoint)
+            push_service_only(body.subscription.endpoint)
         lang = resolve_lang(body.lang)
         kinds = [kind for kind in KINDS if kind in body.kinds]
         if not self.ledger.save_subscription(
@@ -232,10 +260,12 @@ class PushDesk:
                 status = getattr(exc.response, "status_code", None)
                 if status in GONE:
                     self.ledger.delete_subscription(item["endpoint"])
-                logger.warning("push to %s failed: %s", urlsplit(item["endpoint"]).hostname, status or exc)
+                logger.warning(
+                    "push to %s failed: %s", urlsplit(item["endpoint"]).hostname, status or type(exc).__name__
+                )
                 return False
             except Exception as exc:
-                logger.warning("push to %s failed: %r", urlsplit(item["endpoint"]).hostname, exc)
+                logger.warning("push to %s failed: %s", urlsplit(item["endpoint"]).hostname, type(exc).__name__)
                 return False
         return True
 

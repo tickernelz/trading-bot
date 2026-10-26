@@ -73,6 +73,7 @@ class Freqtrade(FakeFreqtrade):
 class PushService:
     def __init__(self, status: int = 201) -> None:
         self.status = status
+        self.location: str | None = None
         self.requests: list[tuple[str, dict[str, str], bytes]] = []
         service = self
 
@@ -81,6 +82,8 @@ class PushService:
                 body = self.rfile.read(int(self.headers["Content-Length"]))
                 service.requests.append((self.path, dict(self.headers), body))
                 self.send_response(service.status)
+                if service.location:
+                    self.send_header("Location", service.location)
                 self.send_header("Content-Length", "0")
                 self.end_headers()
 
@@ -88,7 +91,7 @@ class PushService:
                 pass
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+        threading.Thread(target=self.server.serve_forever, kwargs={"poll_interval": 0.013}, daemon=True).start()
 
     def endpoint(self, name: str) -> str:
         return f"http://127.0.0.1:{self.server.server_port}/{name}"
@@ -236,6 +239,8 @@ def test_key_is_stable_across_restarts(rig, tmp_path):
     first = client.get("/gw/v1/push/key").json()["public_key"]
     assert len(base64.urlsafe_b64decode(first + "==")) == 65
     assert oct((tmp_path / "state" / "vapid_private.pem").stat().st_mode & 0o777) == "0o600"
+    with pytest.raises(FileExistsError):
+        os.open(tmp_path / "state" / "vapid_private.pem", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     from gateway.push import Courier
 
     assert Courier(tmp_path / "state" / "vapid_private.pem", "mailto:a@b.c").public_key == first
@@ -288,17 +293,7 @@ def test_subscription_count_is_capped(rig):
     assert _subscribe(client, service.endpoint("0"), Device(), lang="id").status_code == 201
 
 
-@pytest.mark.parametrize(
-    "endpoint",
-    [
-        "http://push.example.com/x",
-        "https://127.0.0.1/x",
-        "https://localhost/x",
-        "https://10.0.0.5/x",
-        "https://user:pw@push.example.com/x",
-    ],
-)
-def test_endpoints_that_could_reach_this_machine_are_refused(tmp_path, endpoint):
+def _strict_client(tmp_path):
     config = tmp_path / "bot-a.yaml"
     shutil.copy(EXAMPLE, config)
     settings = GatewaySettings(
@@ -316,15 +311,78 @@ def test_endpoints_that_could_reach_this_machine_are_refused(tmp_path, endpoint)
         ],
     )
     gateway = Gateway(settings, ENV)
+    client = TestClient(create_app(gateway))
+    token = client.post("/gw/v1/session", json={"password": PASSWORD}).json()["token"]
+    client.headers["Authorization"] = f"Bearer {token}"
+    return gateway, client
+
+
+@pytest.mark.parametrize(
+    "endpoint",
+    [
+        "http://fcm.googleapis.com/fcm/send/x",
+        "https://127.0.0.1/x",
+        "https://2130706433/x",
+        "https://0x7f000001/x",
+        "https://[::1]/x",
+        "https://localhost/x",
+        "https://localtest.me/x",
+        "https://10.0.0.5/x",
+        "https://example.com/x",
+        "https://fcm.googleapis.com.evil.example/x",
+        "https://evilpush.apple.com/x",
+        "https://fcm.googleapis.com:8443/x",
+        "https://user:pw@fcm.googleapis.com/x",
+    ],
+)
+def test_endpoints_outside_the_push_services_are_refused(tmp_path, endpoint):
+    gateway, client = _strict_client(tmp_path)
     try:
-        client = TestClient(create_app(gateway))
-        token = client.post("/gw/v1/session", json={"password": PASSWORD}).json()["token"]
-        client.headers["Authorization"] = f"Bearer {token}"
         response = _subscribe(client, endpoint, Device())
         assert (response.status_code, response.json()["error"]["code"]) == (400, "invalid_request")
         assert gateway.ledger.push_subscriptions("fill") == []
     finally:
         gateway.ledger.close()
+
+
+@pytest.mark.parametrize(
+    "endpoint",
+    [
+        "https://fcm.googleapis.com/fcm/send/abc",
+        "https://updates.push.services.mozilla.com/wpush/v2/abc",
+        "https://web.push.apple.com/abc",
+        "https://wns2-par02p.notify.windows.com/w/?token=abc",
+    ],
+)
+def test_the_browser_push_services_are_accepted(tmp_path, endpoint):
+    gateway, client = _strict_client(tmp_path)
+    try:
+        assert _subscribe(client, endpoint, Device()).status_code == 201
+    finally:
+        gateway.ledger.close()
+
+
+def test_a_redirect_from_the_push_service_is_not_followed(rig):
+    gateway, client, service = rig
+    inner = PushService()
+    try:
+        _subscribe(client, service.endpoint("a"), Device())
+        service.status = 307
+        service.location = inner.endpoint("internal/admin/kill")
+        assert asyncio.run(gateway.push.notify("kill_switch", PARAMS["kill_switch"])) == {"sent": 0, "failed": 1}
+        assert len(service.requests) == 1
+        assert inner.requests == []
+    finally:
+        inner.close()
+
+
+def test_a_failed_delivery_does_not_log_the_subscription_token(rig, caplog):
+    gateway, client, service = rig
+    _subscribe(client, "http://127.0.0.1:9/fcm/send/SECRET-TOKEN-abc", Device())
+    with caplog.at_level("WARNING", logger="trading_bot.gateway"):
+        assert asyncio.run(gateway.push.notify("kill_switch", PARAMS["kill_switch"])) == {"sent": 0, "failed": 1}
+    assert "push to 127.0.0.1 failed" in caplog.text
+    assert "SECRET-TOKEN" not in caplog.text
 
 
 def test_malformed_subscription_is_refused(rig):
@@ -498,3 +556,21 @@ def test_web_push_off_in_the_bot_config_sends_nothing(rig):
 
     asyncio.run(scenario())
     assert calls == []
+
+
+def test_keys_that_could_never_deliver_are_refused_and_do_not_use_a_slot(rig):
+    gateway, client, service = rig
+    good = Device().keys
+    cases = {
+        "off the curve": {**good, "p256dh": _b64(b"\x04" + os.urandom(64))},
+        "short point": {**good, "p256dh": _b64(os.urandom(33))},
+        "short auth": {**good, "auth": _b64(os.urandom(8))},
+        "long auth": {**good, "auth": _b64(os.urandom(32))},
+    }
+    for name, keys in cases.items():
+        response = client.post(
+            "/gw/v1/push/subscriptions", json={"subscription": {"endpoint": service.endpoint(name), "keys": keys}}
+        )
+        assert response.status_code == 400, name
+        assert response.json()["error"]["code"] == "invalid_request", name
+    assert gateway.ledger.push_subscriptions("fill") == []

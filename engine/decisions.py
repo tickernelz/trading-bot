@@ -84,6 +84,19 @@ def migrate(db: sqlite3.Connection) -> None:
         raise
 
 
+def upgrade_file(path: Path) -> None:
+    """Migrate a decision database in place through a short writer connection."""
+    writer = sqlite3.connect(path, isolation_level=None)
+    try:
+        migrate(writer)
+    except sqlite3.OperationalError as exc:
+        raise sqlite3.OperationalError(
+            f"{path} stores legacy verdict names and cannot be migrated from a read-only open: {exc}"
+        ) from exc
+    finally:
+        writer.close()
+
+
 @dataclass(frozen=True)
 class Outcome:
     decision_id: str
@@ -106,7 +119,7 @@ class DecisionStore:
         if readonly:
             self._db = sqlite3.connect(f"file:{self.path}?mode=ro", uri=True, check_same_thread=False)
             if self._db.execute("PRAGMA user_version").fetchone()[0] < SCHEMA_VERSION:
-                self._migrate_from_reader()
+                upgrade_file(self.path)
         else:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             self._db = sqlite3.connect(self.path, check_same_thread=False, isolation_level=None)
@@ -115,17 +128,6 @@ class DecisionStore:
             migrate(self._db)
             self._db.isolation_level = ""
         self._db.row_factory = sqlite3.Row
-
-    def _migrate_from_reader(self) -> None:
-        writer = sqlite3.connect(self.path, isolation_level=None)
-        try:
-            migrate(writer)
-        except sqlite3.OperationalError as exc:
-            raise sqlite3.OperationalError(
-                f"{self.path} stores legacy verdict names and cannot be migrated from a read-only open: {exc}"
-            ) from exc
-        finally:
-            writer.close()
 
     def close(self) -> None:
         self._db.close()

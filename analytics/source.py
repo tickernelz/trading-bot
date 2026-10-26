@@ -12,7 +12,7 @@ from tb_swarm.models import DecisionRequest
 from tb_swarm.outcome import VoterRecord
 
 from analytics.errors import AnalyticsError
-from engine.decisions import SHADOW_KEY
+from engine.decisions import SCHEMA_VERSION, SHADOW_KEY, upgrade_file
 
 DECISION_COLUMNS = "decision_id, settled_at, pair, status, reason, verdict, required, iqr_limit, request, voters"
 
@@ -86,6 +86,10 @@ def load_decisions(decisions_db: Path, trades_db: Path | None = None, limit: int
     """Load the newest settled decisions, each with its trade outcome when a trades database is given."""
     outcomes = trade_outcomes(trades_db) if trades_db is not None else {}
     db = connect(decisions_db)
+    if db.execute("PRAGMA user_version").fetchone()[0] < SCHEMA_VERSION:
+        db.close()
+        upgrade_file(decisions_db)
+        db = connect(decisions_db)
     try:
         rows = db.execute(
             f"SELECT {DECISION_COLUMNS} FROM decisions WHERE settle_seq IS NOT NULL ORDER BY settle_seq DESC LIMIT ?",

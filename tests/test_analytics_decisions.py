@@ -16,6 +16,7 @@ from analytics.service import BotSource, evaluate
 from analytics.source import RecordedDecision, load_decisions
 from engine.settings import ConfigError, Settings, load_settings
 from tests.analytics_support import record, request, write_decisions, write_trades
+from tests.test_decisions import _fixture_rows, _legacy_database
 
 WEIGHTS = {f"v{index}": 1.0 for index in range(1, 6)}
 
@@ -429,3 +430,19 @@ class TestApplyModes:
         source, config = self.drifting_source(tmp_path, example_raw, auto_disable=True)
         assert evaluate(source, 100, "read")["applied"] == []
         assert evaluate(source, 100, "auto")["applied"] == ["v1"]
+
+
+def test_a_legacy_decision_database_is_read_with_the_current_verdict_names(tmp_path):
+    path = tmp_path / "legacy.sqlite"
+    _legacy_database(path, _fixture_rows())
+    loaded = load_decisions(path)
+    assert loaded.invalid == 0
+    assert {decision.verdict for decision in loaded.decisions} == {"skip"}
+    options = {
+        option
+        for decision in loaded.decisions
+        for voter in decision.voters
+        if voter.answers
+        for option in voter.answers["verdict"].probabilities or {}
+    }
+    assert options <= {"allow", "reduce", "skip"}
