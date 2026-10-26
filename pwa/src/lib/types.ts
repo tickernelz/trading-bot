@@ -172,4 +172,45 @@ export interface ErrorEnvelope {
   error: { code: string; message: string; retry_after_ms?: number };
 }
 
+export interface NewsSource {
+  id: string;
+  name: string;
+  url: string;
+  feed: string;
+  ok: boolean;
+  error: string | null;
+  fetched_at: string | null;
+}
+
+export interface NewsItem {
+  id: string;
+  source: string;
+  title: string;
+  url: string;
+  published: string;
+  assets: string[];
+}
+
+export interface News {
+  as_of: string;
+  enabled: boolean;
+  sources: NewsSource[];
+  items: NewsItem[];
+}
+
+export type FearGreedClass = "Extreme Fear" | "Fear" | "Neutral" | "Greed" | "Extreme Greed";
+
+export interface SentimentPoint {
+  date: string;
+  value: number;
+  classification: FearGreedClass;
+}
+
+export interface Sentiment {
+  as_of: string;
+  enabled: boolean;
+  source: { name: string; provider: string; url: string; ok?: boolean; error?: string | null; fetched_at?: string | null };
+  points: SentimentPoint[];
+}
+
 export type PushKind = "fill" | "risk_breach" | "kill_switch" | "heartbeat_lost" | "quorum_failed" | "daily_summary";

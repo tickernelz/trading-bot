@@ -2,26 +2,28 @@
   import Outcome from "../components/Outcome.svelte";
   import { gateway } from "../lib/gateway.svelte";
   import { clock } from "../lib/format";
-  import type { FeedKind } from "../lib/feedText";
+  import { FEED_KINDS, type FeedKind } from "../lib/feedText";
+  import { t } from "../lib/i18n";
 
   const g = gateway;
-  const FILTERS: ("Semua" | FeedKind)[] = ["Semua", "Order", "Swarm", "Risiko", "Sistem"];
-  let filter = $state<"Semua" | FeedKind>("Semua");
-  const items = $derived(filter === "Semua" ? g.feed : g.feed.filter((i) => i.kind === filter));
+  const FILTERS: ("all" | FeedKind)[] = ["all", "order", "swarm", "risk", "system"];
+  let filter = $state<"all" | FeedKind>("all");
+  const items = $derived(filter === "all" ? g.feed : g.feed.filter((i) => i.kind === filter));
+  const filterLabel = (f: "all" | FeedKind) => (f === "all" ? t("aksi.all") : t(FEED_KINDS[f]));
 </script>
 
-<div class="chips" role="group" aria-label="Saring aksi">
+<div class="chips" role="group" aria-label={t("aksi.filter")}>
   {#each FILTERS as f (f)}
-    <button class="chip" type="button" aria-pressed={filter === f} onclick={() => (filter = f)}>{f}</button>
+    <button class="chip" type="button" aria-pressed={filter === f} onclick={() => (filter = f)}>{filterLabel(f)}</button>
   {/each}
 </div>
 
-<h2 class="sec">Feed aksi <span class="meta">{g.feed.length} kejadian sejak tersambung, terbaru di atas</span></h2>
-<ol class="feed" role="log" aria-label="Feed aksi">
+<h2 class="sec">{t("aksi.title")} <span class="meta">{t("aksi.meta", { n: g.feed.length })}</span></h2>
+<ol class="feed" role="log" aria-label={t("aksi.title")}>
   {#each items as item (item.seq)}
     <li class:warn={item.warn}>
       <time class="num" datetime={item.ts}>{clock(item.ts, true)}</time>
-      <span class="kind">{item.warn ? "Peringatan" : item.kind}</span>
+      <span class="kind">{item.warn ? t("aksi.warning") : t(FEED_KINDS[item.kind])}</span>
       <span class="text">
         {item.text}
         {#if item.outcome !== undefined}<span class="sr-only"><Outcome value={item.outcome} /></span>{/if}
@@ -30,9 +32,9 @@
   {:else}
     <li class="empty">
       {#if g.link.state === "open"}
-        Belum ada aksi{filter === "Semua" ? "" : " jenis " + filter} sejak tersambung. Order, keputusan swarm, penolakan risiko, dan pesan sistem muncul di sini begitu terjadi.
+        {filter === "all" ? t("aksi.empty") : t("aksi.empty_kind", { kind: filterLabel(filter) })}
       {:else}
-        Feed kosong karena belum tersambung ke gateway.
+        {t("aksi.not_connected")}
       {/if}
     </li>
   {/each}

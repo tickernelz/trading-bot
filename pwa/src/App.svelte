@@ -10,27 +10,29 @@
   import Ringkas from "./screens/Ringkas.svelte";
   import Sistem from "./screens/Sistem.svelte";
   import Swarm from "./screens/Swarm.svelte";
+  import { t } from "./lib/i18n";
+  import { SCREENS } from "./lib/route.svelte";
 
-  const TITLES = { ringkas: "Ringkas", grafik: "Grafik", aksi: "Aksi", swarm: "Swarm", sistem: "Sistem" } as const;
+  const title = $derived(SCREENS.find((s) => s.id === route.screen)?.label ?? "");
 
   $effect(() => {
-    document.title = TITLES[route.screen] + " · Bot Trading";
+    document.title = title + " · Bot Trading";
   });
 </script>
 
-{#if !gateway.token}
+{#if !gateway.token && !gateway.viewingSaved}
   <Login />
 {:else}
   <div class="shell">
     <aside class="rail">
       <p class="brand">Bot Trading</p>
-      <Nav current={route.screen} labelled="Navigasi samping" />
+      <Nav current={route.screen} labelled={t("nav.side")} />
     </aside>
     <div class="body">
       <TopBar />
       <StaleBanner />
       <main id="isi">
-        <h1 class="sr-only">{TITLES[route.screen]}</h1>
+        <h1 class="sr-only">{title}</h1>
         {#if route.screen === "ringkas"}
           <Ringkas />
         {:else if route.screen === "grafik"}
