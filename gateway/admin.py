@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
-from engine.settings import ConfigError, Settings
+from engine.settings import ConfigError, ProviderType, Settings
 from gateway.configstore import (
     breached_limits,
     check_patch,
@@ -67,14 +67,7 @@ class SettingsPatch(Body):
 
 
 class ProviderBody(Body):
-    type: Literal[
-        "openai-completions",
-        "openai-responses",
-        "anthropic-messages",
-        "systemone",
-        "openai-decisions",
-        "openrouter-decisions",
-    ]
+    type: ProviderType
     base_url: str = Field(pattern=r"^https?://\S+$")
     models: list[str] = Field(min_length=1)
 

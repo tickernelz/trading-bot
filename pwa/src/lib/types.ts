@@ -274,7 +274,13 @@ export interface Pairs {
   locks: { lock_count: number; locks: Lock[] };
 }
 
-export type ProviderType = "openai-completions" | "openai-responses" | "anthropic-messages";
+export type ProviderType =
+  | "openai-completions"
+  | "openai-responses"
+  | "anthropic-messages"
+  | "systemone"
+  | "openai-decisions"
+  | "openrouter-decisions";
 
 export interface ProviderSetting {
   id: string;

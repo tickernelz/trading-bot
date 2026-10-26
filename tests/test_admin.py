@@ -624,13 +624,22 @@ def test_log_redaction_covers_authorization_tokens_and_registered_values(caplog)
     logger = logging.getLogger("trading_bot.test")
     logger.info("calling with Authorization: Bearer abcdefghijkl and url /gw/v1/events?token=sessiontoken123&x=1")
     logger.info("header %s", {"authorization": "Basic Zm9vOmJhcg==", "x-api-key": "plainkey-123456"})
+    logger.info("oauth access_token=oauthvalue123456 and refresh_token=refreshvalue123456 end")
     registry.add(MARK)
     logger.info("registered %s inside text", MARK)
     try:
         raise RuntimeError(f"boom {MARK}")
     except RuntimeError:
         logger.exception("failed")
-    for secret in ("abcdefghijkl", "sessiontoken123", "Zm9vOmJhcg==", "plainkey-123456", MARK):
+    for secret in (
+        "abcdefghijkl",
+        "sessiontoken123",
+        "Zm9vOmJhcg==",
+        "plainkey-123456",
+        "oauthvalue123456",
+        "refreshvalue123456",
+        MARK,
+    ):
         assert secret not in caplog.text
     assert "x=1" in caplog.text
 

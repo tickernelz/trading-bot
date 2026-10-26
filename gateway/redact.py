@@ -25,7 +25,7 @@ _PATTERNS = (
         ),
         r"\1" + REDACTED,
     ),
-    (re.compile(r"(?i)\b(token=)[^\s\"'&]+"), r"\1" + REDACTED),
+    (re.compile(r"(?i)(token=)[^\s\"'&]+"), r"\1" + REDACTED),
     (re.compile(r"\bsk-[A-Za-z0-9_-]{8,}"), REDACTED),
 )
 
