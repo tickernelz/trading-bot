@@ -67,7 +67,14 @@ class SettingsPatch(Body):
 
 
 class ProviderBody(Body):
-    type: Literal["openai-completions", "openai-responses", "anthropic-messages"]
+    type: Literal[
+        "openai-completions",
+        "openai-responses",
+        "anthropic-messages",
+        "systemone",
+        "openai-decisions",
+        "openrouter-decisions",
+    ]
     base_url: str = Field(pattern=r"^https?://\S+$")
     models: list[str] = Field(min_length=1)
 

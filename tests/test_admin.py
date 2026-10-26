@@ -686,6 +686,14 @@ def test_locality_rules(host, headers, client, expected):
         ("openai-responses", "https://h.example.test/v1/", "https://h.example.test/v1/responses", "authorization"),
         ("anthropic-messages", "https://h.example.test/v1", "https://h.example.test/v1/messages", "x-api-key"),
         ("anthropic-messages", "https://lucif.example.test", "https://lucif.example.test/v1/messages", "x-api-key"),
+        ("systemone", "https://d.example.test", "https://d.example.test/v1/systemone", "authorization"),
+        ("openai-decisions", "https://d.example.test/", "https://d.example.test/v1/decisions", "authorization"),
+        (
+            "openrouter-decisions",
+            "https://d.example.test",
+            "https://d.example.test/api/alpha/decisions",
+            "authorization",
+        ),
     ],
 )
 def test_connection_test_builds_one_small_call_per_api_type(rig, type_, base, url, header):
@@ -698,7 +706,10 @@ def test_connection_test_builds_one_small_call_per_api_type(rig, type_, base, ur
     body = json.loads(request.content)
     assert body["model"] == "m"
     assert "ping" not in json.dumps(body).lower()
-    assert max(value for name, value in body.items() if name.startswith("max")) == 16
+    if provider.type.endswith("decisions") or provider.type == "systemone":
+        assert "questions" in body and "messages" not in body
+    else:
+        assert max(value for name, value in body.items() if name.startswith("max")) == 16
     assert build_test_request(provider, "m", "k")[0] == url
 
 
@@ -713,14 +724,15 @@ def test_connection_test_reports_latency_and_persists_the_last_result(rig):
     row = next(item for item in rig.audit() if item["action"] == "provider.test")
     assert (row["actor"], row["targets"], row["result"]) == ("remote", ["A", "nutaraline"], "ok")
     rig.admin.test_started.clear()
-    assert rig.call("POST", "/gw/v1/providers/nutaraline/test").status_code == 200
+    second = rig.call("POST", "/gw/v1/providers/nutaraline/test")
+    assert second.status_code == 200
     local_row = next(item for item in rig.audit() if item["action"] == "provider.test")
     assert local_row["actor"] == "owner"
     view = rig.call("GET", "/gw/v1/providers", client=rig.remote, token=rig.reader).json()["providers"][0]
     assert view["last_test"]["ok"] is True
     assert view["last_test"]["tested_at"].endswith("Z")
     restarted = Admin(rig.gateway, models_yml=rig.models)
-    assert restarted.last_test("A", "nutaraline")["latency_ms"] == body["latency_ms"]
+    assert restarted.last_test("A", "nutaraline")["latency_ms"] == second.json()["latency_ms"]
     assert view["active_models"] == ["deepseek-v4.1-flash-1017"]
     assert view["host"] == "nutaraline.example.test"
 
@@ -932,8 +944,9 @@ def test_import_replace_updates_an_existing_provider_but_keeps_its_key_unless_ti
 
 def test_voters_are_added_replaced_and_removed_through_configuration_only(rig):
     listing = rig.call("GET", "/gw/v1/voters").json()
-    assert listing["swarm"]["enabled_voters"] == 7
-    assert len(listing["voters"]) == 7
+    configured = rig.raw()["swarm"]["voters"]
+    assert listing["swarm"]["enabled_voters"] == sum(1 for item in configured if item["enabled"])
+    assert len(listing["voters"]) == len(configured)
     body = {
         "adapter": "llm_structured",
         "provider": "nutaraline",
@@ -953,7 +966,7 @@ def test_voters_are_added_replaced_and_removed_through_configuration_only(rig):
     assert len([item for item in rig.raw()["swarm"]["voters"] if item["id"] == "v8"]) == 1
     assert rig.call("DELETE", "/gw/v1/voters/v8").status_code == 200
     assert rig.call("DELETE", "/gw/v1/voters/v8").status_code == 404
-    assert len(rig.raw()["swarm"]["voters"]) == 7
+    assert len(rig.raw()["swarm"]["voters"]) == len(configured)
 
 
 def test_voter_edits_that_break_references_or_quorum_are_rejected(rig):

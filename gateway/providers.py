@@ -17,6 +17,8 @@ from gateway.redact import key_last4, redact
 from gateway.upstream import ApiError
 
 API_TYPES = ("openai-completions", "openai-responses", "anthropic-messages")
+DECISION_QUESTION = "Answer true when the state is a greeting."
+DECISION_STATE = "hello"
 RESERVED_IDS = frozenset({"import"})
 KEY_PATTERN = re.compile(r"^\S{8,1024}$")
 ENV_NAME = re.compile(r"^[A-Z][A-Z0-9_]*$")
@@ -266,6 +268,36 @@ def build_test_request(provider: Provider, model: str, key: str) -> tuple[str, d
             f"{base}/responses",
             {"authorization": f"Bearer {key}"},
             {"model": model, "input": TEST_PROMPT, "max_output_tokens": TEST_MAX_TOKENS},
+        )
+    if provider.type == "systemone":
+        return (
+            f"{base}/v1/systemone",
+            {"authorization": f"Bearer {key}"},
+            {
+                "model": model,
+                "state": DECISION_STATE,
+                "questions": {"q": {"type": "noul", "instructions": DECISION_QUESTION}},
+            },
+        )
+    if provider.type == "openrouter-decisions":
+        return (
+            f"{base}/api/alpha/decisions",
+            {"authorization": f"Bearer {key}"},
+            {
+                "model": model,
+                "state": DECISION_STATE,
+                "questions": {"q": {"type": "noul", "instructions": DECISION_QUESTION}},
+            },
+        )
+    if provider.type == "openai-decisions":
+        return (
+            f"{base}/v1/decisions",
+            {"authorization": f"Bearer {key}"},
+            {
+                "model": model,
+                "input": DECISION_STATE,
+                "questions": [{"type": "predicate", "name": "q", "instructions": DECISION_QUESTION}],
+            },
         )
     url = f"{base}/messages" if base.endswith("/v1") else f"{base}/v1/messages"
     return (
