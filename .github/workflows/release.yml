@@ -103,7 +103,7 @@ jobs:
           mkdir unpacked
           cd build/${{ matrix.target }}/out
           case "${{ matrix.target }}" in
-            win-*) 7z x -y -o../../../unpacked trading-bot-*.zip > /dev/null ;;
+            win-*) uv run --python 3.13 --no-project python -m zipfile -e trading-bot-*.zip ../../../unpacked ;;
             *) tar -xzf trading-bot-*.tar.gz -C ../../../unpacked ;;
           esac
           cd ../../..
