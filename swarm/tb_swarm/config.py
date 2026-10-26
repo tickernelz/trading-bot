@@ -9,13 +9,19 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 from tb_swarm.errors import ConfigError
 
 ProviderType = Literal[
-    "openai-completions", "openai-responses", "anthropic-messages", "systemone", "openrouter-decisions"
+    "openai-completions",
+    "openai-responses",
+    "anthropic-messages",
+    "systemone",
+    "openai-decisions",
+    "openrouter-decisions",
 ]
-Adapter = Literal["llm_structured", "systemone", "openrouter_decisions"]
+Adapter = Literal["llm_structured", "systemone", "openai_decisions", "openrouter_decisions"]
 
 ADAPTER_PROVIDER_TYPES: dict[str, tuple[str, ...]] = {
     "llm_structured": ("openai-completions", "openai-responses", "anthropic-messages"),
     "systemone": ("systemone",),
+    "openai_decisions": ("openai-decisions",),
     "openrouter_decisions": ("openrouter-decisions",),
 }
 

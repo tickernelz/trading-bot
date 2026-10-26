@@ -18,16 +18,58 @@ exchange:
 providers:
   - id: nutaraline
     type: openai-completions
-    base_url: from_import
+    base_url: https://nutaraline.co.uk/v1
     api_key_env: NUTARALINE_API_KEY
     api_key: null
     models: [deepseek-v4.1-flash-1017]
+  - id: modelrouter
+    type: openai-completions
+    base_url: https://modelrouter.id/v1
+    api_key_env: MODELROUTER_API_KEY
+    api_key: null
+    models: [glm-5.3-flash:mr]
+  - id: xai-hm
+    type: openai-responses
+    base_url: https://gateway.example.com/v1
+    api_key_env: XAI_HM_API_KEY
+    api_key: null
+    models: [cx/gpt-6-luna]
+  - id: sub2api-claude
+    type: anthropic-messages
+    base_url: http://localhost:62173
+    api_key_env: SUB2API_CLAUDE_API_KEY
+    api_key: null
+    models: [claude-haiku-5-5]
+  - id: omniroute
+    type: openai-completions
+    base_url: http://localhost:20128/v1
+    api_key_env: OMNIROUTE_API_KEY
+    api_key: null
+    models: [agy/gemini-3.8-flash-medium]
   - id: experientiallabs
     type: openai-completions
     base_url: https://api.experientiallabs.ai/v1
     api_key_env: EXPERIENTIALLABS_API_KEY
     api_key: null
-    models: [deepseek-v4.1-flash-1017]
+    models: [llama-4-maverick]
+  - id: sub2api-agy
+    type: openai-completions
+    base_url: http://localhost:62173/v1
+    api_key_env: SUB2API_AGY_API_KEY
+    api_key: null
+    models: [gpt-oss-120b-medium]
+  - id: experientiallabs-systemone
+    type: systemone
+    base_url: https://api.experientiallabs.ai
+    api_key_env: EXPERIENTIALLABS_API_KEY
+    api_key: null
+    models: [jev-latest, clef, clef-flash]
+  - id: experientiallabs-decisions
+    type: openai-decisions
+    base_url: https://api.experientiallabs.ai
+    api_key_env: EXPERIENTIALLABS_API_KEY
+    api_key: null
+    models: [gpt-6-luna-decisions]
 swarm:
   enabled: true
   mode: shadow
@@ -45,32 +87,32 @@ swarm:
       enabled: true
     - id: v2
       adapter: llm_structured
-      provider: experientiallabs
-      model: deepseek-v4.1-flash-1017
+      provider: modelrouter
+      model: glm-5.3-flash:mr
       variation: option_order
       timeout_s: 30
       weight: 1.0
       enabled: true
     - id: v3
       adapter: llm_structured
-      provider: nutaraline
-      model: deepseek-v4.1-flash-1017
+      provider: xai-hm
+      model: cx/gpt-6-luna
       variation: option_order
       timeout_s: 30
       weight: 1.0
       enabled: true
     - id: v4
       adapter: llm_structured
-      provider: experientiallabs
-      model: deepseek-v4.1-flash-1017
+      provider: sub2api-claude
+      model: claude-haiku-5-5
       variation: option_order
       timeout_s: 30
       weight: 1.0
       enabled: true
     - id: v5
       adapter: llm_structured
-      provider: nutaraline
-      model: deepseek-v4.1-flash-1017
+      provider: omniroute
+      model: agy/gemini-3.8-flash-medium
       variation: option_order
       timeout_s: 30
       weight: 1.0
@@ -78,19 +120,43 @@ swarm:
     - id: v6
       adapter: llm_structured
       provider: experientiallabs
-      model: deepseek-v4.1-flash-1017
+      model: llama-4-maverick
       variation: option_order
       timeout_s: 30
       weight: 1.0
       enabled: true
     - id: v7
       adapter: llm_structured
-      provider: nutaraline
-      model: deepseek-v4.1-flash-1017
+      provider: sub2api-agy
+      model: gpt-oss-120b-medium
       variation: option_order
       timeout_s: 30
       weight: 1.0
       enabled: true
+    - id: d1
+      adapter: systemone
+      provider: experientiallabs-systemone
+      model: jev-latest
+      variation: option_order
+      timeout_s: 30
+      weight: 1.0
+      enabled: false
+    - id: d2
+      adapter: systemone
+      provider: experientiallabs-systemone
+      model: clef-flash
+      variation: option_order
+      timeout_s: 30
+      weight: 1.0
+      enabled: false
+    - id: d3
+      adapter: openai_decisions
+      provider: experientiallabs-decisions
+      model: gpt-6-luna-decisions
+      variation: option_order
+      timeout_s: 30
+      weight: 1.0
+      enabled: false
 llm:
   backend: deepagents
   analyst_model: nutaraline:deepseek-v4.1-flash-1017

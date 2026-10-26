@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 
+LLM_PROVIDER_TYPES = ("openai-completions", "openai-responses", "anthropic-messages")
 Percent = Annotated[float, Field(gt=0, le=100)]
 EnvName = Annotated[str, Field(pattern=r"^[A-Z][A-Z0-9_]*$")]
 
@@ -73,7 +74,14 @@ class Exchange(Strict):
 
 class Provider(Strict):
     id: Annotated[str, Field(pattern=r"^[a-z0-9][a-z0-9_-]*$")]
-    type: Literal["openai-completions", "openai-responses", "anthropic-messages"]
+    type: Literal[
+        "openai-completions",
+        "openai-responses",
+        "anthropic-messages",
+        "systemone",
+        "openai-decisions",
+        "openrouter-decisions",
+    ]
     base_url: Annotated[str, Field(pattern=r"^(from_import|https?://\S+)$")]
     api_key_env: EnvName | None = None
     api_key: SecretStr | None = None
@@ -232,6 +240,8 @@ class Settings(Strict):
         analyst_provider, analyst_model = self.llm.analyst_model.split(":", 1)
         if analyst_provider not in providers:
             raise ValueError(f"llm.analyst_model references unknown provider {analyst_provider!r}")
+        if providers[analyst_provider].type not in LLM_PROVIDER_TYPES:
+            raise ValueError(f"llm.analyst_model provider {analyst_provider!r} is not a chat provider")
         if analyst_model not in providers[analyst_provider].models:
             raise ValueError(f"llm.analyst_model {analyst_model!r} is not listed by provider {analyst_provider}")
         return self

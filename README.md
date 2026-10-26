@@ -72,7 +72,7 @@ Empat proses, satu image (`trading-bot/engine`), semuanya hanya mendengarkan 127
 | shadow-b | 8091 | `POST /candidates` hanya dengan header `X-Shadow-Token` yang sama dengan SHADOW_TOKEN. Swarm voter nyata; mencatat jawaban, median, sebaran, kuorum, dan verdict yang AKAN diambil ke `bot-b/swarm_decisions.sqlite`. Tidak pernah memengaruhi order |
 | gateway | 8090 | Sesi, endpoint baca, feed, kesehatan, biaya dan token, audit |
 
-Tujuh voter contoh memakai model uji yang sama (`deepseek-v4.1-flash-1017`) tetapi dibagi ke dua key: empat di nutaraline, tiga di experientiallabs. Terukur 2026-10-26 02:0x UTC lewat `ShadowService` dengan voter nyata, satu kandidat BTC/IDR yang sama tiap ronde dan jeda 2 s antar ronde (keluaran mentah per keputusan dan per voter terlampir di ZHA-3764):
+Susunan voter contoh mengikuti tahap 0c (tujuh voter aktif di tujuh provider berbeda, docs/stage0-findings.md). Alasan tidak menaruh banyak voter pada satu key terukur 2026-10-26 02:0x UTC lewat `ShadowService` dengan voter nyata, satu kandidat BTC/IDR yang sama tiap ronde dan jeda 2 s antar ronde (keluaran mentah per keputusan dan per voter terlampir di ZHA-3764):
 
 | Susunan | Ronde | Panggilan voter | Keputusan |
 | --- | --- | --- | --- |
@@ -80,7 +80,7 @@ Tujuh voter contoh memakai model uji yang sama (`deepseek-v4.1-flash-1017`) teta
 | 4 nutaraline + 3 experientiallabs | 8 | 56 dari 56 sah | 7 dari 7 menjawab di 8 dari 8; 5 `ok`, 3 `choice_tie` |
 | 3 nutaraline + 2 tiprouter + 2 experientiallabs | 5 | tiprouter 0 dari 10 (6 HTTP 503, 4 timeout 30 s) | kuorum 5 tercapai karena 5 voter lain |
 
-Latensi jawaban sah pembagian 4+3: nutaraline median 1,6 s maks 2,7 s; experientiallabs median 6,4 s maks 26,9 s. Maks experientiallabs dekat `timeout_s` 30, jadi timeout voter itu perlu dipantau. `choice_tie` adalah seri antar jawaban voter (aturan agregasi), bukan galat provider. tiprouter tidak dipakai.
+Latensi jawaban sah pembagian 4+3: nutaraline median 1,6 s maks 2,7 s; experientiallabs median 6,4 s maks 26,9 s. Maks experientiallabs dekat `timeout_s` 30, jadi timeout voter itu perlu dipantau. `choice_tie` adalah seri antar jawaban voter (aturan agregasi), bukan galat provider.
 
 Mode `swarm.mode: veto` ditolak skema sampai gerbang dibangun. Trade yang dibayangi membawa custom data `shadow_decision_id`, sehingga `DecisionStore.outcomes(<tradesv3.dryrun.sqlite>)` bisa menghitung apakah entry yang akan dilewati ternyata rugi.
 
