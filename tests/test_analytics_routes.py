@@ -209,7 +209,7 @@ class TestSignalsRoute:
         )
         assert (
             client.get(
-                f"{PREFIX}/signals", params={"pair": "ADA/IDR", "from": "2026-10-01", "to": "2026-10-02"}
+                f"{PREFIX}/signals", params={"pair": "DOGE/IDR", "from": "2026-10-01", "to": "2026-10-02"}
             ).status_code
             == 404
         )
@@ -277,7 +277,7 @@ class TestExportRoutes:
     def test_portfolio_lists_every_configured_pair(self, env):
         client, *_ = env
         pairs = [row["pair"] for row in client.get(f"{PREFIX}/portfolio").json()["pairs"]]
-        assert sorted(pairs) == ["BTC/IDR", "DOGE/IDR", "ETH/IDR", "SOL/IDR", "XRP/IDR"]
+        assert sorted(pairs) == ["BTC/IDR", "ETH/IDR", "SOL/IDR"]
 
 
 class TestScoreboardRoutes:

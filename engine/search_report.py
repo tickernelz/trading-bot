@@ -267,7 +267,12 @@ def render(
         checks = holdout["checks"]
         parts += [
             "",
-            f"## {final_label} {holdout['period'][0][:10]} .. {holdout['period'][1][:10]}: `{holdout['candidate']}`, tier {holdout['tier']}",
+            f"## {final_label} {holdout['period'][0][:10]} .. {holdout['period'][1][:10]}: `{holdout['candidate']}`, "
+            + (
+                f"tier {holdout['tier']}"
+                if final_label == "Holdout"
+                else "supporting evidence, not the final evaluation"
+            ),
             "",
             table(
                 ["Costs", *SUMMARY_HEAD], [[name, *summary_row(cost["all"])] for name, cost in holdout["costs"].items()]

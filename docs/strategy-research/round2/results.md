@@ -152,7 +152,7 @@ shift: every entry and exit signal moved 1 hour or 1 rule candle earlier (the ru
 | W-rsi14-1h-sma100-tp3atr-st5atr | -0.724% | 57.8% | -1.927% | -1.927% | -0.014% | 68.0% | 0/200 | 0/200 |
 | K-SwingEmaRsi | -0.645% | 38.0% | -0.254% | -0.254% | -0.176% | 47.7% | 0/200 | 0/200 |
 
-## Pre-sample 2018-09-01 .. 2021-01-01: `S-don1d20-sma50-tp5-lock3`, tier T2
+## Pre-sample 2018-09-01 .. 2021-01-01: `S-don1d20-sma50-tp5-lock3`, supporting evidence, not the final evaluation
 
 | Costs | Trades | Win rate | Wilson low | Mean net | 95% CI | PF | Payoff | Largest loss | Worst 5 mean | Max DD | Trades/month |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |

@@ -294,6 +294,18 @@ def test_drawdown_sizes_each_trade_by_the_stop_distance():
     assert metrics.max_drawdown(rows, -0.10, 0.0031) == pytest.approx(expected)
 
 
+def test_an_entry_refused_for_lack_of_slots_frees_no_slot_it_never_held():
+    def held(profit: float, entry: int, exit_: int) -> metrics.Row:
+        start = pd.Timestamp("2025-01-01", tz="UTC")
+        hours = pd.Timedelta(hours=1)
+        return metrics.Row("BTC/IDR", start, start + entry * hours, start + exit_ * hours, profit, "roi", "bull", "F1")
+
+    open_three = [held(0.0, 0, 10), held(0.0, 1, 11), held(0.0, 2, 3)]
+    refused, fifth = held(0.0, 2, 20), held(-0.10, 4, 5)
+    loss = 0.005 / (1.0031 - 0.9 * 0.9969) * 0.10
+    assert metrics.max_drawdown([*open_three, refused, fifth], -0.10, 0.0031) == pytest.approx(loss)
+
+
 def test_rounds_stay_within_the_search_budget_and_ids_are_unique():
     ids = [candidate.id for candidate in plan.round1_candidates()]
     current = [candidate.id for candidate in plan.candidates()]

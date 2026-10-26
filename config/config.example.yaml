@@ -12,21 +12,19 @@ risk:
   daily_reset_timezone: Asia/Jakarta
 exchange:
   name: indodax
-  pairs: [BTC/IDR, ETH/IDR, SOL/IDR, XRP/IDR, DOGE/IDR]
+  pairs: [BTC/IDR, ETH/IDR, SOL/IDR]
   timeframe: 1h
   fee_pct: 0.31055
 strategy:
   name: RuleStrategy
   rule:
-    entry: donchian
-    timeframe: 1d
-    lookback: 20
-    trend_filter: above_sma50_1d
-    exit: donchian_mid
-    exit_lookback: 20
-    take_profit: 0.05
-    lock_at: 0.03
-    stoploss: -0.08
+    entry: rsi_dip
+    timeframe: 1h
+    lookback: 14
+    threshold: 30
+    exit: none
+    take_profit: 0.03
+    stoploss: -0.10
 providers:
   - id: nutaraline
     type: openai-completions

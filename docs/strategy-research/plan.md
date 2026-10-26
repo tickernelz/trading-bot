@@ -119,3 +119,11 @@ Locked in the commit that adds this section, before the first round 2 run. Every
 3. Final tier of that configuration: (a) on the pre-sample trades, (b) on the walk-forward folds, (c) and (d) on both; expectancy, CI and null on the pre-sample.
 4. When the selected configuration is not T1 or T2 on the walk-forward, the pre-sample stays untouched, the round reports its walk-forward tier only, and the default does not change.
 5. The default changes only to a configuration whose final tier is higher than the current default's (T4 on the round 1 holdout, T3 on the walk-forward), with a Freqtrade backtest of `RuleStrategy` that reproduces the simulator's trades.
+
+### Correction after review (ZHA-3896, 2026-10-26, after the round 2 runs)
+
+Points 2, 3 and 5 loosened the task's rule, which accepts only the holdout or forward data for target (a) and the final tier, and requires "not enough data" with fewer than 100 forward trades. They are replaced, which tightens the plan and changes no run:
+
+- The final evaluation of round 2, and of every later round, uses forward data only: Indodax candles after 2026-10-26 or a dry run started after the configuration was locked, with no parameter tuned on them. Below 100 forward trades on at least 2 pairs the round's result is "not enough data", no target is reported as met, and the default does not change.
+- The pre-sample run stays a once-only, locked out-of-sample check and is reported as supporting evidence next to the walk-forward, never as the final tier.
+- At 2026-10-26 the forward data holds 0 trades, so round 2's result is "not enough data" and the default stays `J-rsi14-1h-tp3-sl10`.

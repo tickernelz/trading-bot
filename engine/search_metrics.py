@@ -79,7 +79,6 @@ def max_drawdown(rows: list[Row], stoploss: float, fee: float) -> float:
     for _, kind, i in events:
         if kind == 0:
             if len(stakes) >= plan.MAX_OPEN_TRADES:
-                stakes[i] = 0.0
                 continue
             free = equity - sum(stakes.values())
             stakes[i] = max(0.0, min(equity * plan.RISK_PER_TRADE / per_stake, free))

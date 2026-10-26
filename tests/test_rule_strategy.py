@@ -70,24 +70,23 @@ def analyzed(instance: RuleStrategy, frame: pd.DataFrame) -> pd.DataFrame:
     return instance.populate_exit_trend(out, {"pair": "BTC/IDR"})
 
 
-ROUND2_SELECTED = "S-don1d20-sma50-tp5-lock3"
+ROUND1_SELECTED = "J-rsi14-1h-tp3-sl10"
 
 
-def test_example_config_runs_the_round_two_selection_on_its_pairs():
-    [selected] = [candidate for candidate in search_plan.candidates() if candidate.id == ROUND2_SELECTED]
-    settings = load_settings(EXAMPLE)
-    assert (settings.strategy.name, settings.strategy.rule) == ("RuleStrategy", selected.spec)
-    assert tuple(settings.exchange.pairs) == search_plan.PAIRS
+def test_example_config_runs_the_round_one_selection():
+    [selected] = [candidate for candidate in search_plan.round1_candidates() if candidate.id == ROUND1_SELECTED]
+    strategy = load_settings(EXAMPLE).strategy
+    assert (strategy.name, strategy.rule) == ("RuleStrategy", selected.spec)
 
 
 def test_default_rule_enters_where_the_shared_signal_enters():
     instance = strategy()
-    frame = walk(24 * 300)
+    frame = walk(2000)
     out = analyzed(instance, frame)
-    expected = rule_frame(frame, instance.rule, {"1d": resample(frame, "1d")})["enter"]
-    assert expected.sum() > 3
+    expected = rule_frame(frame, instance.rule, {})["enter"]
+    assert expected.sum() > 10
     assert (out["enter_long"] == 1).fillna(False).tolist() == expected.tolist()
-    assert set(out.loc[out["enter_long"] == 1, "enter_tag"]) == {"rule_donchian"}
+    assert set(out.loc[out["enter_long"] == 1, "enter_tag"]) == {"rule_rsi_dip"}
     assert {"ema_fast", "ema_slow", "rsi"} <= set(out.columns)
 
 
