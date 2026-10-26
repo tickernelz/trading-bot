@@ -28,12 +28,12 @@ logger = logging.getLogger("trading_bot.gateway")
 KINDS = ("fill", "risk_breach", "kill_switch", "heartbeat_lost", "quorum_failed", "daily_summary")
 Kind = Literal["fill", "risk_breach", "kill_switch", "heartbeat_lost", "quorum_failed", "daily_summary"]
 URLS = {
-    "fill": "/#aksi",
-    "risk_breach": "/#ringkas",
-    "kill_switch": "/#ringkas",
-    "heartbeat_lost": "/#sistem",
+    "fill": "/#activity",
+    "risk_breach": "/#summary",
+    "kill_switch": "/#summary",
+    "heartbeat_lost": "/#system",
     "quorum_failed": "/#swarm",
-    "daily_summary": "/#ringkas",
+    "daily_summary": "/#summary",
 }
 DEFAULT_LANG = "en"
 LOCALES = Path(__file__).parent / "locales"

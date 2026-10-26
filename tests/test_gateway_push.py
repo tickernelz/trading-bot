@@ -22,6 +22,7 @@ from gateway.push import (
     DEFAULT_LANG,
     KINDS,
     LOCALES,
+    URLS,
     MAX_SUBSCRIPTIONS,
     format_number,
     load_catalogs,
@@ -149,6 +150,26 @@ def test_indonesian_text_differs_from_english(kind):
     english, indonesian = render(kind, PARAMS[kind], "en"), render(kind, PARAMS[kind], "id")
     assert english["title"] != indonesian["title"]
     assert english["body"] != indonesian["body"]
+
+
+def test_every_kind_opens_an_existing_pwa_screen():
+    screens = {
+        "summary",
+        "chart",
+        "activity",
+        "swarm",
+        "control",
+        "config",
+        "provider",
+        "history",
+        "ab",
+        "audit",
+        "system",
+        "more",
+    }
+    assert set(URLS) == set(KINDS)
+    assert {url.removeprefix("/#") for url in URLS.values()} <= screens
+    assert URLS["fill"] == "/#activity" and URLS["heartbeat_lost"] == "/#system" and URLS["quorum_failed"] == "/#swarm"
 
 
 def test_numbers_follow_the_language_style():
@@ -334,7 +355,7 @@ def test_test_push_reaches_each_device_in_its_own_language(rig):
         "Ringkasan harian",
         "Bot A: -0,31% kemarin, trade ditutup: 2.",
     )
-    assert en["url"] == "/#ringkas" and en["id"] and en["ts"]
+    assert en["url"] == "/#summary" and en["id"] and en["ts"]
     headers = {name.lower(): value for name, value in delivered["/en"][0].items()}
     key = client.get("/gw/v1/push/key").json()["public_key"]
     assert headers["authorization"].startswith("vapid t=") and f"k={key}" in headers["authorization"]
