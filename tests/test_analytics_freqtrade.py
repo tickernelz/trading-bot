@@ -107,7 +107,7 @@ class TestViews:
             signals_view(payload)
         assert "enter_long" in error.value.message
 
-    def test_backtest_view_drops_trade_lists_and_keeps_the_headline_figures(self):
+    def test_backtest_view_reads_the_strategy_the_job_ran_and_drops_trade_lists(self):
         status = {
             "status": "ended",
             "running": False,
@@ -117,7 +117,7 @@ class TestViews:
             "trade_count": 3,
             "backtest_result": {
                 "strategy": {
-                    "SwingEmaRsi": {
+                    "RuleStrategy": {
                         "total_trades": 3,
                         "profit_total_abs": -120.5,
                         "trades": [{"pair": "BTC/IDR"}] * 3,
@@ -128,12 +128,13 @@ class TestViews:
                 }
             },
         }
-        view = backtest_view(status, "SwingEmaRsi")
+        view = backtest_view(status)
+        assert view["strategy"] == "RuleStrategy"
         assert view["result"]["total_trades"] == 3
         assert view["result"]["profit_total_abs"] == -120.5
         assert "trades" not in view["result"] and "locks" not in view["result"]
         assert view["result"]["results_per_pair"] == [{"key": "BTC/IDR"}]
 
     def test_backtest_view_of_a_running_job_has_no_result(self):
-        view = backtest_view({"status": "running", "running": True, "progress": 0.4, "backtest_result": None}, "S")
+        view = backtest_view({"status": "running", "running": True, "progress": 0.4, "backtest_result": None})
         assert view["running"] is True and "result" not in view

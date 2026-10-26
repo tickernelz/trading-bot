@@ -1,4 +1,4 @@
-"""Run the locked round 1 strategy search: walk-forward, controls, validation, and the single holdout run."""
+"""Run the locked strategy search: walk-forward, controls, validation, and the single runs on untouched data."""
 
 from __future__ import annotations
 
@@ -29,6 +29,7 @@ REPO = Path(__file__).resolve().parents[1]
 DEFAULT_LEDGER = REPO / "docs" / "strategy-research" / "ledger.jsonl"
 SWING_EXITS = Exits(stoploss=-0.03, roi=((0, 0.05), (480, 0.025), (1440, 0.012)), roi_net_of_fee=True)
 HOLDOUT_KINDS = ("holdout_started", "holdout")
+PRESAMPLE_KINDS = ("presample_started", "presample")
 COMPARE_ROWS = 48
 
 
@@ -42,7 +43,7 @@ class Signals:
 
 
 class HoldoutUsed(Exception):
-    """Raised when the holdout was already run for another configuration."""
+    """Raised when an untouched period was already run for another configuration."""
 
 
 def sha256(path: Path) -> str:
@@ -53,9 +54,9 @@ def pair_file(datadir: Path, pair: str) -> Path:
     return datadir / f"{pair.replace('/', '_')}-1h.feather"
 
 
-def load_candles(datadir: Path, end: pd.Timestamp) -> dict[str, pd.DataFrame]:
+def load_candles(datadir: Path, end: pd.Timestamp, pairs: tuple[str, ...] = plan.PAIRS) -> dict[str, pd.DataFrame]:
     out = {}
-    for pair in plan.PAIRS:
+    for pair in pairs:
         frame = pd.read_feather(pair_file(datadir, pair))
         frame["date"] = pd.to_datetime(frame["date"], utc=True)
         out[pair] = frame[frame["date"] < end].sort_values("date").reset_index(drop=True)
@@ -241,11 +242,14 @@ def tier_on(rows: list[metrics.Row], checks: dict, null: dict | None = None) -> 
     summary = metrics.summarize(rows, plan.WALK_FORWARD_START, plan.HOLDOUT_START, -0.1, 0.003)
     mean = summary.get("mean", 0.0)
     ci_low = summary.get("ci95", [0.0, 0.0])[0]
+    adjusted = metrics.adjusted_lower(np.array([row.profit for row in rows], dtype=float), plan.cumulative_trials())
     beaten = None if null is None else bool(mean > null["mean_p95"])
     return {
-        "tier": metrics.tier(checks["met"], mean, ci_low, beaten),
+        "tier": metrics.tier(checks["met"], mean, min(ci_low, adjusted), beaten),
         "mean": mean,
         "ci_low": ci_low,
+        "ci_low_adjusted": adjusted,
+        "trials": plan.cumulative_trials(),
         "null_beaten": beaten,
     }
 
@@ -268,7 +272,7 @@ def walk_forward(args, ledger_entry: dict) -> dict:
     regimes = regime_by_hour(candles[plan.REGIME_PAIR])
     by_id = {candidate.id: candidate for candidate in plan.candidates()}
     start, end = plan.WALK_FORWARD_START, plan.HOLDOUT_START
-    results, trade_dump, kept_signals = [], {}, {}
+    results, trade_dump, kept_signals, kept_rows = [], {}, {}, {}
     for candidate in by_id.values():
         if candidate.kind == "buy_hold":
             continue
@@ -294,6 +298,7 @@ def walk_forward(args, ledger_entry: dict) -> dict:
         checks = metrics.target_checks(primary_rows, primary_rows, [primary_rows])
         entry["wf_checks"] = checks
         entry["wf_tier"] = tier_on(primary_rows, checks)
+        kept_rows[candidate.id] = primary_rows
         entry["open_at_end"] = sum(row.reason == "end" for row in primary_rows)
         trade_dump[candidate.id] = [
             [
@@ -317,7 +322,9 @@ def walk_forward(args, ledger_entry: dict) -> dict:
     out = {
         "round": plan.ROUND,
         "period": [start.isoformat(), end.isoformat()],
+        "pairs": list(plan.PAIRS),
         "candidates": len(by_id),
+        "cumulative_trials": plan.cumulative_trials(),
         "results": results,
         "buy_and_hold": {
             name: buy_and_hold(candles, costs, windows + [("walk_forward", start, end)])
@@ -331,6 +338,7 @@ def walk_forward(args, ledger_entry: dict) -> dict:
         out["selected_null"] = null_distribution(
             kept_signals[selected["id"]], plan.COSTS[plan.PRIMARY_COST], regimes, start, end
         )
+        selected["wf_tier"] = tier_on(kept_rows[selected["id"]], selected["wf_checks"], out["selected_null"])
     with gzip.open(args.out / "walk_forward_trades.json.gz", "wt", encoding="utf-8") as handle:
         json.dump(trade_dump, handle)
     ledger_entry["selected"] = out["selected"]
@@ -450,7 +458,7 @@ def _entries_only(item: Signals) -> Signals:
 
 def validate(args, ledger_entry: dict) -> dict:
     first, last = (pd.Timestamp(day, tz="UTC") for day in plan.STAGE2_IN_SAMPLE)
-    candles = load_candles(args.datadir, last)
+    candles = load_candles(args.datadir, last, plan.ROUND1_PAIRS)
     regimes = regime_by_hour(candles[plan.REGIME_PAIR])
     by_id = {candidate.id: candidate for candidate in plan.candidates()}
     signals = build_signals(by_id["K-SwingEmaRsi"], candles, pd.DataFrame(columns=["date", "fg"]), by_id)
@@ -475,21 +483,23 @@ def append_ledger(path: Path, entry: dict) -> None:
         handle.write(json.dumps(entry, sort_keys=True) + "\n")
 
 
-def holdout(args, ledger_entry: dict) -> dict:
-    used = [line for line in ledger_lines(args.ledger) if line["kind"] in HOLDOUT_KINDS]
+def single_run_guard(args, kinds: tuple[str, ...], name: str) -> None:
+    """Refuse a second run on an untouched period; a replay must name the recorded configuration."""
+    used = [line for line in ledger_lines(args.ledger) if line["kind"] in kinds]
     if used and not args.replay:
-        raise HoldoutUsed(f"holdout already used by run {used[0]['run_id']} for {used[0].get('candidate')}")
+        raise HoldoutUsed(f"{name} already used by run {used[0]['run_id']} for {used[0].get('candidate')}")
     if args.replay and (not used or used[0].get("candidate") != args.candidate):
-        raise HoldoutUsed("a replay must name the configuration of the recorded holdout run")
-    if not args.replay:
-        append_ledger(args.ledger, {**ledger_entry, "kind": "holdout_started", "status": "started"})
-    candles = load_candles(args.datadir, plan.DATA_END)
+        raise HoldoutUsed(f"a replay must name the configuration of the recorded {name} run")
+
+
+def holdout(args, ledger_entry: dict) -> dict:
+    candles = load_candles(args.datadir, plan.DATA_END, plan.ROUND1_PAIRS)
     wf_candles = {
         pair: frame[frame["date"] < plan.HOLDOUT_START].reset_index(drop=True) for pair, frame in candles.items()
     }
     fear_greed = load_fear_greed(args.fear_greed)
     regimes = regime_by_hour(candles[plan.REGIME_PAIR])
-    by_id = {candidate.id: candidate for candidate in plan.candidates()}
+    by_id = {candidate.id: candidate for candidate in plan.round1_candidates()}
     candidate = by_id[args.candidate]
     start, end = plan.HOLDOUT_START, plan.DATA_END
     signals = build_signals(candidate, candles, fear_greed, by_id)
@@ -533,6 +543,56 @@ def holdout(args, ledger_entry: dict) -> dict:
     return out
 
 
+def presample(args, ledger_entry: dict) -> dict:
+    """One configuration on the untouched period before the round 1 data, judged with its walk-forward folds."""
+    candles = load_candles(args.datadir, plan.PRESAMPLE_END, plan.PRESAMPLE_PAIRS)
+    wf_candles = load_candles(args.wf_datadir, plan.HOLDOUT_START)
+    fear_greed = load_fear_greed(args.fear_greed)
+    regimes = regime_by_hour(candles[plan.REGIME_PAIR])
+    wf_regimes = regime_by_hour(wf_candles[plan.REGIME_PAIR])
+    by_id = {candidate.id: candidate for candidate in plan.candidates()}
+    candidate = by_id[args.candidate]
+    start, end = plan.PRESAMPLE_START, plan.PRESAMPLE_END
+    signals = build_signals(candidate, candles, fear_greed, by_id)
+    wf_signals = build_signals(candidate, wf_candles, fear_greed, by_id)
+    primary = plan.COSTS[plan.PRIMARY_COST]
+    stoploss = stoploss_of(signals)
+    out = {"candidate": candidate.id, "period": [start.isoformat(), end.isoformat()], "costs": {}}
+    for name, costs in plan.COSTS.items():
+        rows = rows_of(trades_of(signals, costs), costs, regimes, start, end)
+        out["costs"][name] = report(rows, start, end, stoploss, costs)
+    rows = rows_of(trades_of(signals, primary), primary, regimes, start, end)
+    wf_rows = rows_of(trades_of(wf_signals, primary), primary, wf_regimes, plan.WALK_FORWARD_START, plan.HOLDOUT_START)
+    null = null_distribution(signals, primary, regimes, start, end)
+    checks = metrics.target_checks(rows, wf_rows, [wf_rows, rows])
+    summary = out["costs"][plan.PRIMARY_COST]["all"]
+    mean = summary.get("mean", 0.0)
+    ci_low = summary.get("ci95", [0.0, 0.0])[0]
+    beaten = bool(mean > null["mean_p95"])
+    out.update(
+        {
+            "null": null,
+            "null_beaten": beaten,
+            "checks": checks,
+            "tier": metrics.tier(checks["met"], mean, ci_low, beaten),
+            "trades": [
+                [
+                    row.pair,
+                    row.entry_time.isoformat(),
+                    row.exit_time.isoformat(),
+                    round(row.profit, 8),
+                    row.reason,
+                    row.regime,
+                ]
+                for row in rows
+            ],
+            "comparators": comparators(candles, fear_greed, regimes, by_id, start, end),
+        }
+    )
+    ledger_entry["tier"] = out["tier"]
+    return out
+
+
 def comparators(candles, fear_greed, regimes, by_id, start, end) -> dict:
     costs = plan.COSTS[plan.PRIMARY_COST]
     swing = build_signals(by_id["K-SwingEmaRsi"], candles, fear_greed, by_id)
@@ -548,7 +608,29 @@ COMMANDS = {
     "controls": ("controls", controls),
     "validate": ("validation", validate),
     "holdout": ("holdout", holdout),
+    "presample": ("presample", presample),
 }
+GUARDS = {"holdout": (HOLDOUT_KINDS, "holdout"), "presample": (PRESAMPLE_KINDS, "presample")}
+PERIODS = {
+    "walk_forward": (plan.WALK_FORWARD_START, plan.HOLDOUT_START),
+    "controls": (plan.WALK_FORWARD_START, plan.HOLDOUT_START),
+    "validation": tuple(pd.Timestamp(day, tz="UTC") for day in plan.STAGE2_IN_SAMPLE),
+    "holdout": (plan.HOLDOUT_START, plan.DATA_END),
+    "presample": (plan.PRESAMPLE_START, plan.PRESAMPLE_END),
+}
+
+
+def data_hashes(args) -> dict[str, str]:
+    out = {pair: sha256(pair_file(args.datadir, pair)) for pair in pairs_of(args.command)}
+    if args.wf_datadir:
+        out |= {f"walk_forward {pair}": sha256(pair_file(args.wf_datadir, pair)) for pair in plan.PAIRS}
+    return out | {"fear_greed": sha256(args.fear_greed)}
+
+
+def pairs_of(command: str) -> tuple[str, ...]:
+    return {"holdout": plan.ROUND1_PAIRS, "validate": plan.ROUND1_PAIRS, "presample": plan.PRESAMPLE_PAIRS}.get(
+        command, plan.PAIRS
+    )
 
 
 def main(argv: list[str]) -> int:
@@ -558,14 +640,20 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--fear-greed", required=True, type=Path)
     parser.add_argument("--out", required=True, type=Path)
     parser.add_argument("--ledger", type=Path, default=DEFAULT_LEDGER)
+    parser.add_argument("--wf-datadir", type=Path, help="walk-forward candles, for presample")
     parser.add_argument("--candidate")
     parser.add_argument("--replay", action="store_true")
     args = parser.parse_args(argv)
-    if args.command == "holdout" and not args.candidate:
-        parser.error("holdout needs --candidate")
+    if args.command in GUARDS and not args.candidate:
+        parser.error(f"{args.command} needs --candidate")
+    if args.command == "presample" and not args.wf_datadir:
+        parser.error("presample needs --wf-datadir")
+    if args.replay and args.command not in GUARDS:
+        parser.error("--replay applies to holdout and presample")
     kind, run = COMMANDS[args.command]
+    period = PERIODS[kind]
     if args.replay:
-        kind = "holdout_replay"
+        kind = f"{kind}_replay"
     args.out.mkdir(parents=True, exist_ok=True)
     entry = {
         "run_id": uuid.uuid4().hex,
@@ -575,10 +663,13 @@ def main(argv: list[str]) -> int:
         "git_dirty": os.environ.get("TRADING_BOT_GIT_DIRTY", "unknown"),
         "started_at": datetime.now(UTC).isoformat(),
         "candidate": args.candidate,
-        "data_sha256": {pair: sha256(pair_file(args.datadir, pair)) for pair in plan.PAIRS}
-        | {"fear_greed": sha256(args.fear_greed)},
+        "period": [period[0].isoformat(), period[1].isoformat()],
     }
     try:
+        entry["data_sha256"] = data_hashes(args)
+        if args.command in GUARDS:
+            single_run_guard(args, *GUARDS[args.command])
+        append_ledger(args.ledger, {**entry, "kind": f"{kind}_started", "status": "started"})
         result = run(args, entry)
         (args.out / f"{args.command}.json").write_text(json.dumps(result, indent=1, default=str), encoding="utf-8")
         entry["status"] = "ok"
@@ -592,13 +683,6 @@ def main(argv: list[str]) -> int:
         entry["status"] = f"failed: {type(exc).__name__}: {exc}"
         return_code = 1
     entry["finished_at"] = datetime.now(UTC).isoformat()
-    entry["period"] = {
-        "walk_forward": [plan.WALK_FORWARD_START.isoformat(), plan.HOLDOUT_START.isoformat()],
-        "controls": [plan.WALK_FORWARD_START.isoformat(), plan.HOLDOUT_START.isoformat()],
-        "validation": list(plan.STAGE2_IN_SAMPLE),
-        "holdout": [plan.HOLDOUT_START.isoformat(), plan.DATA_END.isoformat()],
-        "holdout_replay": [plan.HOLDOUT_START.isoformat(), plan.DATA_END.isoformat()],
-    }[kind]
     append_ledger(args.ledger, entry)
     return return_code
 

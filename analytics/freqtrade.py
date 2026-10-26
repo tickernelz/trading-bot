@@ -120,12 +120,14 @@ def signals_view(history: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def backtest_view(status: dict[str, Any], strategy: str) -> dict[str, Any]:
-    """Return the backtest job state with the strategy's headline figures and without the trade list."""
+def backtest_view(status: dict[str, Any]) -> dict[str, Any]:
+    """Return the backtest job state with the headline figures of the strategy it ran and without the trade list."""
     view = {key: status.get(key) for key in ("status", "running", "status_msg", "step", "progress", "trade_count")}
     result = status.get("backtest_result")
     if result:
-        stats = (result.get("strategy") or {}).get(strategy) or {}
+        strategies = result.get("strategy") or {}
+        view["strategy"] = next(iter(sorted(strategies)), None)
+        stats = strategies.get(view["strategy"]) or {}
         view["result"] = {
             key: value
             for key, value in stats.items()

@@ -10,7 +10,6 @@ from freqtrade.strategy import merge_informative_pair
 from engine.rules import RuleSpec
 
 BASE = "1h"
-TREND_SMA = 200
 ADX_PERIOD = 14
 ATR_PERIOD = 14
 VOLUME_PERIOD = 20
@@ -55,8 +54,8 @@ def _indicators(candles: pd.DataFrame, spec: RuleSpec, timeframe: str) -> pd.Dat
             lows = candles["low"].rolling(spec.exit_lookback).min()
             out["dc_mid"] = ((highs + lows) / 2).shift(shift)
             out["sma_exit"] = ta.SMA(candles, timeperiod=spec.exit_lookback)
-    if timeframe == "1d" and spec.trend_filter != "none":
-        out["sma_trend"] = ta.SMA(candles, timeperiod=TREND_SMA)
+    if timeframe == "1d" and spec.trend_sma is not None:
+        out["sma_trend"] = ta.SMA(candles, timeperiod=spec.trend_sma)
     return out
 
 
@@ -95,7 +94,7 @@ def rule_frame(candles: pd.DataFrame, spec: RuleSpec, informative: dict[str, pd.
         condition &= main["adx"] > spec.adx_min
     if spec.adx_max is not None:
         condition &= main["adx"] < spec.adx_max
-    if spec.trend_filter == "above_sma200_1d":
+    if spec.trend_sma is not None:
         daily = main if spec.timeframe == "1d" else _on_base(base, _indicators(sources["1d"], spec, "1d"), "1d")
         condition &= daily["close"] > daily["sma_trend"]
     condition &= base["volume"] > 0

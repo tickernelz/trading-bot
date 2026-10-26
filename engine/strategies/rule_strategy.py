@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import math
 from datetime import datetime
 
 import pandas as pd
 from freqtrade.persistence import Trade
+from freqtrade.strategy import stoploss_from_absolute
 from pandas import DataFrame
 
-from engine.rules import RuleSpec
+from engine.rules import RuleSpec, fee_inclusive_roi
 from engine.signals import rule_frame, trade_exit_reason
 from engine.strategies.gated import RiskGated
 from engine.strategies.swing_ema_rsi import swing_indicators
@@ -24,7 +26,10 @@ class RuleStrategy(RiskGated):
     def __init__(self, config: dict) -> None:
         self.rule = RuleSpec.model_validate(config["trading_bot"]["rule"])
         self.stoploss = self.rule.stoploss
-        self.minimal_roi = self.rule.freqtrade_roi(float(config["fee"]))
+        self.fee = float(config["fee"])
+        self.minimal_roi = self.rule.freqtrade_roi(self.fee)
+        self.use_custom_roi = self.rule.take_profit_atr is not None
+        self.use_custom_stoploss = self.rule.stop_atr is not None
         super().__init__(config)
 
     def informative_pairs(self) -> list[tuple[str, str]]:
@@ -66,3 +71,29 @@ class RuleStrategy(RiskGated):
         hours = (pd.Timestamp(current_time) - opened).total_seconds() / 3600
         reason = trade_exit_reason(self.rule, trade.open_rate, closes, float(held["rule_atr"].iloc[-1]), hours)
         return None if reason is None else f"rule_{reason}"
+
+    def signal_atr(self, pair: str, trade: Trade) -> float:
+        """ATR of the rule timeframe at the candle whose close produced the entry signal."""
+        dataframe, _ = self.dp.get_analyzed_dataframe(pair, self.timeframe)
+        signal = pd.Timestamp(trade.open_date_utc).floor("1h") - pd.Timedelta(hours=1)
+        values = dataframe.loc[dataframe["date"] == signal, "rule_atr"] if not dataframe.empty else []
+        return float(values.iloc[0]) if len(values) else math.nan
+
+    def custom_roi(
+        self, pair: str, trade: Trade, current_time: datetime, trade_duration: int, entry_tag, side: str, **kwargs
+    ) -> float | None:
+        target = self.rule.atr_target(trade.open_rate, self.signal_atr(pair, trade))
+        return None if target is None else fee_inclusive_roi(target / trade.open_rate, self.fee)
+
+    def custom_stoploss(
+        self,
+        pair: str,
+        trade: Trade,
+        current_time: datetime,
+        current_rate: float,
+        current_profit: float,
+        after_fill: bool,
+        **kwargs,
+    ) -> float | None:
+        stop = self.rule.stop_price(trade.open_rate, self.signal_atr(pair, trade))
+        return stoploss_from_absolute(stop, current_rate)

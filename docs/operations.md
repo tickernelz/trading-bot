@@ -162,7 +162,7 @@ Additional pairs only need to be written in exchange.pairs (and risk.max_open_tr
 ## Measured Indodax limitations
 
 - Freqtrade 2026.9 prints a warning that indodax is not officially supported and uses the generic exchange class, but 1h OHLCV for BTC/IDR, ETH/IDR, SOL/IDR is fetched.
-- ccxt 4.5.84 reports the Indodax taker fee 0.2 as a ratio (not 0.2%), so Freqtrade would use a 20% fee if not overridden. Therefore exchange.fee_pct: 0.2 is mandatory in the config and is rendered as fee: 0.002.
+- ccxt 4.5.84 reports the Indodax taker fee 0.2 as a ratio (not 0.2%), so Freqtrade would use a 20% fee if not overridden. Therefore exchange.fee_pct is mandatory in the config. The example sets 0.31055, the mean of the Indodax taker all-in buy (0.20555%) and sell (0.41555%, tax included) costs, so one fee per side reproduces the 0.6211% round trip; it is rendered as fee: 0.0031055.
 - ccxt reports fetchMyTrades and watchOHLCV as unavailable (reported by Freqtrade as missing opt).
 - A single OHLCV request with a long range returns only the latest candles (1h: 649 candles, 27 days), so Freqtrade's download-data stops at 27 days. The 1h history itself is available from at least 2023-10-01: engine/history.py fetches it in windows of 500 candles (docs/stage2-backtest.md).
 

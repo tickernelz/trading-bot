@@ -63,6 +63,12 @@ def _roi_price(exits: Exits, entry: float, minutes: float, costs: Costs) -> floa
     return entry * (1 + fee) * (1 + ratio) / (1 - fee)
 
 
+def _levels(exits: Exits, entry_price: float, signal_atr: float) -> tuple[float, float | None]:
+    if exits.rule is None:
+        return entry_price * (1 + exits.stoploss), None
+    return exits.rule.stop_price(entry_price, signal_atr), exits.rule.atr_target(entry_price, signal_atr)
+
+
 def simulate(
     pair: str,
     candles: pd.DataFrame,
@@ -80,7 +86,8 @@ def simulate(
     closes = candles["close"].to_numpy(dtype=float)
     trades: list[Trade] = []
     entry_index = -1
-    entry_price = 0.0
+    entry_price = stop_price = 0.0
+    atr_target: float | None = None
     pending: str | None = None
     for i in range(1, len(closes)):
         exit_price = None
@@ -93,11 +100,11 @@ def simulate(
             entry_index, pending = -1, None
         if entry_index < 0 and not exited_now and enter[i - 1]:
             entry_index, entry_price = i, opens[i]
+            stop_price, atr_target = _levels(exits, entry_price, float(atr[i - 1]))
         if entry_index < 0 or exited_now:
             continue
         first = i == entry_index
-        stop_price = entry_price * (1 + exits.stoploss)
-        target = _roi_price(exits, entry_price, (i - entry_index) * 60, costs)
+        target = atr_target if atr_target is not None else _roi_price(exits, entry_price, (i - entry_index) * 60, costs)
         if lows[i] <= stop_price:
             exit_price, reason = (stop_price if first else min(opens[i], stop_price)), "stoploss"
         elif target is not None and highs[i] >= target:

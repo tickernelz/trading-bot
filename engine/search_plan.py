@@ -1,4 +1,4 @@
-"""Round 1 strategy search plan, frozen before the first backtest: candidates, periods, costs, seeds and targets."""
+"""Strategy search plan, frozen per round before its first backtest: candidates, periods, costs, seeds and targets."""
 
 from __future__ import annotations
 
@@ -10,12 +10,14 @@ import pandas as pd
 from engine.rules import RuleSpec
 from engine.simulate import Costs
 
-ROUND = 1
+ROUND = 2
 SEED = 3872
 BOOTSTRAP_SAMPLES = 10_000
 NULL_SHUFFLES = 1_000
-PAIRS = ("BTC/IDR", "ETH/IDR", "SOL/IDR")
+ROUND1_PAIRS = ("BTC/IDR", "ETH/IDR", "SOL/IDR")
+PAIRS = (*ROUND1_PAIRS, "XRP/IDR", "DOGE/IDR")
 REGIME_PAIR = "BTC/IDR"
+SEARCH_BUDGET = 600
 
 WALK_FORWARD_START = pd.Timestamp("2022-07-01", tz="UTC")
 HOLDOUT_START = pd.Timestamp("2026-04-26", tz="UTC")
@@ -31,6 +33,9 @@ FOLDS = (
     ("F8", "2026-01-01", "2026-04-26"),
 )
 STAGE2_IN_SAMPLE = ("2023-10-26", "2025-10-26")
+PRESAMPLE_PAIRS = ("BTC/IDR", "ETH/IDR", "XRP/IDR", "DOGE/IDR")
+PRESAMPLE_START = pd.Timestamp("2018-09-01", tz="UTC")
+PRESAMPLE_END = pd.Timestamp("2021-01-01", tz="UTC")
 
 PRIMARY_COST = "taker"
 COSTS = {
@@ -79,7 +84,7 @@ def _pct(value: float) -> str:
     return f"{value * 100:g}"
 
 
-def candidates() -> list[Candidate]:
+def round1_candidates() -> list[Candidate]:
     """The locked round 1 matrix."""
     out: list[Candidate] = []
     for n in (10, 20, 30, 60, 90):
@@ -381,3 +386,154 @@ def candidates() -> list[Candidate]:
         Candidate("K-buy-and-hold", "K benchmark", "buy_hold", deployable=False),
     ]
     return out
+
+
+def candidates() -> list[Candidate]:
+    """The locked round 2 matrix, run on PAIRS."""
+    out: list[Candidate] = []
+    don1d20 = {"entry": "donchian", "timeframe": "1d", "lookback": 20, "exit": "donchian_mid", "exit_lookback": 20}
+    out += [
+        _rule(
+            f"Q-F-don1d20-tp{_pct(tp)}-lock3",
+            "Q round 1 near miss on five pairs",
+            trend_filter="above_sma200_1d",
+            take_profit=tp,
+            lock_at=0.03,
+            stoploss=-0.08,
+            **don1d20,
+        )
+        for tp in (0.05, 0.08)
+    ]
+    out.append(
+        _rule(
+            "Q-G-rsi2-1d-10-sl25",
+            "Q round 1 near miss on five pairs",
+            entry="rsi_dip",
+            timeframe="1d",
+            lookback=2,
+            threshold=10,
+            trend_filter="above_sma200_1d",
+            exit="sma_reclaim",
+            exit_lookback=5,
+            max_hold_hours=240,
+            stoploss=-0.25,
+        )
+    )
+    out.append(
+        _rule(
+            "Q-J-rsi14-1h-tp3-sl10",
+            "Q round 1 near miss on five pairs",
+            entry="rsi_dip",
+            timeframe="1h",
+            lookback=14,
+            threshold=30,
+            exit="none",
+            take_profit=0.03,
+            stoploss=-0.10,
+        )
+    )
+    filters = {"sma50": "above_sma50_1d", "sma100": "above_sma100_1d", "nofilter": "none"}
+    for n in (10, 20):
+        for tag, trend in filters.items():
+            for tp in (0.05, 0.08):
+                out.append(
+                    _rule(
+                        f"S-don1d{n}-{tag}-tp{_pct(tp)}-lock3",
+                        "S faster trend filter",
+                        entry="donchian",
+                        timeframe="1d",
+                        lookback=n,
+                        exit="donchian_mid",
+                        exit_lookback=n,
+                        trend_filter=trend,
+                        take_profit=tp,
+                        lock_at=0.03,
+                        stoploss=-0.08,
+                    )
+                )
+    for tag in ("sma200", "sma100"):
+        for tp in (1.0, 1.5, 2.0):
+            for st in (2.0, 3.0):
+                out.append(
+                    _rule(
+                        f"V-don1d20-{tag}-tp{tp:g}atr-st{st:g}atr",
+                        "V volatility exits on 1d trend entry",
+                        trend_filter=f"above_{tag}_1d",
+                        take_profit_atr=tp,
+                        stop_atr=st,
+                        stoploss=-0.15,
+                        **don1d20,
+                    )
+                )
+    for tp in (1.5, 2.5, 3.5):
+        for st in (2.0, 3.0):
+            out.append(
+                _rule(
+                    f"V-don4h20-sma200-tp{tp:g}atr-st{st:g}atr",
+                    "V volatility exits on 4h trend entry",
+                    entry="donchian",
+                    timeframe="4h",
+                    lookback=20,
+                    exit="donchian_mid",
+                    exit_lookback=20,
+                    trend_filter="above_sma200_1d",
+                    take_profit_atr=tp,
+                    stop_atr=st,
+                    stoploss=-0.10,
+                )
+            )
+    for tag in ("sma50", "sma100"):
+        for tp in (1.0, 1.5):
+            for st in (1.5, 2.5):
+                out.append(
+                    _rule(
+                        f"W-rsi2-4h-{tag}-tp{tp:g}atr-st{st:g}atr",
+                        "W trend pullback with volatility exits",
+                        entry="rsi_dip",
+                        timeframe="4h",
+                        lookback=2,
+                        threshold=10,
+                        trend_filter=f"above_{tag}_1d",
+                        exit="none",
+                        take_profit_atr=tp,
+                        stop_atr=st,
+                        max_hold_hours=72,
+                        stoploss=-0.12,
+                    )
+                )
+    for tp in (2.0, 3.0):
+        for st in (3.0, 5.0):
+            out.append(
+                _rule(
+                    f"W-rsi14-1h-sma100-tp{tp:g}atr-st{st:g}atr",
+                    "W trend pullback with volatility exits",
+                    entry="rsi_dip",
+                    timeframe="1h",
+                    lookback=14,
+                    threshold=30,
+                    trend_filter="above_sma100_1d",
+                    exit="none",
+                    take_profit_atr=tp,
+                    stop_atr=st,
+                    max_hold_hours=168,
+                    stoploss=-0.10,
+                )
+            )
+    out += [
+        Candidate(
+            "R-random-V-don1d20-exits",
+            "R random entry control",
+            "random",
+            random_rate=0.001,
+            exits_from="V-don1d20-sma200-tp1.5atr-st2atr",
+            deployable=False,
+        ),
+        Candidate("K-SwingEmaRsi", "K benchmark", "swing"),
+        Candidate("K-buy-and-hold", "K benchmark", "buy_hold", deployable=False),
+    ]
+    return out
+
+
+def cumulative_trials() -> int:
+    """Configurations tried over every round so far, the count the multiple-testing correction uses."""
+    return len(round1_candidates()) + len(candidates())

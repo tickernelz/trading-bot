@@ -72,3 +72,50 @@ Tiers: T1 target met and net expectancy above 0 with CI lower bound above 0 and 
 - Live window: entries computed on the last 649 candles of each timeframe (the stage 0a live window) must equal entries on full history at the same cuts.
 - Freqtrade `lookahead-analysis` and `recursive-analysis` on the selected strategy class.
 - Benchmarks on the same folds and holdout: buy-and-hold per pair, random entry, SwingEmaRsi.
+
+
+# Round 2: locked plan (ZHA-3876)
+
+Locked in the commit that adds this section, before the first round 2 run. Everything above stays in force unless this section says otherwise; targets may be tightened, never loosened. Round 1's matrix stays in `engine/search_plan.py` as `round1_candidates()` and its holdout guard still refuses a second holdout run.
+
+## What round 1 showed (walk-forward data, `walk-forward-summary.json`)
+
+- Every configuration with a positive mean was a long-only trend rule behind the 1d SMA200 filter, and all of them failed (b) at least because F1 (2022-07..2023-01) or F8 (2026-01..2026-04-26) had no trade: the filter keeps them flat in BTC bear markets. Nearest misses: `F-don1d20-tp5-lock3` (184 trades, 67.9%, +0.353%, CI -0.36..+1.06, traded folds 52-72%, SD 7.7) and `F-don1d20-tp8-lock3` (160 trades, 64.4%, +0.835%, CI -0.04..+1.69, F2 34.8%).
+- The high win rate families (J, N) win 60-90% in every fold and regime, but with fixed percentage targets and stops their payoff is 0.06 to 0.56 and the mean is negative in all of them.
+- Trend rules made 28 to 272 trades in almost four years on three pairs, so their CIs are wide.
+
+## Changes in round 2
+
+| Change | Why |
+| --- | --- |
+| Pairs: BTC/IDR, ETH/IDR, SOL/IDR plus XRP/IDR and DOGE/IDR | more trades per fold and narrower CIs; XRP and DOGE are the most liquid IDR coins after them (Indodax ticker 2026-10-26: spread 0.4 and 7.1 bps) |
+| Trend filters `above_sma50_1d` and `above_sma100_1d` | a faster filter can let trend entries trade in the rallies of bear folds that SMA200 blocks |
+| `take_profit_atr` and `stop_atr`: target and stop in multiples of the rule timeframe's ATR(14) at the signal candle; the stop is never looser than `stoploss` | fixed targets ignore volatility; ZHA-3871 section 4.4 proposes exits at k x ATR. Freqtrade runs them with `custom_roi` and `custom_stoploss` |
+| Multiple-testing correction | T1 on the walk-forward also needs the Bonferroni lower bound of the mean (normal, two-sided 5% family-wise over the cumulative trial count, 142 after this round) above zero, next to the bootstrap CI and the null p95 |
+| Untouched pre-sample period | the round 1 holdout is used and there is no forward data after 2026-10-26 yet; see below |
+
+## Data
+
+- Walk-forward: Indodax 1h candles for the five pairs from 2021-01-01 to 2026-04-26 00:00 UTC (the round 1 files for BTC, ETH and SOL, cut at the holdout start; XRP and DOGE fetched for the same range). The runner never loads a candle after 2026-04-26.
+- Pre-sample: Indodax 1h candles from 2018-01-01 to 2021-01-01 for BTC/IDR, ETH/IDR, XRP/IDR and DOGE/IDR (SOL/IDR was not listed). Scored from 2018-09-01, after the 220 days the 1d SMA200 and its 20-day slope need. No run in this repository and no probe in ZHA-3871 has scored a trade before 2021-01-01.
+
+## Locked matrix: 49 configurations (cumulative 142 of 600)
+
+| Family | Configurations |
+| --- | --- |
+| Q round 1 near misses on five pairs: `F-don1d20` tp 5% and 8% with lock 3%, `G-rsi2-1d-10-sl25`, `J-rsi14-1h-tp3-sl10` (the current default) | 4 |
+| S Donchian 1d 10 and 20, filter SMA50, SMA100 or none, fixed target 5% or 8%, lock 3%, stop 8% | 12 |
+| V Donchian 1d 20, filter SMA200 or SMA100, target 1, 1.5 or 2 ATR, stop 2 or 3 ATR (hard stop 15%) | 12 |
+| V Donchian 4h 20, filter SMA200, target 1.5, 2.5 or 3.5 ATR(4h), stop 2 or 3 ATR (hard stop 10%) | 6 |
+| W RSI2 < 10 on 4h above SMA50 or SMA100, target 1 or 1.5 ATR, stop 1.5 or 2.5 ATR, 72 h time stop | 8 |
+| W RSI14 < 30 on 1h above SMA100, target 2 or 3 ATR(1h), stop 3 or 5 ATR, 168 h time stop | 4 |
+| R random entries with the exits of `V-don1d20-sma200-tp1.5atr-st2atr` (control, not deployable) | 1 |
+| K benchmarks: SwingEmaRsi, buy-and-hold | 2 |
+
+## Selection, final evaluation and default
+
+1. Walk-forward, eligibility, ranking, null and controls as in round 1, on the five pairs.
+2. The pre-sample run is allowed once, for one configuration, and only when the selected configuration meets the target with a positive mean on the walk-forward (walk-forward tier T1 or T2). A T3 is not spent on it: the pre-sample is the only untouched data left for later rounds. The runner refuses a second run (`presample_started` in the ledger).
+3. Final tier of that configuration: (a) on the pre-sample trades, (b) on the walk-forward folds, (c) and (d) on both; expectancy, CI and null on the pre-sample.
+4. When the selected configuration is not T1 or T2 on the walk-forward, the pre-sample stays untouched, the round reports its walk-forward tier only, and the default does not change.
+5. The default changes only to a configuration whose final tier is higher than the current default's (T4 on the round 1 holdout, T3 on the walk-forward), with a Freqtrade backtest of `RuleStrategy` that reproduces the simulator's trades.

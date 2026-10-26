@@ -264,13 +264,13 @@ def make_router(ctx: Context, reader: Callable[..., Any]) -> APIRouter:
                 "backtest_cache": "none",
             }
             detail["request"] = payload
-            return backtest_view(await analysis_of(ctx).backtest_start(payload), settings.strategy.name)
+            return backtest_view(await analysis_of(ctx).backtest_start(payload))
 
         return await audited(ctx, request, "analytics.backtest.start", [body.bot or "default"], detail, start)
 
     @router.get("/backtest")
     async def backtest_status() -> dict[str, Any]:
-        return backtest_view(await analysis_of(ctx).backtest_status(), await strategy_of())
+        return backtest_view(await analysis_of(ctx).backtest_status())
 
     @router.delete("/backtest", dependencies=[Depends(control(ctx, "analytics.backtest.stop"))])
     async def backtest_stop(request: Request) -> dict[str, Any]:
@@ -279,7 +279,7 @@ def make_router(ctx: Context, reader: Callable[..., Any]) -> APIRouter:
             status = await client.backtest_status()
             if status.get("running"):
                 await client.backtest_abort()
-            return backtest_view(await client.backtest_reset(), await strategy_of())
+            return backtest_view(await client.backtest_reset())
 
         return await audited(ctx, request, "analytics.backtest.stop", [], {}, stop)
 
@@ -288,9 +288,12 @@ def make_router(ctx: Context, reader: Callable[..., Any]) -> APIRouter:
         return await analysis_of(ctx).backtest_history()
 
     @router.get("/backtest/history/result")
-    async def backtest_history_result(filename: Annotated[str, Query(pattern=r"^[A-Za-z0-9._-]+$")]) -> dict[str, Any]:
-        strategy = await strategy_of()
-        return backtest_view(await analysis_of(ctx).backtest_history_result(filename, strategy), strategy)
+    async def backtest_history_result(
+        filename: Annotated[str, Query(pattern=r"^[A-Za-z0-9._-]+$")],
+        strategy: Annotated[str | None, Query(pattern=r"^[A-Za-z][A-Za-z0-9_]*$")] = None,
+    ) -> dict[str, Any]:
+        name = strategy or await strategy_of()
+        return backtest_view(await analysis_of(ctx).backtest_history_result(filename, name))
 
     return router
 

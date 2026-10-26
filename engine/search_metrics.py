@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from statistics import NormalDist
 
 import numpy as np
 import pandas as pd
@@ -49,6 +50,14 @@ def bootstrap_ci(
         ]
     )
     return (float(np.percentile(means, 2.5)), float(np.percentile(means, 97.5)))
+
+
+def adjusted_lower(values: np.ndarray, trials: int) -> float:
+    """Lower bound of the mean at a two-sided 5% family-wise level over trials tests (Bonferroni, normal)."""
+    if len(values) < 2:
+        return math.nan
+    z = float(NormalDist().inv_cdf(1 - 0.025 / max(trials, 1)))
+    return float(values.mean() - z * values.std(ddof=1) / math.sqrt(len(values)))
 
 
 def rolling_min_win_rate(wins: np.ndarray, window: int = plan.ROLLING_WINDOW) -> float | None:

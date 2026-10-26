@@ -118,6 +118,47 @@ def test_trailing_stop_uses_highest_close_minus_atr_multiple():
     assert (trade.reason, trade.exit_time) == ("trail", frame["date"][5])
 
 
+def test_atr_target_and_stop_use_the_atr_of_the_signal_candle():
+    rule = spec(take_profit_atr=1.5, stop_atr=2.0, stoploss=-0.2)
+    atr = np.array([2.0, 50.0, 50.0, 50.0])
+    target = candles([100, 100, 100, 100], highs=[100, 100, 102.9, 104])
+    [won] = run(target, flags(4, 0), exits=exits_for(rule), atr=atr)
+    assert (won.exit_price, won.reason, won.exit_time) == (pytest.approx(103), "roi", target["date"][3])
+    stop = candles([100, 100, 100, 100], lows=[100, 96.5, 100, 95])
+    [lost] = run(stop, flags(4, 0), exits=exits_for(rule), atr=atr)
+    assert (lost.exit_price, lost.reason, lost.exit_time) == (96, "stoploss", stop["date"][3])
+
+
+def test_atr_stop_never_loosens_the_hard_stoploss():
+    rule = spec(stop_atr=3.0, stoploss=-0.05)
+    assert rule.stop_price(100.0, 10.0) == pytest.approx(95.0)
+    assert rule.stop_price(100.0, 1.0) == pytest.approx(97.0)
+    assert rule.stop_price(100.0, float("nan")) == pytest.approx(95.0)
+    assert rule.atr_target(100.0, float("nan")) is None
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [{"take_profit": 0.03, "take_profit_atr": 1.0}, {"take_profit_atr": 1.0, "lock_at": 0.02}],
+)
+def test_conflicting_exit_fields_are_rejected(fields):
+    with pytest.raises(ValueError):
+        spec(**fields)
+
+
+def test_trend_filter_compares_the_daily_close_with_the_configured_sma():
+    frame = daily_walk(260, seed=4)
+    daily = {"1d": resample(frame, "1d")}
+    entries = {
+        trend: rule_frame(frame, spec(entry="tsmom", lookback=5, exit="none", trend_filter=trend), daily)["enter"]
+        for trend in ("none", "above_sma50_1d", "above_sma200_1d")
+    }
+    assert entries["above_sma50_1d"].sum() < entries["none"].sum()
+    assert not entries["above_sma200_1d"].iloc[: 200 * 24].any()
+    assert not entries["above_sma50_1d"].iloc[: 50 * 24].any()
+    assert entries["above_sma50_1d"].iloc[50 * 24 : 200 * 24].any()
+
+
 def daily_walk(days: int, seed: int = 1) -> pd.DataFrame:
     rng = np.random.default_rng(seed)
     closes = 100 * np.exp(np.cumsum(rng.normal(0, 0.01, days * 24)))
@@ -134,6 +175,7 @@ def daily_walk(days: int, seed: int = 1) -> pd.DataFrame:
         spec(entry="rsi_dip", timeframe="4h", lookback=2, threshold=20, exit="sma_reclaim", exit_lookback=5),
         spec(entry="ema_trend", timeframe="4h", lookback=14, fast=5, slow=10, exit="ema_cross", trail_atr=2.0),
         spec(entry="tsmom", timeframe="1d", lookback=5, exit="tsmom_flip", trend_filter="above_sma200_1d"),
+        spec(timeframe="1d", lookback=5, exit="donchian_mid", exit_lookback=5, trend_filter="above_sma50_1d"),
     ],
 )
 def test_signals_never_change_when_later_candles_are_added(rule):
@@ -252,25 +294,69 @@ def test_drawdown_sizes_each_trade_by_the_stop_distance():
     assert metrics.max_drawdown(rows, -0.10, 0.0031) == pytest.approx(expected)
 
 
-def test_plan_stays_within_the_round_budget_and_ids_are_unique():
-    ids = [candidate.id for candidate in plan.candidates()]
-    assert len(ids) == len(set(ids)) <= 300
+def test_rounds_stay_within_the_search_budget_and_ids_are_unique():
+    ids = [candidate.id for candidate in plan.round1_candidates()]
+    current = [candidate.id for candidate in plan.candidates()]
+    assert len(current) == len(set(current))
+    assert not set(current) & set(ids) - {"K-SwingEmaRsi", "K-buy-and-hold"}
+    assert plan.cumulative_trials() == len(ids) + len(current) <= plan.SEARCH_BUDGET
 
 
-def holdout_args(tmp_path, candidate: str, replay: bool = False):
-    return type("Args", (), {"ledger": tmp_path / "ledger.jsonl", "replay": replay, "candidate": candidate})()
+def test_adjusted_lower_bound_widens_with_the_number_of_trials():
+    values = np.random.default_rng(1).normal(0.01, 0.05, 200)
+    one, many = metrics.adjusted_lower(values, 1), metrics.adjusted_lower(values, 150)
+    assert one == pytest.approx(values.mean() - 1.959964 * values.std(ddof=1) / np.sqrt(200), rel=1e-5)
+    assert many < one
 
 
-def test_second_holdout_run_is_refused_before_any_data_is_read(tmp_path):
-    (tmp_path / "ledger.jsonl").write_text(
-        json.dumps({"kind": "holdout_started", "run_id": "r1", "candidate": "A"}) + "\n", encoding="utf-8"
-    )
+def search_dirs(tmp_path, pairs):
+    datadir = tmp_path / "data"
+    datadir.mkdir(exist_ok=True)
+    for pair in pairs:
+        strategy_search.pair_file(datadir, pair).write_bytes(pair.encode())
+    fear_greed = tmp_path / "fg.json"
+    fear_greed.write_text("{}", encoding="utf-8")
+    return datadir, fear_greed
+
+
+def ledger_kinds(path):
+    return [line["kind"] for line in strategy_search.ledger_lines(path)]
+
+
+def test_a_run_writes_its_started_line_before_reading_any_data(tmp_path, monkeypatch):
+    datadir, fear_greed = search_dirs(tmp_path, plan.PAIRS)
+    ledger = tmp_path / "ledger.jsonl"
+
+    def killed(args, entry):
+        assert ledger_kinds(ledger) == ["walk_forward_started"]
+        raise KeyboardInterrupt
+
+    monkeypatch.setitem(strategy_search.COMMANDS, "walk-forward", ("walk_forward", killed))
+    argv = ["walk-forward", "--datadir", str(datadir), "--fear-greed", str(fear_greed), "--out", str(tmp_path / "o")]
+    with pytest.raises(KeyboardInterrupt):
+        strategy_search.main([*argv, "--ledger", str(ledger)])
+    [line] = strategy_search.ledger_lines(ledger)
+    assert line["status"] == "started" and set(line["data_sha256"]) == {*plan.PAIRS, "fear_greed"}
+
+
+@pytest.mark.parametrize("command,kind", [("holdout", "holdout_started"), ("presample", "presample")])
+def test_second_run_on_an_untouched_period_is_refused_before_any_data_is_read(tmp_path, monkeypatch, command, kind):
+    datadir, fear_greed = search_dirs(tmp_path, {*plan.PAIRS, *plan.ROUND1_PAIRS, *plan.PRESAMPLE_PAIRS})
+    ledger = tmp_path / "ledger.jsonl"
+    ledger.write_text(json.dumps({"kind": kind, "run_id": "r1", "candidate": "A"}) + "\n", encoding="utf-8")
+
+    def reads_data(args, entry):
+        raise AssertionError("data was read")
+
+    monkeypatch.setitem(strategy_search.COMMANDS, command, (strategy_search.COMMANDS[command][0], reads_data))
+    base = [command, "--datadir", str(datadir), "--wf-datadir", str(datadir), "--fear-greed", str(fear_greed)]
+    base += ["--out", str(tmp_path / "o"), "--ledger", str(ledger), "--candidate"]
+    assert strategy_search.main([*base, "B"]) == 3
+    assert strategy_search.main([*base, "B", "--replay"]) == 3
+    assert ledger_kinds(ledger) == [kind, command, f"{command}_replay"]
+
+
+def test_replay_without_a_recorded_run_is_refused(tmp_path):
+    args = type("Args", (), {"ledger": tmp_path / "ledger.jsonl", "replay": True, "candidate": "A"})()
     with pytest.raises(strategy_search.HoldoutUsed):
-        strategy_search.holdout(holdout_args(tmp_path, "B"), {})
-    with pytest.raises(strategy_search.HoldoutUsed):
-        strategy_search.holdout(holdout_args(tmp_path, "B", replay=True), {})
-
-
-def test_replay_without_a_recorded_holdout_is_refused(tmp_path):
-    with pytest.raises(strategy_search.HoldoutUsed):
-        strategy_search.holdout(holdout_args(tmp_path, "A", replay=True), {})
+        strategy_search.single_run_guard(args, strategy_search.PRESAMPLE_KINDS, "presample")

@@ -74,7 +74,7 @@ ROUND1_SELECTED = "J-rsi14-1h-tp3-sl10"
 
 
 def test_example_config_runs_the_round_one_selection():
-    [selected] = [candidate for candidate in search_plan.candidates() if candidate.id == ROUND1_SELECTED]
+    [selected] = [candidate for candidate in search_plan.round1_candidates() if candidate.id == ROUND1_SELECTED]
     strategy = load_settings(EXAMPLE).strategy
     assert (strategy.name, strategy.rule) == ("RuleStrategy", selected.spec)
 
@@ -145,6 +145,34 @@ def test_lock_exit_counts_the_entry_candle_of_a_trade_filled_after_its_open():
     )
     assert exit_for(rule, [104.5, 103.0], 2) is None
     assert exit_for(rule, [104.5, 101.5], 2) == "rule_lock"
+
+
+def atr_callbacks(rule: RuleSpec, signal_atr: float):
+    instance = strategy(rule)
+    frame = walk(6)
+    frame["rule_atr"] = [9.0, signal_atr, 7.0, 7.0, 7.0, 7.0]
+    instance.dp = Provider(frame)
+    instance.dp.analyzed = frame
+    return instance, open_trade(START + timedelta(hours=2, minutes=3))
+
+
+def test_atr_target_reaches_freqtrade_roi_exactly_at_the_gross_target_price():
+    rule = RuleSpec(
+        entry="donchian", timeframe="1h", lookback=5, exit="none", stoploss=-0.2, take_profit_atr=1.5, stop_atr=2.0
+    )
+    instance, trade = atr_callbacks(rule, 2.0)
+    assert instance.use_custom_roi and instance.use_custom_stoploss
+    roi = instance.custom_roi("BTC/IDR", trade, START + timedelta(hours=4), 120, None, "long")
+    fee = instance.fee
+    assert 103.0 * (1 - fee) / (100.0 * (1 + fee)) - 1 == pytest.approx(roi)
+    stop = instance.custom_stoploss("BTC/IDR", trade, START + timedelta(hours=4), 110.0, 0.1, False)
+    assert 110.0 * (1 - stop) == pytest.approx(96.0)
+
+
+def test_fixed_exit_rules_leave_the_custom_callbacks_off():
+    rule = RuleSpec(entry="rsi_dip", timeframe="1h", lookback=14, threshold=30, exit="none", stoploss=-0.1)
+    instance = strategy(rule)
+    assert not instance.use_custom_roi and not instance.use_custom_stoploss
 
 
 def test_stake_risks_the_configured_share_of_equity_at_the_rule_stop():

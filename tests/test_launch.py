@@ -42,7 +42,7 @@ def test_rendered_config_passes_freqtrade_validation(tmp_path):
     assert rendered["tradable_balance_ratio"] == 0.99
     assert rendered["dry_run"] is True
     assert rendered["dry_run_wallet"] == 2_000_000
-    assert rendered["fee"] == 0.002
+    assert rendered["fee"] == pytest.approx(0.0031055)
     assert rendered["apiserver"] == {"allow_custom_messages": True}
     assert rendered["trading_bot"]["compounding"] is True
 

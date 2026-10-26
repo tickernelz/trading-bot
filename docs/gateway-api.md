@@ -692,9 +692,9 @@ Example: shape taken from a test (one BTC/IDR position of Rp 300,000, stop -3%, 
 Uses the same webserver instance as 13.2. Verified prerequisite: the `webserver` launcher uses `strategy_path` in the rendered config, not the `--strategy` argument (Freqtrade 2026.9 rejects `--strategy` for `webserver`; that error was already in the launcher).
 
 - `POST /gw/v1/analytics/backtest` (control from loopback) body `{"timerange": "20261003-20261025", "max_open_trades": 3, "dry_run_wallet": 2000000}` (`timerange` required, the rest optional with defaults from config). Strategy, `timeframe`, `stake_amount: "unlimited"`, and `enable_protections: false` are fixed by the gateway. Replies `202` with the job status.
-- `GET /gw/v1/analytics/backtest`: status (`status`, `running`, `step`, `progress`) and, when finished, `result` containing the Freqtrade summary figures without the trade list; `results_per_pair` and `exit_reason_summary` are included.
+- `GET /gw/v1/analytics/backtest`: status (`status`, `running`, `step`, `progress`) and, when finished, `strategy` (the strategy the job ran, read from the result) and `result` containing its Freqtrade summary figures without the trade list; `results_per_pair` and `exit_reason_summary` are included.
 - `DELETE /gw/v1/analytics/backtest` (control from loopback): stop the running job and then clean up.
-- `GET /gw/v1/analytics/backtest/history` and `GET /gw/v1/analytics/backtest/history/result?filename=...`: saved results (file names only `[A-Za-z0-9._-]`).
+- `GET /gw/v1/analytics/backtest/history` and `GET /gw/v1/analytics/backtest/history/result?filename=...&strategy=...`: saved results (file names only `[A-Za-z0-9._-]`; `strategy` defaults to the configured `strategy.name`, the history list names the strategy of each file).
 
 Indodax 1h OHLCV history is limited to about 27 days (section 10), so the 1h backtest range is too. Backtest results use historical data and guarantee nothing for live conditions. Real example: BTC, ETH, SOL, 2026-10-03 to 2026-10-25, 2,000,000 IDR: 15 trades, finished in 2.04 seconds (profit and loss figures are not shown here because they are not a conclusion).
 

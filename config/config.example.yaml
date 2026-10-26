@@ -14,7 +14,7 @@ exchange:
   name: indodax
   pairs: [BTC/IDR, ETH/IDR, SOL/IDR]
   timeframe: 1h
-  fee_pct: 0.2
+  fee_pct: 0.31055
 strategy:
   name: RuleStrategy
   rule:
