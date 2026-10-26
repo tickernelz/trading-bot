@@ -6,6 +6,7 @@ RUN pip install --user --no-cache-dir -c /tmp/swarm/constraints.txt /tmp/swarm &
 WORKDIR /opt/trading-bot
 COPY --chown=ftuser:ftuser engine ./engine
 COPY --chown=ftuser:ftuser gateway ./gateway
+COPY --chown=ftuser:ftuser analytics ./analytics
 ENV PYTHONPATH=/opt/trading-bot \
     TRADING_BOT_CONFIG=/opt/trading-bot/config/config.yaml \
     TRADING_BOT_USERDIR=/freqtrade/user_data

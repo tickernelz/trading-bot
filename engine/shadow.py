@@ -19,7 +19,8 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
 from tb_swarm.config import parse_config
 from tb_swarm.models import ChoiceQuestion, DecisionRequest
-from tb_swarm.runner import DecisionOutcome, SwarmRunner
+from tb_swarm.outcome import DecisionOutcome
+from tb_swarm.runner import SwarmRunner
 
 from engine.decisions import DecisionStore
 from engine.logredact import install as install_log_redaction

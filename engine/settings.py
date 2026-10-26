@@ -142,6 +142,36 @@ class Shadow(Strict):
         return f"http://{host}:{self.port}"
 
 
+class Scoreboard(Strict):
+    enabled: bool = True
+    auto_disable: bool = True
+    min_samples: Annotated[int, Field(ge=5)] = 30
+    max_ece: Annotated[float, Field(gt=0, lt=1)] = 0.25
+    brier_margin: Annotated[float, Field(ge=0, lt=1)] = 0.05
+    accuracy_margin: Annotated[float, Field(ge=0, lt=0.5)] = 0.05
+    bins: Annotated[int, Field(ge=2, le=20)] = 5
+    interval_s: Annotated[int, Field(ge=60)] = 3600
+
+
+class Stress(Strict):
+    drop_pct: Percent = 10.0
+
+
+class Tax(Strict):
+    pph22_final_pct: Annotated[float, Field(ge=0, le=100)] = 0.21
+
+
+class Portfolio(Strict):
+    max_pair_share_pct: Percent = 50.0
+
+
+class Analytics(Strict):
+    scoreboard: Scoreboard = Scoreboard()
+    stress: Stress = Stress()
+    tax: Tax = Tax()
+    portfolio: Portfolio = Portfolio()
+
+
 class Settings(Strict):
     mode: Literal["dry_run"]
     bot_id: Annotated[str, Field(pattern=r"^[A-Z]$")] = "A"
@@ -156,6 +186,7 @@ class Settings(Strict):
     notify: Notify
     api: Api = Api()
     shadow: Shadow | None = None
+    analytics: Analytics = Analytics()
 
     @model_validator(mode="after")
     def _swarm_mode_supported(self) -> Settings:

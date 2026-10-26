@@ -116,3 +116,19 @@ shadow:
   port: 8091
   database: swarm_decisions.sqlite
   token_env: SHADOW_TOKEN
+analytics:
+  scoreboard:
+    enabled: true
+    auto_disable: true
+    min_samples: 30
+    max_ece: 0.25
+    brier_margin: 0.05
+    accuracy_margin: 0.05
+    bins: 5
+    interval_s: 3600
+  stress:
+    drop_pct: 10.0
+  tax:
+    pph22_final_pct: 0.21
+  portfolio:
+    max_pair_share_pct: 50.0
