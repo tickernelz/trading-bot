@@ -83,7 +83,13 @@ Tes berjalan di dalam image turunan Freqtrade, jadi versi Freqtrade, ccxt, dan p
 - Freqtrade 2026.9 mencetak peringatan bahwa indodax tidak didukung resmi dan memakai kelas exchange generik, tetapi OHLCV 1h BTC/IDR, ETH/IDR, SOL/IDR terambil.
 - ccxt 4.5.84 melaporkan biaya taker Indodax 0.2 sebagai rasio (bukan 0,2%), sehingga Freqtrade akan memakai biaya 20% bila tidak ditimpa. Karena itu exchange.fee_pct: 0.2 wajib di config dan dirender menjadi fee: 0.002.
 - ccxt melaporkan fetchMyTrades dan watchOHLCV tidak tersedia (dilaporkan Freqtrade sebagai missing opt).
-- Riwayat OHLCV 1h hanya sekitar 649 candle terakhir (27 hari) walaupun diminta 120 hari; permintaan 1d mengembalikan 1000 candle dalam satu panggilan. Backtest 1h karena itu terbatas pada sekitar 27 hari.
+- Satu permintaan OHLCV dengan rentang panjang hanya mengembalikan candle terbaru (1h: 649 candle, 27 hari), sehingga download-data Freqtrade berhenti di 27 hari. Riwayat 1h sendiri tersedia minimal sejak 2023-10-01: engine/history.py mengambilnya per jendela 500 candle (docs/stage2-backtest.md).
+
+## Backtest tahap 2
+
+    IMAGE=trading-bot/engine:dev scripts/stage2_backtest.sh user_data/stage2
+
+Mengunduh riwayat 1h tiga pair sejak 2023-10-01, lalu menjalankan delapan backtest yang matriksnya dikunci di engine/backtest_suite.py (in-sample dan out-of-sample, fee 0,2% dan pajak 0,21% per sisi, pembanding fee saja dan tanpa biaya, batas risiko apa adanya dan dimatikan). Hasil: report.json dan report.md di direktori keluaran. Temuan: docs/stage2-backtest.md.
 
 ## Memperbarui Freqtrade
 
