@@ -1,10 +1,19 @@
 <script lang="ts">
   import { gateway } from "../lib/gateway.svelte";
   import { age, clock, MINUS, percent } from "../lib/format";
+  import { t } from "../lib/i18n";
 
   const g = gateway;
   const word = $derived(
-    g.safety === "aman" ? "Aman" : g.safety === "ditahan" ? "Ditahan" : g.safety === "berhenti" ? "Berhenti" : g.coreFault ? "Tidak diketahui" : "",
+    g.safety === "aman"
+      ? t("board.safe")
+      : g.safety === "ditahan"
+        ? t("board.held")
+        : g.safety === "berhenti"
+          ? t("board.stopped")
+          : g.coreFault
+            ? t("board.unknown")
+            : "",
   );
   const sentence = $derived.by(() => {
     const risk = g.risk;
@@ -12,28 +21,29 @@
     const loss = percent(risk.daily_loss_pct);
     const limit = percent(risk.limits.max_daily_loss_pct, 1);
     if (g.safety === "berhenti") {
-      return "Bot tidak memproses entry atau exit. " + g.openTrades.length + " posisi terbuka tetap tercatat; stop loss hanya jalan saat bot berjalan.";
+      return t("board.s_stopped", { n: g.openTrades.length });
     }
     if (g.safety === "ditahan") {
-      if (risk.breaches.includes("total_drawdown")) return "Rugi total " + percent(risk.drawdown_pct) + " menyentuh batas " + percent(risk.limits.max_total_drawdown_pct, 1) + ". Entry baru ditahan sampai batas diubah.";
-      return "Rugi hari ini " + MINUS + loss + " menyentuh batas " + limit + ". Entry baru ditahan sampai besok; posisi terbuka tetap dijaga stop loss.";
+      if (risk.breaches.includes("total_drawdown"))
+        return t("board.s_drawdown", { loss: percent(risk.drawdown_pct), limit: percent(risk.limits.max_total_drawdown_pct, 1) });
+      return t("board.s_daily_hit", { loss: MINUS + loss, limit });
     }
-    if (risk.daily_pnl >= 0) return "Belum ada rugi hari ini. Batas rugi harian " + limit + ". Entry baru boleh dibuka.";
-    return "Rugi hari ini " + MINUS + loss + " dari batas " + limit + ". Entry baru boleh dibuka.";
+    if (risk.daily_pnl >= 0) return t("board.s_no_loss", { limit });
+    return t("board.s_loss", { loss: MINUS + loss, limit });
   });
 </script>
 
-<section class="board {g.safety ?? (g.coreFault ? 'unknown' : 'loading')}" class:stale={g.stale && g.safety !== null} aria-label="Keadaan bot">
-  <p class="sr-only" aria-live="assertive">{word ? "Keadaan bot: " + word : ""}</p>
+<section class="board {g.safety ?? (g.coreFault ? 'unknown' : 'loading')}" class:stale={g.stale && g.safety !== null} aria-label={t("board.label")}>
+  <p class="sr-only" aria-live="assertive">{word ? t("board.live", { word }) : ""}</p>
   {#if g.safety}
     <div class="w" aria-hidden="true">{word}</div>
     <p class="s">{sentence}</p>
     {#if g.stale}
-      <p class="basi">Keadaan terakhir yang diketahui, dari {g.lastDataAt ? clock(g.lastDataAt) : "-"} ({age(g.dataAge)}). Bisa sudah berubah.</p>
+      <p class="basi">{t("board.stale", { at: g.lastDataAt ? clock(g.lastDataAt) : "-", age: age(g.dataAge) })}</p>
     {/if}
   {:else if g.coreFault}
-    <div class="w">Tidak diketahui</div>
-    <p class="s">Keadaan bot belum bisa dimuat dari gateway. Jangan anggap aman sampai papan ini menampilkan keadaan.</p>
+    <div class="w">{t("board.unknown")}</div>
+    <p class="s">{t("board.s_unknown")}</p>
   {:else}
     <span class="skeleton" style="width:40%;height:2.5rem"></span>
     <span class="skeleton" style="width:85%;margin-top:12px"></span>
