@@ -1,16 +1,16 @@
 M = "\u2212"
 
 VOTERS = [
-    ("v1", "modelrouter", "jev-1.13", "izinkan", 0.71),
-    ("v2", "experientiallabs", "clef", "izinkan", 0.64),
-    ("v3", "experientiallabs", "jev-latest", "kecilkan", 0.40),
-    ("v4", "xai-hm", "model chat (contoh)", "izinkan", 0.62),
-    ("v5", "tiprouter", "model chat (contoh)", "izinkan", 0.69),
-    ("v6", "nutaraline", "deepseek-v4.1-flash-1017", "izinkan", 0.74),
-    ("v7", "lucif", "model chat (contoh)", "timeout", None),
+    ("v1", "modelrouter", "jev-1.13", "allow", 0.71),
+    ("v2", "experientiallabs", "clef", "allow", 0.64),
+    ("v3", "experientiallabs", "jev-latest", "reduce", 0.40),
+    ("v4", "xai-hm", "chat model (example)", "allow", 0.62),
+    ("v5", "tiprouter", "chat model (example)", "allow", 0.69),
+    ("v6", "nutaraline", "deepseek-v4.1-flash-1017", "allow", 0.74),
+    ("v7", "lucif", "chat model (example)", "timeout", None),
 ]
 
-NAV = ["Ringkas", "Grafik", "Aksi", "Swarm", "Atur"]
+NAV = ["Summary", "Chart", "Actions", "Swarm", "Settings"]
 
 
 def gain(text):
@@ -22,7 +22,7 @@ def loss(text):
 
 
 def label(title):
-    return '<div class="lab"><b>' + title + '</b><span class="ex">contoh data, bukan hasil nyata</span></div>'
+    return '<div class="lab"><b>' + title + '</b><span class="ex">example data, not real results</span></div>'
 
 
 def row(k, v, cls=""):
@@ -37,7 +37,7 @@ def sec(title, meta=""):
 def meter(name, value, limit, pct, hot=False):
     cls = "sig" if hot else ""
     return (
-        '<div class="meter"><div class="h"><span>' + name + '</span><b>' + value + ' dari batas ' + limit
+        '<div class="meter"><div class="h"><span>' + name + '</span><b>' + value + ' of limit ' + limit
         + '</b></div><div class="t"><i class="' + cls + '" style="width:' + str(pct) + '%"></i></div></div>'
     )
 
@@ -46,13 +46,13 @@ def switch(on, text):
     return '<span class="sw ' + ("on" if on else "") + '"><i></i>' + text + "</span>"
 
 
-def phone(inner, nav_on, dark=False, age="4 dtk lalu", mode="Dry-run", link=True, h=620):
+def phone(inner, nav_on, dark=False, age="4 s ago", mode="Dry-run", link=True, h=620):
     dot = '<span class="dot"></span>' if link else '<span class="dot hol"></span>'
     nav = "".join('<span class="' + ("on" if n == nav_on else "") + '">' + n + "</span>" for n in NAV)
     return (
         '<div class="dev ui' + (" dark" if dark else "") + '" style="height:' + str(h) + 'px">'
         '<div class="sb"><span>09:41</span><span>PWA</span></div>'
-        '<div class="top"><span class="mode">' + mode + "</span><span>" + dot + age + '</span><span class="sp"></span><span class="kb">Hentikan</span></div>'
+        '<div class="top"><span class="mode">' + mode + "</span><span>" + dot + age + '</span><span class="sp"></span><span class="kb">Stop</span></div>'
         '<div class="scr">' + inner + '</div><div class="nav">' + nav + "</div></div>"
     )
 
@@ -65,11 +65,11 @@ def phones(*items):
     return '<div class="mkw"><div class="phones">' + "".join(items) + "</div></div>"
 
 
-def desk(inner, nav_on, items=("Ringkas", "Grafik", "Aksi", "Swarm", "Posisi dan riwayat", "Atur"), age="3 dtk lalu"):
+def desk(inner, nav_on, items=("Summary", "Chart", "Actions", "Swarm", "Positions and history", "Settings"), age="3 s ago"):
     nav = "".join('<div class="' + ("on" if n == nav_on else "") + '">' + n + "</div>" for n in items)
     return (
         '<div class="desk ui"><div class="top"><span class="mode">Dry-run</span><span><span class="dot"></span>' + age
-        + '</span><span class="sp"></span><span>Bot A dan Bot B berjalan</span><span class="kb">Hentikan entry baru</span></div>'
+        + '</span><span class="sp"></span><span>Bot A and Bot B running</span><span class="kb">Stop new entries</span></div>'
         '<div class="dw"><div class="dn2">' + nav + '</div><div class="dm">' + inner + "</div></div></div>"
     )
 
@@ -168,14 +168,14 @@ def candles_svg(w, h, n=40, entry=28, exit_i=14, stop=-1.3):
     out.append('<polyline points="%s" fill="none" stroke="var(--ink)" stroke-width="1.8"/>' % " ".join("%.1f,%.1f" % (X(i), Y(v)) for i, v in enumerate(e)))
     ys = Y(stop)
     out.append('<line x1="%d" y1="%.1f" x2="%d" y2="%.1f" stroke="var(--sig)" stroke-width="2" stroke-dasharray="5 3"/>' % (pl, ys, w - pr, ys))
-    out.append('<text x="%d" y="%.1f" font-size="9" fill="var(--loss)" text-anchor="end" font-weight="600">stop loss (contoh)</text>' % (w - pr - 2, ys - 3))
+    out.append('<text x="%d" y="%.1f" font-size="9" fill="var(--loss)" text-anchor="end" font-weight="600">stop loss (example)</text>' % (w - pr - 2, ys - 3))
     xe, ye = X(entry), Y(data[entry][2]) + 5
     out.append('<polygon points="%.1f,%.1f %.1f,%.1f %.1f,%.1f" fill="var(--ink)"/>' % (xe, ye, xe - 5, ye + 9, xe + 5, ye + 9))
-    out.append('<text x="%.1f" y="%.1f" font-size="9" font-weight="600" fill="var(--ink)" text-anchor="middle">Masuk</text>' % (xe, ye + 20))
+    out.append('<text x="%.1f" y="%.1f" font-size="9" font-weight="600" fill="var(--ink)" text-anchor="middle">Entry</text>' % (xe, ye + 20))
     xx, yx = X(exit_i), Y(data[exit_i][1]) - 5
     out.append('<polygon points="%.1f,%.1f %.1f,%.1f %.1f,%.1f" fill="var(--ink)"/>' % (xx, yx, xx - 5, yx - 9, xx + 5, yx - 9))
-    out.append('<text x="%.1f" y="%.1f" font-size="9" font-weight="600" fill="var(--ink)" text-anchor="middle">Keluar</text>' % (xx, yx - 12))
-    out.append('<text x="%d" y="%d" font-size="9" fill="var(--ink2)" text-anchor="middle">1 kandel = 1 jam; sumbu: persen dari harga masuk</text>' % ((pl + w - pr) // 2, h - 3))
+    out.append('<text x="%.1f" y="%.1f" font-size="9" font-weight="600" fill="var(--ink)" text-anchor="middle">Exit</text>' % (xx, yx - 12))
+    out.append('<text x="%d" y="%d" font-size="9" fill="var(--ink2)" text-anchor="middle">1 candle = 1 hour; axis: percent from entry price</text>' % ((pl + w - pr) // 2, h - 3))
     out.append("</svg>")
     return "".join(out)
 
@@ -202,16 +202,16 @@ def dots_svg(w, voters, median, q1, q3):
     out.append('<rect width="%d" height="%d" fill="var(--panel)"/>' % (w, h))
     out.append('<rect x="%.1f" y="6" width="%.1f" height="58" fill="var(--rule)"/>' % (X(q1), X(q3) - X(q1)))
     out.append('<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="var(--ink2)" stroke-width="1"/>' % (pl, ax, w - pr, ax))
-    for t, s in ((0, "0"), (0.5, "0,5"), (1, "1")):
+    for t, s in ((0, "0"), (0.5, "0.5"), (1, "1")):
         out.append('<line x1="%.1f" y1="%d" x2="%.1f" y2="%d" stroke="var(--ink2)" stroke-width="1"/>' % (X(t), ax - 4, X(t), ax + 4))
         out.append('<text x="%.1f" y="%d" font-size="9" fill="var(--ink2)" text-anchor="middle">%s</text>' % (X(t), ax + 16, s))
     out.append('<line x1="%.1f" y1="6" x2="%.1f" y2="%d" stroke="var(--ink)" stroke-width="2.5"/>' % (X(median), X(median), ax))
     for vid, ans, x, lv in dots:
-        fill = "var(--ink)" if ans == "izinkan" else "var(--bg)"
+        fill = "var(--ink)" if ans == "allow" else "var(--bg)"
         out.append('<circle cx="%.1f" cy="%d" r="5" fill="%s" stroke="var(--ink)" stroke-width="1.6"/>' % (x, lv, fill))
         out.append('<text x="%.1f" y="%d" font-size="9" fill="var(--ink)" font-weight="600">%s</text>' % (x + 8, lv + 3, vid))
-    out.append('<text x="%d" y="103" font-size="9" fill="var(--ink2)">Titik penuh = izinkan, kosong = kecilkan.</text>' % pl)
-    out.append('<text x="%d" y="114" font-size="9" fill="var(--ink2)">Garis tebal = median, pita = selisih kuartil.</text>' % pl)
+    out.append('<text x="%d" y="103" font-size="9" fill="var(--ink2)">Filled dot = allow, empty = reduce.</text>' % pl)
+    out.append('<text x="%d" y="114" font-size="9" fill="var(--ink2)">Thick line = median, band = interquartile range.</text>' % pl)
     out.append("</svg>")
     return "".join(out)
 

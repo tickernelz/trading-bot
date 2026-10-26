@@ -1,152 +1,154 @@
-# Plan final bot trading otonom 24 jam (revisi 10)
+# Final plan for a 24-hour autonomous trading bot (revision 10)
 
-Disusun 2026-10-25 setelah riset mendalam (dokumen research-swarm-pwa pada issue ini). Arahan Zhafron yang dipenuhi: modal Rp 2 juta; profit masuk lagi jadi modal; analisis memakai berita dan social; demo dulu; decision model (System One) sebagai bantuan cepat untuk LLM dan harus mendukung banyak model, bukan hanya Jev; analisis dengan swarm dan median; jalan di semua OS, mobile lewat PWA. Belum ada kode, akun, atau uang yang disentuh.
+Drafted 2026-10-25 after in-depth research (the research-swarm-pwa document). Directives from the owner that are fulfilled: capital of Rp 2 million; profit goes back into capital; analysis uses news and social; demo first; decision model (System One) as a fast aid for the LLM and must support many models, not only Jev; analysis with a swarm and median; runs on all OSes, mobile via PWA. No code, accounts, or money have been touched yet.
 
-Perubahan revisi 4 (arahan Zhafron 2026-10-25): (1) semua pengaturan dibuat configurable; (2) backend LLM memakai deepagents supaya provider dari mana pun bisa dipakai; (3) batas rugi default mengikuti usulan Wira dan tetap configurable; (4) PDF plan beserta mockup dikerjakan tim lebih dulu sebelum task tahap 0 dan 1.
+## Revision history
 
-Perubahan revisi 5 (Zhafron 2026-10-25): biaya compute LLM bukan batasan karena Zhafron punya banyak provider AI; yang diutamakan adalah kemampuan maksimal bot. Batas biaya tetap tersedia di konfigurasi tetapi default mati.
+Changes in revision 4 (the owner's directive 2026-10-25): (1) all settings are made configurable; (2) the LLM backend uses deepagents so any provider can be used; (3) the default loss limits follow the operator's proposal and remain configurable; (4) the plan PDF along with mockups is done by the team first, before the stage 0 and 1 tasks.
 
-Perubahan revisi 6 (Zhafron 2026-10-25): provider AI yang dipakai adalah yang aktif di omp models.yml; daftar dan temuannya ada di bagian 4.3.
+Changes in revision 5 (the owner 2026-10-25): LLM compute cost is not a constraint because the owner has many AI providers; the priority is the bot's maximum capability. The cost limit remains available in configuration but is off by default.
 
-Perubahan revisi 7 (Zhafron 2026-10-25): (a) bot berjalan di PC Zhafron sendiri; (b) model uji: deepseek-v4.1-flash-1017 di provider nutaraline untuk semua peran LLM selama testing; (c) ada UI setup provider dan key, dan Wira yang mengatur penyimpanan key supaya aman (bagian 4.5); (d) UI/UX harus unik, bukan AI slop, dengan skill impeccable (bagian 12); (e) proyek disimpan di ~/Projects dengan git (bagian 11).
+Changes in revision 6 (the owner 2026-10-25): the AI providers used are those active in omp models.yml; the list and findings are in section 4.3.
 
-Perubahan revisi 8 (Zhafron 2026-10-25): aplikasi dibuat full features, termasuk grafik live, aksi live, dan pratinjau live; daftar fitur must-have dan nice-to-have mengikuti saran Wira (bagian 13).
+Changes in revision 7 (the owner 2026-10-25): (a) the bot runs on the owner's own PC; (b) test model: deepseek-v4.1-flash-1017 on the nutaraline provider for all LLM roles during testing; (c) there is a provider and key setup UI, and the operator arranges key storage to be secure (section 4.5); (d) the UI/UX must be unique, not AI slop, using the impeccable skill (section 12); (e) the project is stored in ~/Projects with git (section 11).
 
-Perubahan revisi 9 (Zhafron 2026-10-25): (a) secret tidak perlu terlalu dalam: API key boleh lewat variabel lingkungan atau langsung di config; keyring dibuang (bagian 4.5); (b) Freqtrade dijadikan vendor lewat git submodule supaya modifikasi mudah dan fleksibel (bagian 11); (c) yang memakai aplikasi adalah Zhafron di PC-nya sendiri, tema visual mengikuti keputusan Wira; (d) mode full otonom: setelah plan selesai, pekerjaan berjalan sampai selesai tanpa menunggu persetujuan per langkah, Zhafron mengoreksi sambil jalan (jendela otonom 24 jam).
+Changes in revision 8 (the owner 2026-10-25): the application is built full-featured, including live charts, live actions, and live preview; the must-have and nice-to-have feature list follows the operator's suggestions (section 13).
 
-Perubahan revisi 10 (Zhafron 2026-10-25): (a) destruktif diizinkan ("full otonom destruktif true"); uang sungguhan dan push ke remote tetap di luar yang Wira kerjakan sendiri; (b) arah visual diputuskan Wira dan ditulis di PRODUCT.md dan DESIGN.md (bagian 12); (c) task tahap 0 dan 1 dibuat (bagian 8).
+Changes in revision 9 (the owner 2026-10-25): (a) secrets do not need to go too deep: the API key may come from an environment variable or directly in the config; the keyring is dropped (section 4.5); (b) Freqtrade is vendored via a git submodule so modification is easy and flexible (section 11); (c) the person using the application is the owner on their own PC, and the visual theme follows the operator's decision; (d) full-autonomy mode: after the plan is finished, the work runs to completion without waiting for approval at each step, with the owner correcting along the way (24-hour autonomy window).
 
-## 1. Pernyataan jujur tentang hasil
+Changes in revision 10 (the owner 2026-10-25): (a) destructive actions are permitted ("full autonomy destructive true"); real money and pushes to the remote remain outside what the operator does on their own; (b) the visual direction is decided by the operator and written in PRODUCT.md and DESIGN.md (section 12); (c) the stage 0 and 1 tasks are created (section 8).
 
-- Profit setiap hari tidak bisa dijamin. Yang dijamin adalah batas: bot berhenti membuka posisi baru bila rugi harian lewat batas.
-- Rp 100 ribu per hari butuh 5% per hari dari Rp 2 juta: tidak realistis. 0,1% per hari = Rp 2.000, 0,3% = Rp 6.000 (compound 0,1% per hari setahun = +44%, sudah ambisius). Tujuan tahap awal adalah membuktikan sistem, bukan penghasilan.
-- Swarm dan median adalah filter yang diukur, bukan sumber profit yang diasumsikan. Bukti ensemble menaikkan profit trading belum kutemukan; bukti yang ada untuk prediksi peristiwa, bukan harga (detail di dokumen riset).
-- Biaya Indodax: fee 0,2% (API publik 2026-10-25) dan pajak 0,21% (sumber sekunder), jadi satu siklus beli-jual 0,61-0,82%. Strategi harus untung rata-rata di atas itu per trade, jadi swing 1-4 jam, bukan scalping.
+## 1. Honest statement about results
 
-## 2. Arsitektur
+- Profit every day cannot be guaranteed. What is guaranteed is the limit: the bot stops opening new positions if the daily loss exceeds the limit.
+- Rp 100 thousand per day requires 5% per day on Rp 2 million: not realistic. 0.1% per day = Rp 2,000, 0.3% = Rp 6,000 (compounding 0.1% per day over a year = +44%, already ambitious). The goal of the early stage is to prove the system, not to earn income.
+- The swarm and median are a measured filter, not an assumed source of profit. I have not found evidence that an ensemble raises trading profit; the evidence that exists is for event prediction, not prices (details in the research document).
+- Indodax costs: 0.2% fee (public API 2026-10-25) and 0.21% tax (secondary source), so one buy-sell cycle costs 0.61-0.82%. The strategy must be profitable on average above that per trade, so swing 1-4 hours, not scalping.
 
-Satu mesin, empat lapis, satu panel kontrol:
+## 2. Architecture
 
-1. Engine: Freqtrade (Python) berjalan di PC Zhafron (native Windows, Docker, atau WSL2; pilihan dibahas di bagian 4.5 dan 10). Strategi aturan swing 1-4 jam menghasilkan kandidat entry. Profit jadi modal lagi lewat stake_amount "unlimited" dengan tradable_balance_ratio 0.99 (terverifikasi di dokumen Freqtrade).
-2. Swarm (hanya penyaring): sekumpulan voter beragam menjawab pertanyaan bertipe yang sama; hasilnya digabung dengan median. Hanya boleh membatalkan atau mengecilkan entry. Tidak pernah menambah risiko, tidak menyentuh exit dan stop loss.
-3. Lapisan risiko deterministik: risiko per trade, batas rugi harian dan total, kill switch, ukuran posisi. Tidak melewati AI.
-4. Order dan exit: deterministik. Stop loss berjalan di sisi bot (Indodax tidak terdokumentasi mendukung stoploss on exchange), jadi PC harus selalu menyala dan batas rugi ketat lebih penting.
-5. System 2: LLM besar seperti Wira hanya untuk review harian dan riset strategi di luar loop order.
-6. Panel kontrol: PWA (bagian 6).
+One machine, four layers, one control panel:
 
-## 3. Swarm dan median
+1. Engine: Freqtrade (Python) runs on the owner's PC (native Windows, Docker, or WSL2; the choice is discussed in sections 4.5 and 10). A 1-4 hour swing rule strategy produces entry candidates. Profit becomes capital again via stake_amount "unlimited" with tradable_balance_ratio 0.99 (verified in the Freqtrade documentation).
+2. Swarm (filter only): a set of diverse voters answers questions of the same type; the results are combined with the median. It may only cancel or reduce entries. It never adds risk and never touches exits and stop loss.
+3. Deterministic risk layer: risk per trade, daily and total loss limits, kill switch, position sizing. It does not pass through AI.
+4. Orders and exits: deterministic. The stop loss runs on the bot's side (Indodax is not documented as supporting stoploss on exchange), so the PC must always be on and a tight loss limit matters more.
+5. System 2: a large LLM acting as the operator is used only for daily review and strategy research outside the order loop.
+6. Control panel: PWA (section 6).
 
-Dua kelompok voter, dua tugas:
+## 3. Swarm and median
 
-A. Voter decision model (pertanyaan bertipe pada state: indikator, berita yang sudah ditandai, Fear and Greed):
-- noul: apakah entry ini searah dengan berita terbaru; apakah ada berita risiko (regulasi, peretasan exchange, makro).
-- score: sentimen berita pada skala berurutan.
-- choice: izinkan, kecilkan, atau lewati.
-B. Voter jalur harga (shadow dulu): Kronos (MIT; mini, small, base terbuka), satu model dasar time series umum, dan model FreqAI (LightGBM). Masing-masing memberi prakiraan return horizon entry.
+Two groups of voters, two tasks:
 
-Agregasi (nilai awal usulan, ditentukan ulang dari data shadow, bukan hasil tuning):
-- Tiap voter A dijalankan dengan urutan opsi diacak (urutan opsi terbukti mengubah hasil di laporan satu model: 72% vs 21%).
-- Gabungkan dengan median probabilitas dan ukur sebaran (selisih kuartil). Sebaran besar berarti voter tidak sepakat: lewati.
-- Kuorum: minimal 5 dari 7 voter A menjawab; kurang dari itu, entry baru dilewati (fail-closed).
-- Voter B: entry hanya lolos bila median prakiraan return di atas ambang biaya (0,82% + margin) dan mayoritas voter searah.
-- Bobot awal sama untuk semua voter. Bobot tidak disetel dari data kecil (risiko overfit). Voter yang kalibrasinya buruk di forward test dikeluarkan, bukan diberi bobot lagi.
-- Keberagaman: vendor dan keluarga model berbeda, karena voter yang kesalahannya berkorelasi mengulang kesalahan yang sama.
+A. Decision model voters (typed questions on the state: indicators, tagged news, Fear and Greed):
+- noul: whether this entry is aligned with the latest news; whether there is risk news (regulation, exchange hack, macro).
+- score: news sentiment on an ordinal scale.
+- choice: allow, reduce, or skip.
+B. Price path voters (shadow first): Kronos (MIT; mini, small, base are open), one general time series foundation model, and a FreqAI (LightGBM) model. Each gives a return forecast for the entry horizon.
 
-## 4. Dukungan banyak model decision (bukan hanya Jev)
+Aggregation (initial proposed values, to be re-determined from shadow data, not tuning results):
+- Each voter A is run with the option order shuffled (option order has been shown to change results in a single-model report: 72% vs 21%).
+- Combine with the median probability and measure the spread (interquartile range). A large spread means the voters disagree: skip.
+- Quorum: at least 5 of 7 voter A must answer; fewer than that, the new entry is skipped (fail-closed).
+- Voter B: an entry passes only if the median return forecast is above the cost threshold (0.82% + margin) and the majority point the same direction.
+- The initial weights are equal for all voters. Weights are not tuned from small data (overfitting risk). A voter whose calibration is poor in forward testing is removed, not given a new weight.
+- Diversity: different vendors and model families, because voters whose errors are correlated repeat the same mistakes.
 
-Antarmuka DecisionProvider dengan adapter:
-1. System One wire (/v1/systemone): Jev (TypeSafe), Solar Decide, Hanzo Kai, dan semua server yang meniru wire itu. Ollama (native sejak 0.35.0) dan vLLM menyajikannya lokal untuk model open-weight (Clef, d1, Tev1, pplx-decider, dan lain-lain).
-2. OpenRouter Decisions API (POST /api/alpha/decisions, alpha): satu API key OpenRouter, tagihan satu akun.
-3. OpenAI Decisions API (bentuk sendiri).
-4. Cadangan LLM biasa dengan structured output (103 model berstruktur murah di OpenRouter, 11 gratis) lewat adapter yang meniru choice, noul, score; AnyJev (Nokia, Apache 2.0) sebagai referensi cara mengubah LLM menjadi decision model.
+## 4. Support for many decision models (not only Jev)
 
-Registri voter berupa berkas konfigurasi: model, adapter, harga, batas waktu, status kesehatan. Voter yang gagal atau lambat dibuang untuk keputusan itu; kuorum menentukan hasil. Menambah model baru berarti menambah satu baris konfigurasi, bukan kode. Katalog decision model di OpenRouter diambil di tahap 0 memakai API key.
+A DecisionProvider interface with adapters:
+1. System One wire (/v1/systemone): Jev (TypeSafe), Solar Decide, Hanzo Kai, and all servers that imitate that wire. Ollama (native since 0.35.0) and vLLM serve it locally for open-weight models (Clef, d1, Tev1, pplx-decider, and others).
+2. OpenRouter Decisions API (POST /api/alpha/decisions, alpha): one OpenRouter API key, one account bill.
+3. OpenAI Decisions API (its own shape).
+4. Fallback regular LLM with structured output (103 cheap structured models on OpenRouter, 11 free) via an adapter that imitates choice, noul, score; AnyJev (Nokia, Apache 2.0) as a reference for how to turn an LLM into a decision model.
 
-### 4.1 Backend LLM: deepagents
+The voter registry is a configuration file: model, adapter, price, timeout, health status. A voter that fails or is slow is dropped for that decision; the quorum determines the result. Adding a new model means adding one line of configuration, not code. The decision model catalog on OpenRouter is fetched in stage 0 using the API key.
 
-Terverifikasi hari ini: deepagents (langchain-ai/deepagents) lisensi MIT, versi PyPI 0.7.32 (diunggah 2026-10-23), Python 3.11 atau lebih baru. Model ditulis dengan format provider:model, misalnya openai:gpt-5.4 atau anthropic:claude-sonnet-4-6 (contoh dari dokumen); semua model LangChain yang mendukung tool calling bisa dipakai, termasuk OpenRouter dan Ollama (dokumen deepagents). Jadi provider diganti lewat satu string konfigurasi.
+### 4.1 LLM backend: deepagents
 
-Pembagian peran:
-- Agen analis System 2 (review harian, riset strategi, penjelasan keputusan): deepagents dengan model dari konfigurasi. Tool-nya hanya baca (metrik, riwayat trade, log voter). Tidak ada tool yang bisa membuat order atau mengubah konfigurasi.
-- Voter cepat: lewat adapter DecisionProvider. Adapter cadangan LLM memakai string provider:model yang sama lewat LangChain dengan structured output.
-- Belum ada angka apakah harness deepagents (perencanaan, filesystem, konteks) menambah latensi dan token per keputusan voter. Diukur di tahap 0. Bila selisihnya kecil, semua lewat deepagents; bila besar, voter cepat memakai pemanggilan langsung dan deepagents hanya untuk agen analis. Keputusan setelah angkanya keluar, dan keduanya tetap hanya pengaturan konfigurasi.
+Verified today: deepagents (langchain-ai/deepagents) MIT license, PyPI version 0.7.32 (uploaded 2026-10-23), Python 3.11 or later. Models are written in provider:model format, for example openai:gpt-5.4 or anthropic:claude-sonnet-4-6 (examples from the documentation); all LangChain models that support tool calling can be used, including OpenRouter and Ollama (deepagents documentation). So the provider is swapped via a single configuration string.
 
-Catatan keamanan dari review sebelumnya (ZHA-3610, deepagents 0.7.13, belum diuji ulang di 0.7.32): sub-agent tanpa daftar tools mewarisi semua tools induknya, dan aturan keselamatan yang hanya ada di system prompt induk tidak sampai ke sub-agent. Karena itu batas risiko tidak boleh bergantung pada prompt: ditegakkan di kode (strategi, gateway), dan agen LLM tidak diberi tool yang bisa menempatkan order. Uji ulang di tahap 0 sebelum agen analis dipasang.
+Division of roles:
+- System 2 analyst agent (daily review, strategy research, decision explanations): deepagents with the model from configuration. Its tools are read-only (metrics, trade history, voter logs). No tool can create an order or change configuration.
+- Fast voters: via the DecisionProvider adapter. The fallback LLM adapter uses the same provider:model string via LangChain with structured output.
+- There is no figure yet on whether the deepagents harness (planning, filesystem, context) adds latency and tokens per voter decision. It is measured in stage 0. If the difference is small, everything goes through deepagents; if large, fast voters use direct calls and deepagents is only for the analyst agent. The decision comes once the figures are out, and both remain purely a configuration setting.
 
-### 4.2 Semua configurable
+Security note from an earlier review (deepagents 0.7.13, not re-tested on 0.7.32): a sub-agent with no tool list inherits all of its parent's tools, and safety rules that exist only in the parent's system prompt do not reach the sub-agent. Therefore the risk limits must not depend on the prompt: they are enforced in code (strategy, gateway), and the LLM agent is not given any tool that can place orders. Re-test in stage 0 before the analyst agent is installed.
 
-Satu berkas konfigurasi YAML. API key boleh lewat variabel lingkungan (api_key_env) atau langsung di config/config.yaml (api_key); config.yaml dan .env ada di .gitignore dan tidak masuk repo. Berkas divalidasi skema saat start; konfigurasi salah berarti bot tidak start, bukan jalan dengan nilai tebakan. Nilai di bawah adalah default usulan Wira, semuanya bisa diubah Zhafron.
+### 4.2 Everything configurable
+
+A single YAML configuration file. The API key may come via an environment variable (api_key_env) or directly in config/config.yaml (api_key); config.yaml and .env are in .gitignore and do not enter the repo. The file is schema-validated at start; a wrong configuration means the bot does not start, rather than running on guessed values. The values below are the operator's proposed defaults, all of which the owner can change.
 
 ```yaml
-mode: dry_run                     # live butuh konfirmasi dua langkah
+mode: dry_run                     # live requires two-step confirmation
 capital:
   initial_idr: 2000000
   compounding: true               # stake_amount unlimited, tradable_balance_ratio 0.99
 risk:
-  max_daily_loss_pct: 1.0         # Rp 20.000 pada modal Rp 2 juta
+  max_daily_loss_pct: 1.0         # Rp 20.000 on capital of Rp 2 million
   max_total_drawdown_pct: 10.0    # Rp 200.000
   risk_per_trade_pct: 0.5         # Rp 10.000
   max_open_trades: 3
-  leverage: none                  # spot saja
+  leverage: none                  # spot only
   on_breach: stop_new_entries     # kill switch
 exchange:
-  name: indodax                   # dukungan Freqtrade belum terbukti, diuji di tahap 0
+  name: indodax                   # Freqtrade support not yet proven, tested in stage 0
   pairs: [BTC/IDR, ETH/IDR, SOL/IDR]
   timeframe: 1h
 providers:
   - id: nutaraline
     type: openai-completions       # openai-completions, openai-responses, anthropic-messages
-    base_url: from_import          # diambil dari omp models.yml, berakhiran /v1
-    api_key_env: NUTARALINE_API_KEY   # nama variabel lingkungan; atau isi api_key di bawah
-    api_key: null                  # boleh diisi langsung di config.yaml lokal (tidak di-commit)
+    base_url: from_import          # taken from omp models.yml, ends with /v1
+    api_key_env: NUTARALINE_API_KEY   # environment variable name; or fill in api_key below
+    api_key: null                  # may be filled in directly in the local config.yaml (not committed)
     models: [deepseek-v4.1-flash-1017]
 swarm:
   enabled: true
-  mode: shadow                    # shadow atau veto; veto hanya setelah kriteria adopsi lolos
+  mode: shadow                    # shadow or veto; veto only after the adoption criteria pass
   shuffle_options: true
   min_voters_answered: 5
-  max_spread: tbd                 # ditetapkan dari data shadow di tahap 0
+  max_spread: tbd                 # set from shadow data in stage 0
   voters:
     - id: v1
       adapter: llm_structured      # systemone, openrouter_decisions, openai_decisions, llm_structured
       provider: nutaraline
       model: deepseek-v4.1-flash-1017
       variation: option_order     # option_order, temperature, prompt_variant
-      timeout_s: 30               # angka awal, diukur di tahap 0
+      timeout_s: 30               # initial number, measured in stage 0
       weight: 1.0
       enabled: true
 llm:
   backend: deepagents
-  analyst_model: nutaraline:deepseek-v4.1-flash-1017   # id provider bot : model; model uji
+  analyst_model: nutaraline:deepseek-v4.1-flash-1017   # bot provider id : model; test model
 compute:
-  max_cost_idr_per_day: off       # default mati; isi angka bila ingin batas
-  on_exceed: skip_new_entries     # berlaku hanya bila batas diisi
-  log_cost: true                  # biaya dan token dicatat sebagai informasi
+  max_cost_idr_per_day: off       # off by default; fill in a number to set a limit
+  on_exceed: skip_new_entries     # applies only when a limit is set
+  log_cost: true                  # cost and tokens are recorded as information
 data:
   news_rss: [coindesk, cointelegraph]
   fear_greed: true
-  social: off                     # aktif setelah akses Reddit diverifikasi
+  social: off                     # enabled after Reddit access is verified
 notify:
   web_push: true
 ```
 
-Aturan perubahan konfigurasi:
-1. Setiap perubahan dicatat: siapa, kapan, nilai lama dan baru.
-2. Dari PWA, menurunkan batas risiko berlaku langsung. Menaikkan batas risiko atau pindah ke mode live butuh konfirmasi dua langkah. Keputusan menaikkan batas tetap di tangan Zhafron.
-3. Menambah atau mengganti voter dan backend LLM hanya mengubah konfigurasi, bukan kode.
-4. Mengganti mode swarm dari shadow ke veto hanya setelah kriteria adopsi di bagian 8 terpenuhi atau Zhafron memutuskan lain.
-5. Protections bawaan Freqtrade belum kukonfirmasi dari dokumen, jadi batas rugi harian diimplementasikan dan diuji sendiri di tahap 0.
-6. Ukuran posisi berdasarkan risk_per_trade_pct diterapkan lewat custom_stake_amount di strategi (callback ini disebut di dokumen Freqtrade); rancangan rincinya di tahap 0.
+Configuration change rules:
+1. Every change is logged: who, when, old and new value.
+2. From the PWA, lowering a risk limit takes effect immediately. Raising a risk limit or switching to live mode requires two-step confirmation. The decision to raise a limit stays with the owner.
+3. Adding or replacing voters and LLM backends only changes configuration, not code.
+4. Switching the swarm mode from shadow to veto happens only after the adoption criteria in section 8 are met or the owner decides otherwise.
+5. Freqtrade's built-in Protections have not been confirmed from the documentation, so the daily loss limit is implemented and tested by ourselves in stage 0.
+6. Position sizing based on risk_per_trade_pct is applied through custom_stake_amount in the strategy (this callback is mentioned in the Freqtrade documentation); the detailed design is in stage 0.
 
-### 4.3 Provider AI yang sudah dimiliki Zhafron (dari omp models.yml)
+### 4.3 AI providers the owner already has (from omp models.yml)
 
-Dibaca 2026-10-25 dari ~/.omp/agent/models.yml. Yang diambil hanya nama provider, tipe API, host, dan id model. API key tidak disalin ke dokumen ini; key diberikan lewat variabel lingkungan atau config lokal (bagian 4.5).
+Read on 2026-10-25 from ~/.omp/agent/models.yml. Only the provider name, API type, host, and model ids were taken. API keys are not copied into this document; keys are supplied through environment variables or local config (section 4.5).
 
-| Provider | Tipe API | Host | Jumlah id model |
+| Provider | API type | Host | Number of model ids |
 |---|---|---|---|
 | sub2api-codex | openai-responses | localhost:62173 | 18 |
 | sub2api-agy | openai-completions | localhost:62173 | 21 |
-| sub2api-claude, sub2api-claude-kaitech, sub2api-claude-all | anthropic-messages | localhost:62173 | 7 masing-masing |
+| sub2api-claude, sub2api-claude-kaitech, sub2api-claude-all | anthropic-messages | localhost:62173 | 7 each |
 | sub2api-mimo | openai-completions | localhost:62173 | 8 |
 | omniroute | openai-completions | localhost:20128 | 20 |
 | xai-hm | openai-responses | gateway.example.com | 17 |
@@ -156,213 +158,213 @@ Dibaca 2026-10-25 dari ~/.omp/agent/models.yml. Yang diambil hanya nama provider
 | lucif | anthropic-messages | lucif.ai | 2 |
 | experientiallabs | openai-completions | api.experientiallabs.ai | 272 |
 
-Total 13 provider dan 443 id model (sebagian id sama muncul di beberapa gateway).
+Total 13 providers and 443 model ids (some of the same ids appear on several gateways).
 
-Temuan:
-1. Keluarga model beragam menurut id (jumlah provider yang memuatnya): Claude 8, Gemini 6, GPT 5, DeepSeek 5, GLM 5, Nemotron 5, Mimo 5, MiniMax 4, Hunyuan 4, Kimi 3, Step 3, Solar 3, Longcat 3, Qwen 2, serta Mistral, Llama, Grok, dan Cohere di satu provider. Voter swarm dipilih per keluarga model, bukan per gateway: id yang sama di dua gateway belum tentu model yang berbeda, dan itu bukan dua voter independen ([INFERENCE]).
-2. Decision model sudah ada di provider Zhafron menurut id model: jev-1.13 di modelrouter; jev-latest, clef, clef-flash, dan gpt-6-luna-decisions di experientiallabs. Belum terbukti gateway itu menyajikan endpoint decisions atau /v1/systemone dan bukan hanya chat completions; diuji di tahap 0 dengan key yang disediakan Zhafron. Id mercury-2 dan mercury-3 di experientiallabs kemungkinan model chat biasa, bukan Mercury Decide; belum diverifikasi.
-3. models.yml tidak memuat OpenRouter. Jadi OpenRouter API key tidak lagi wajib; adapter OpenRouter Decisions tetap didukung sebagai opsi.
-4. Tiga tipe API muncul: openai-completions, openai-responses, anthropic-messages. Adapter llm_structured harus mendukung ketiganya. Dukungan base URL kustom untuk ketiganya lewat LangChain dan deepagents belum kuverifikasi dari dokumen yang kubaca; diuji di tahap 0 ([INFERENCE]: kelas chat OpenAI dan Anthropic menerima base URL kustom).
-5. 7 dari 13 provider beralamat localhost (sub2api-*, omniroute): hanya terjangkau dari PC Zhafron. Bot berjalan di PC Zhafron (diputuskan 2026-10-25), jadi provider localhost terjangkau. Bila bot suatu hari dipindah ke VPS, voter pada provider localhost tidak terjangkau kecuali ada tunnel. 6 provider lain beralamat publik (xai-hm, modelrouter, tiprouter, nutaraline, lucif, experientiallabs).
-6. Beberapa gateway tampak pihak ketiga; ketersediaan dan kebijakan tiap gateway tidak kuketahui. Desain kuorum dan voter gagal dibuang (bagian 3) memang untuk itu. Voter disebar ke lebih dari satu gateway supaya satu gateway mati tidak menjatuhkan kuorum.
-7. Registri voter menyimpan nama variabel lingkungan untuk key (api_key_env), atau nilainya di config.yaml lokal yang tidak di-commit.
+Findings:
+1. Model families are diverse by id (number of providers that list them): Claude 8, Gemini 6, GPT 5, DeepSeek 5, GLM 5, Nemotron 5, Mimo 5, MiniMax 4, Hunyuan 4, Kimi 3, Step 3, Solar 3, Longcat 3, Qwen 2, plus Mistral, Llama, Grok, and Cohere on one provider each. Swarm voters are chosen per model family, not per gateway: the same id on two gateways is not necessarily a different model, and it is not two independent voters ([INFERENCE]).
+2. Decision models already exist on the owner's providers by model id: jev-1.13 on modelrouter; jev-latest, clef, clef-flash, and gpt-6-luna-decisions on experientiallabs. It is not proven that these gateways serve a decisions endpoint or /v1/systemone rather than only chat completions; this is tested in stage 0 with a key supplied by the owner. The ids mercury-2 and mercury-3 on experientiallabs are probably ordinary chat models, not Mercury Decide; not yet verified.
+3. models.yml does not include OpenRouter. So an OpenRouter API key is no longer mandatory; the OpenRouter Decisions adapter is still supported as an option.
+4. Three API types appear: openai-completions, openai-responses, anthropic-messages. The llm_structured adapter must support all three. Custom base URL support for all three through LangChain and deepagents has not been verified from the documents I read; tested in stage 0 ([INFERENCE]: the OpenAI and Anthropic chat classes accept a custom base URL).
+5. 7 of the 13 providers are addressed at localhost (sub2api-*, omniroute): reachable only from the owner's PC. The bot runs on the owner's PC (decided 2026-10-25), so localhost providers are reachable. If the bot is ever moved to a VPS, voters on localhost providers will not be reachable unless there is a tunnel. The other 6 providers have public addresses (xai-hm, modelrouter, tiprouter, nutaraline, lucif, experientiallabs).
+6. Some gateways appear to be third-party; I do not know each gateway's availability and policies. The quorum design and discarding failed voters (section 3) exist for exactly this reason. Voters are spread across more than one gateway so that one gateway going down does not break the quorum.
+7. The voter registry stores the environment variable name for the key (api_key_env), or its value in a local config.yaml that is not committed.
 
-### 4.4 Model uji (diputuskan Zhafron 2026-10-25)
+### 4.4 Test model (decided by the owner 2026-10-25)
 
-Selama testing semua peran LLM (agen analis dan semua voter) memakai deepseek-v4.1-flash-1017 di provider nutaraline. Dari models.yml (hanya bidang non-rahasia): nama "DeepSeek V4.1 Flash 1017 LoRA (nutaraline)", API openai-completions, base URL berakhiran /v1, auth apiKey, reasoning aktif, contextWindow 1.048.576, maxTokens 384.000.
+During testing all LLM roles (the analyst agent and all voters) use deepseek-v4.1-flash-1017 on the nutaraline provider. From models.yml (non-secret fields only): name "DeepSeek V4.1 Flash 1017 LoRA (nutaraline)", API openai-completions, base URL ending in /v1, auth apiKey, reasoning enabled, contextWindow 1,048,576, maxTokens 384,000.
 
-- Karena reasoning aktif, latensi dan token per keputusan bisa lebih besar dari model non-reasoning. Timeout voter awal 30 detik adalah angka usulan yang diukur di tahap 0.
-- Dukungan structured output untuk model ini belum terbukti. Diuji di tahap 0. Bila tidak ada, adapter llm_structured memakai keluaran JSON yang divalidasi skema, dan jawaban tidak valid dihitung sebagai voter gagal (kuorum).
-- Satu model untuk semua voter berarti kesalahan voter berkorelasi. Swarm di fase testing hanya menguji mesin dan adapter, bukan nilai swarm. Voter beragam diaktifkan setelah mesin lolos.
-- Format provider:model di konfigurasi memakai id provider milik bot (nutaraline). Backend menerjemahkannya ke integrasi LangChain: openai-completions menjadi kelas chat OpenAI dengan base_url kustom ([INFERENCE], diuji di tahap 0).
+- Because reasoning is enabled, latency and tokens per decision may be larger than with a non-reasoning model. The initial voter timeout of 30 seconds is a proposed figure, measured in stage 0.
+- Structured output support for this model is not yet proven. Tested in stage 0. If it is absent, the llm_structured adapter uses JSON output validated against a schema, and invalid answers are counted as a failed voter (quorum).
+- One model for all voters means voter errors are correlated. In the testing phase the swarm only tests the engine and adapters, not the value of the swarm. Diverse voters are enabled after the engine passes.
+- The provider:model format in the configuration uses the bot's own provider id (nutaraline). The backend translates it to the LangChain integration: openai-completions becomes the OpenAI chat class with a custom base_url ([INFERENCE], tested in stage 0).
 
-### 4.5 Setup provider dan key (UI) dan penyimpanan
+### 4.5 Provider and key setup (UI) and storage
 
-Zhafron (revisi 9): secret tidak perlu terlalu dalam, boleh lewat env atau langsung di config. Keputusan sebelumnya (keyring dan Credential Locker) dibatalkan; dengan begitu pilihan native Windows atau Docker tidak lagi bergantung pada penyimpanan key.
+The owner (revision 9): secrets do not need to be handled too deeply; env or directly in config is fine. The earlier decision (keyring and Credential Locker) is cancelled; as a result, the choice of native Windows or Docker no longer depends on key storage.
 
-UI (layar Provider):
-- Daftar provider: nama, tipe API, host, status uji terakhir, model aktif.
-- Tambah atau ubah provider: tipe API, base URL, daftar model.
-- Kolom key: ditulis ke config/config.yaml (api_key) atau, bila diisi nama variabel, dibaca dari lingkungan (api_key_env). Setelah disimpan tampilan hanya memperlihatkan 4 karakter terakhir.
-- Tombol Uji koneksi: satu panggilan kecil, menampilkan latensi dan hasil.
-- Pilih provider dan model per peran (agen analis, tiap voter).
-- Impor dari omp models.yml: dibaca lokal oleh aplikasi di PC (nama, tipe API, base URL, model; key hanya bila dicentang per provider).
+UI (Provider screen):
+- Provider list: name, API type, host, last test status, active model.
+- Add or edit provider: API type, base URL, model list.
+- Key field: written to config/config.yaml (api_key) or, if a variable name is entered, read from the environment (api_key_env). After saving, the display shows only the last 4 characters.
+- Test connection button: one small call, shows latency and result.
+- Choose provider and model per role (analyst agent, each voter).
+- Import from omp models.yml: read locally by the app on the PC (name, API type, base URL, models; key only if ticked per provider).
 
-Aturan sederhana yang tetap dipegang:
-1. config/config.yaml dan .env ada di .gitignore; pemindaian rahasia pada staged diff dijalankan sebelum commit.
-2. Tidak ada endpoint yang mengembalikan key utuh; key tidak ditulis ke log (log menyaring pola Authorization dan token).
-3. Agen LLM (deepagents) tidak diberi tool yang membaca config atau .env.
-4. Memasukkan atau mengganti key hanya dari PC (localhost), tidak dari PWA jarak jauh; PWA jarak jauh hanya menampilkan status, aktif atau nonaktif, dan uji koneksi.
+Simple rules that still hold:
+1. config/config.yaml and .env are in .gitignore; secret scanning of the staged diff runs before commit.
+2. No endpoint returns a full key; keys are not written to logs (logs filter Authorization and token patterns).
+3. The LLM agent (deepagents) is not given any tool that reads config or .env.
+4. Entering or replacing a key is done only from the PC (localhost), not from the remote PWA; the remote PWA only shows status, active or inactive, and connection test.
 
-Konsekuensi yang diterima Zhafron: key di config.yaml tersimpan sebagai teks biasa di disk PC. Cukup untuk bot pribadi di PC sendiri; bila repo atau berkas itu pernah tersalin keluar, key harus dianggap bocor dan diganti. Rekomendasi Wira: pakai env bila nyaman, config bila praktis.
+Consequence accepted by the owner: the key in config.yaml is stored as plain text on the PC's disk. This is sufficient for a personal bot on one's own PC; if the repo or that file is ever copied out, the key must be considered leaked and replaced. The operator's recommendation: use env if comfortable, config if practical.
 
-Cara menjalankan di PC: dokumen Freqtrade merekomendasikan Docker untuk Windows (lebih mudah dan lebih aman), lalu WSL2; native lewat setup.ps1 (Python 3.12 atau lebih baru, 64 bit) bila memang diperlukan. Rekomendasi Wira sekarang: Docker, karena alasan memilih native (keyring) sudah gugur. Satu hal yang diuji di tahap 0: provider localhost (sub2api, omniroute) dari dalam kontainer harus lewat host.docker.internal atau jaringan host ([INFERENCE], belum diuji). Bila itu merepotkan, native Windows atau WSL2 jadi pilihan.
+How to run on the PC: the Freqtrade documentation recommends Docker for Windows (easier and safer), then WSL2; native via setup.ps1 (Python 3.12 or newer, 64 bit) if really needed. The operator's current recommendation: Docker, because the reason for choosing native (keyring) no longer applies. One thing tested in stage 0: localhost providers (sub2api, omniroute) from inside the container must go through host.docker.internal or the host network ([INFERENCE], not yet tested). If that is troublesome, native Windows or WSL2 becomes the option.
 
-## 5. Sumber data
+## 5. Data sources
 
-- Berita: RSS CoinDesk (25 item) dan Cointelegraph (30 item), terbaca 2026-10-25; tanpa arsip historis.
-- Fear and Greed Index (alternative.me): 3.185 nilai harian sejak 2018-02-01, gratis, wajib mencantumkan sumber.
-- Social (Reddit, X): belum diverifikasi akses dan biayanya; Reddit lebih dulu dicoba di tahap 0.
-- Harga: data publik exchange lewat Freqtrade; dry-run tidak butuh API key atau akun.
+- News: RSS CoinDesk (25 items) and Cointelegraph (30 items), read 2026-10-25; no historical archive.
+- Fear and Greed Index (alternative.me): 3,185 daily values since 2018-02-01, free, attribution of the source required.
+- Social (Reddit, X): access and cost not yet verified; Reddit is tried first in stage 0.
+- Prices: public exchange data via Freqtrade; dry-run needs no API key or account.
 
-## 6. Semua OS dan mobile (PWA)
+## 6. All OS and mobile (PWA)
 
-- Engine berjalan di PC Zhafron sendiri (diputuskan 2026-10-25). Bot tidak dijalankan di HP (HP membatasi proses latar belakang; [INFERENCE]). Konsekuensi PC: stop loss ada di sisi bot, jadi bila PC mati, tidur, restart (misalnya Windows Update), atau internet putus, posisi terbuka tidak terlindungi. Mitigasi usulan: dry-run dulu (tanpa risiko); live hanya setelah PC diatur tanpa sleep dan tanpa restart otomatis; heartbeat dari bot ke pemantau di luar PC yang mengirim notifikasi bila heartbeat berhenti (layanan pemantau belum dipilih); saat start ulang, bot memeriksa posisi terbuka dan batas rugi lebih dulu sebelum membuka posisi baru.
-- API Freqtrade tetap di localhost dan tidak dibuka ke internet (peringatan dokumen). Antara PWA dan engine ada gateway kecil buatan sendiri: autentikasi, endpoint baca, kill switch, pengirim Web Push. Gateway diakses lewat HTTPS tunnel (usulan Cloudflare Tunnel dengan Access, atau jaringan privat), bukan port terbuka. Zhafron sudah punya Cloudflare named tunnel untuk subdomain domain pribadinya (catatan skill internal), jadi gateway bisa memakainya setelah disetujui; tidak dikerjakan sekarang.
-- PWA: dasbor (profit, posisi terbuka, meter rugi harian, suara tiap voter, median, sebaran) dan notifikasi. FreqUI bukan PWA (tanpa manifest dan service worker), jadi PWA dibuat sendiri. Android dan desktop: dipasang dari browser Chrome atau Edge (pemasangan desktop belum kuverifikasi). iOS: iOS 16.4 atau lebih baru, harus ditambahkan ke Home Screen, izin push diminta lewat ketukan tombol, notifikasi harus terlihat.
-- Tindakan berbahaya dari ponsel (mode live, menaikkan batas) butuh konfirmasi dua langkah. Versi pertama panel hanya baca ditambah notifikasi; kontrol menyusul setelah gateway diuji.
-- Windows: tiga cara menjalankan Freqtrade: Docker (direkomendasikan dokumen), WSL2, atau native lewat setup.ps1. Rekomendasi sekarang Docker (bagian 4.5).
+- The engine runs on the owner's own PC (decided 2026-10-25). The bot is not run on a phone (phones restrict background processes; [INFERENCE]). Consequence of the PC: the stop loss lives on the bot side, so if the PC is off, asleep, restarted (for example by Windows Update), or the internet drops, open positions are unprotected. Proposed mitigations: dry-run first (no risk); live only after the PC is set to no sleep and no automatic restart; a heartbeat from the bot to a monitor outside the PC that sends a notification if the heartbeat stops (monitor service not yet chosen); on restart, the bot checks open positions and the loss limit first before opening new positions.
+- The Freqtrade API stays on localhost and is not exposed to the internet (documentation warning). Between the PWA and the engine there is a small self-built gateway: authentication, read endpoints, kill switch, Web Push sender. The gateway is accessed through an HTTPS tunnel (proposed Cloudflare Tunnel with Access, or a private network), not an open port. The owner already has a Cloudflare named tunnel for a subdomain of a personal domain (internal skill notes), so the gateway can use it once approved; not done now.
+- PWA: dashboard (profit, open positions, daily loss meter, each voter's vote, median, spread) and notifications. FreqUI is not a PWA (no manifest and service worker), so the PWA is built ourselves. Android and desktop: installed from the Chrome or Edge browser (desktop installation not yet verified). iOS: iOS 16.4 or newer, must be added to the Home Screen, push permission is requested via a button tap, notifications must be visible.
+- Dangerous actions from the phone (live mode, raising limits) require two-step confirmation. The first version of the panel is read-only plus notifications; controls follow after the gateway is tested.
+- Windows: three ways to run Freqtrade: Docker (recommended by the documentation), WSL2, or native via setup.ps1. Current recommendation Docker (section 4.5).
 
-## 7. Biaya compute (bukan batasan)
+## 7. Compute cost (not a constraint)
 
-Arahan Zhafron: biaya LLM tidak perlu terlalu dipikirkan karena provider AI-nya banyak; yang penting bot bisa maksimal.
+The owner's direction: LLM cost need not be worried about too much because there are many AI providers; what matters is that the bot can be maximal.
 
-- compute.max_cost_idr_per_day tetap ada di konfigurasi, default mati. Bila suatu hari diisi dan terlampaui, perilakunya mengikuti compute.on_exceed (default: lewati entry baru).
-- Biaya dan token tetap dicatat sebagai informasi di log dan PWA. Pencatatan tidak membatasi apa pun.
-- Konsekuensi: voter boleh memakai model yang lebih besar dan jumlah voter boleh lebih dari 7 (daftar voter hanya konfigurasi). Batas praktis bergeser dari uang ke latensi dan rate limit tiap provider. Untuk strategi 1-4 jam, latensi beberapa detik per keputusan kemungkinan masih dapat diterima ([INFERENCE]); diukur di tahap 0.
-- Model lebih besar atau lebih mahal tidak otomatis lebih akurat. Keberagaman vendor dan kalibrasi voter tetap diuji di forward test sebelum swarm boleh membatalkan entry (kriteria adopsi di bagian 8).
-- Perkiraan sebelumnya (7 voter murah, sekitar Rp 380 per hari pada harga 0,04 dolar per juta token) hanya sebagai pembanding; biaya dengan model besar belum diukur.
+- compute.max_cost_idr_per_day remains in the configuration, off by default. If it is filled in someday and exceeded, behavior follows compute.on_exceed (default: skip new entries).
+- Cost and tokens are still recorded as information in the log and PWA. Recording does not limit anything.
+- Consequence: voters may use larger models and the number of voters may exceed 7 (the voter list is only configuration). The practical limit shifts from money to latency and each provider's rate limit. For a 1-4 hour strategy, latency of a few seconds per decision is probably still acceptable ([INFERENCE]); measured in stage 0.
+- A larger or more expensive model is not automatically more accurate. Vendor diversity and voter calibration are still tested in the forward test before the swarm may cancel entries (adoption criteria in section 8).
+- The earlier estimate (7 cheap voters, about Rp 380 per day at a price of 0.04 dollars per million tokens) is only a comparison; cost with large models has not been measured.
 
-## 8. Tahap dan syarat lolos
+## 8. Stages and pass criteria
 
-| Tahap | Isi | Syarat lolos (usulan) |
+| Stage | Content | Pass criteria (proposed) |
 |---|---|---|
-| 0. Setup (1-2 hari) | Freqtrade dry-run (Docker atau VPS), uji Indodax via CCXT, spike adapter DecisionProvider (gateway milik Zhafron: jev dan clef di modelrouter dan experientiallabs, satu model chat biasa lewat llm_structured; Ollama lokal dan OpenRouter opsional), uji model uji deepseek-v4.1-flash-1017 di nutaraline (structured output, latensi, token reasoning), uji menjalankan submodule Freqtrade di Docker dan native Windows (termasuk jangkauan provider localhost dari kontainer), ambil katalog decision model, uji Kronos mini di CPU, pasang batas rugi default lewat konfigurasi, ukur latensi dan token voter lewat deepagents dibanding pemanggilan langsung | Dry-run jalan dengan data Indodax tanpa error; minimal 3 adapter menjawab pertanyaan yang sama |
-| 1. Demo minggu 1 | Dry-run 7 hari non-stop. Bot A aturan saja; bot B aturan ditambah swarm dalam mode bayangan (hanya mencatat). Kerangka PWA baca-saja dan notifikasi dibangun paralel | Mesin stabil 24 jam, tidak ada order gagal, biaya dan token tercatat. Ini uji mesin, bukan bukti profit |
-| 2. Minggu 2-4 | Backtest strategi aturan 2-3 tahun (tanpa sinyal berita), dry-run berlanjut, evaluasi swarm di forward test | Ekspektasi positif setelah fee dan pajak di data out-of-sample; kriteria adopsi swarm di bawah |
-| 3. Live kecil, minimal 4 minggu | Porsi awal usulan Rp 500 ribu (25%), karena fee dan minimum order membuat porsi 5-10% terlalu kecil untuk diukur | Tidak melanggar batas rugi; selisih dengan dry-run wajar |
-| 4. Naik bertahap | Tambah modal bertahap, review bulanan | review bulanan |
+| 0. Setup (1-2 days) | Freqtrade dry-run (Docker or VPS), test Indodax via CCXT, spike the DecisionProvider adapters (the owner's gateway: jev and clef on modelrouter and experientiallabs, one plain chat model through llm_structured; local Ollama and OpenRouter optional), test the test model deepseek-v4.1-flash-1017 on nutaraline (structured output, latency, reasoning tokens), test running the Freqtrade submodule in Docker and native Windows (including reaching the localhost provider from the container), fetch the decision model catalogue, test Kronos mini on CPU, set the default loss limits through configuration, measure voter latency and tokens through deepagents compared with direct calls | Dry-run runs with Indodax data without errors; at least 3 adapters answer the same question |
+| 1. Week 1 demo | Dry-run for 7 days non-stop. Bot A rules only; bot B rules plus swarm in shadow mode (logging only). The read-only PWA shell and notifications are built in parallel | Engine stable for 24 hours, no failed orders, costs and tokens recorded. This is an engine test, not proof of profit |
+| 2. Weeks 2-4 | Backtest the rule strategy over 2-3 years (without news signals), dry-run continues, swarm evaluated in forward test | Positive expectancy after fees and tax on out-of-sample data; swarm adoption criteria below |
+| 3. Small live, at least 4 weeks | Proposed initial allocation Rp 500 thousand (25%), because fees and minimum orders make a 5-10% allocation too small to measure | No breach of the loss limits; difference from dry-run is reasonable |
+| 4. Scale up gradually | Add capital in steps, monthly review | monthly review |
 
-Kriteria adopsi swarm sebagai gerbang (setelah minimal 4 minggu bayangan dan minimal 30 keputusan veto; angka final ditetapkan di tahap 0): (a) trade yang akan dibatalkan rata-rata lebih rugi daripada yang diizinkan; (b) laba bersih atau drawdown bot B lebih baik dari bot A setelah fee dan pajak; (c) biaya compute dicatat sebagai informasi, bukan syarat (arahan Zhafron). Bila tidak terpenuhi, swarm tetap hanya menjadi laporan.
+Swarm adoption criteria as a gate (after at least 4 weeks in shadow and at least 30 veto decisions; final numbers set in stage 0): (a) trades that would be cancelled are on average more losing than those allowed; (b) net profit or drawdown of bot B is better than bot A after fees and tax; (c) compute cost is recorded as information, not a requirement (the owner's directive). If not met, the swarm remains a report only.
 
-Selama testing semua voter memakai model uji yang sama (deepseek-v4.1-flash-1017), jadi swarm di fase itu hanya menguji mesin dan adapter, bukan nilai swarm: kesalahan model yang sama berkorelasi. Voter beragam diaktifkan setelah mesin lolos.
+During testing all voters use the same test model (deepseek-v4.1-flash-1017), so the swarm in that phase only tests the engine and adapters, not the value of the swarm: errors from the same model are correlated. Diverse voters are enabled after the engine passes.
 
-Seminggu demo hanya menguji mesin; strategi 1-4 jam menghasilkan sedikit trade per minggu (jumlahnya diukur di backtest), jadi belum cukup menilai untung rugi. Uang asli diusulkan setelah minimal 4 minggu dry-run.
+One week of demo only tests the engine; a 1-4 hour strategy produces few trades per week (the number is measured in backtest), so it is not yet enough to judge profit and loss. Real money is proposed after at least 4 weeks of dry-run.
 
-## 9. Yang tidak dipakai dan alasannya
+## 9. What is not used and why
 
-- MiroFish dan MiroShark: simulasi sosial boros token, lisensi AGPL-3.0, tanpa benchmark akurasi publik yang kutemukan. Bukan inti; boleh dicoba kemudian untuk eksplorasi skenario berita.
-- Scalping, grid rapat, dan leverage: biaya 0,61-0,82% per siklus memakan margin; leverage memperbesar risiko.
-- Swarm LLM besar di dalam loop order tidak lagi dikecualikan karena biaya (arahan Zhafron). Syaratnya hanya lolos uji latensi dan kalibrasi di tahap 0 dan forward test. LLM tidak memegang exit, stop loss, dan batas risiko.
+- MiroFish and MiroShark: social simulation wastes tokens, AGPL-3.0 license, no public accuracy benchmark that I found. Not core; may be tried later for news scenario exploration.
+- Scalping, tight grids, and leverage: costs of 0.61-0.82% per cycle eat the margin; leverage increases risk.
+- A large LLM swarm inside the order loop is no longer excluded because of cost (the owner's directive). The only condition is passing the latency and calibration tests in stage 0 and the forward test. The LLM does not hold exit, stop loss, and risk limits.
 
-## 10. Keputusan
+## 10. Decisions
 
-Sudah diputuskan Zhafron: bot berjalan di PC sendiri; model uji deepseek-v4.1-flash-1017 di nutaraline; UI setup provider dan key dengan penyimpanan aman yang diatur Wira; UI/UX harus unik (bukan AI slop) dengan impeccable; proyek di ~/Projects dengan git; biaya compute LLM bukan batasan (batas biaya default mati); modal Rp 2 juta; profit masuk lagi jadi modal; demo dulu; semua configurable; backend LLM deepagents; batas rugi default sesuai usulan (1% per hari, 10% total, tetap configurable); PDF plan beserta mockup dibuat dulu oleh tim.
+Already decided by the owner: the bot runs on his own PC; test model deepseek-v4.1-flash-1017 on nutaraline; provider and key setup UI with secure storage arranged by the operator; UI/UX must be unique (not AI slop) using impeccable; project in ~/Projects with git; LLM compute cost is not a constraint (default cost limit off); capital Rp 2 million; profit is reinvested as capital; demo first; everything configurable; LLM backend deepagents; default loss limits as proposed (1% per day, 10% total, still configurable); the PDF plan along with mockups is made first by the team.
 
-Masih dibutuhkan dari Zhafron: tidak ada yang menghalangi pekerjaan. Mode full otonom (revisi 9): Wira memutuskan sendiri dan Zhafron mengoreksi sambil jalan. Keputusan yang Wira ambil dan bisa dikoreksi:
-1. Task tahap 0 dan 1 dibuat setelah plan ini (sebelumnya menunggu persetujuan; sekarang tercakup full otonom).
-2. Tema dan arah visual diputuskan Wira (bagian 12), bukan hasil wawancara.
-3. Cara menjalankan di PC: Docker dulu (bagian 4.5), diuji di tahap 0.
-4. Repo tetap lokal tanpa remote dan tanpa LICENSE sampai Zhafron memutuskan (push dan lisensi tidak termasuk jendela otonom).
-5. Exchange untuk tahap live: tidak dibutuhkan untuk demo; live tidak dimulai tanpa persetujuan eksplisit Zhafron (uang sungguhan di luar jendela otonom).
+Still needed from the owner: nothing blocks the work. Full-autonomy mode (revision 9): the operator decides on his own and the owner corrects along the way. Decisions the operator has taken that can be corrected:
+1. The stage 0 and 1 tasks are created after this plan (previously waiting for approval; now covered by full autonomy).
+2. The theme and visual direction are decided by the operator (section 12), not the result of an interview.
+3. How to run on the PC: Docker first (section 4.5), tested in stage 0.
+4. The repo stays local with no remote and no LICENSE until the owner decides (push and license are not part of the autonomous window).
+5. Exchange for the live stage: not needed for the demo; live does not start without the owner's explicit approval (real money is outside the autonomous window).
 
-## 11. Proyek dan git
+## 11. Project and git
 
-- Lokasi: ~/Projects/trading-bot (nama kerja, mudah diganti). Branch main. Identitas commit mengikuti ~/.gitconfig (Zhafron), tanpa Co-Authored-By.
-- Freqtrade sebagai git submodule di vendor/freqtrade (arahan Zhafron revisi 9): url https://github.com/freqtrade/freqtrade.git, branch stable, shallow, terkunci di commit 1f394eae yang adalah tag 2026.9 (commit 568b46b). Strategi, konfigurasi, dan data pengguna ada di luar vendor lewat --strategy-path dan --userdir (dokumen Freqtrade), jadi isi vendor tidak diubah. Bila suatu saat engine perlu dimodifikasi: fork Freqtrade lalu ubah url di .gitmodules ke fork itu. Memperbarui versi: fetch tag baru di submodule, checkout, commit gitlink-nya (langkah ada di README).
-- Ukuran: submodule shallow sekitar 58 MB berkas kerja dan 41 MB data git (diukur saat dipasang).
-- Sudah ada di repo: README, .gitignore, .gitattributes, .editorconfig, .env.example, hook git, contoh konfigurasi tanpa komentar, salinan plan dan riset di docs/. PRODUCT.md dan DESIGN.md (seed) dari impeccable. Tautan skill impeccable di .agents/skills tidak di-commit.
-- Dibuat di tahap 0, belum ada: strategi Freqtrade, gateway, adapter DecisionProvider dan voter, agen analis deepagents, PWA, docker-compose.
-- Commit: Conventional Commits berbahasa Inggris, subject di bawah 72 karakter. Hook commit-msg menolak format salah dan trailer Co-Authored-By. Hook pre-commit menjalankan gerbang komentar pada kode kita (aturan Zhafron: tanpa komentar); isi vendor/freqtrade adalah kode pihak ketiga dan tidak diperiksa.
-- Cabang: main dan cabang fitur (feat/..., fix/...). Worktree lewat ~/Projects/.worktrees.
-- Tes: repo tanpa CI, jadi suite penuh lokal maksimal sekali per SHA final sebelum push; saat mengembangkan hanya tes terkait (aturan Zhafron).
-- Alat: Python 3.12 atau lebih baru dengan uv; deepagents; kerangka PWA dipilih di tahap desain.
-- Rahasia: config/config.yaml, .env, user_data, basis data, dan log tidak masuk repo (.gitignore).
-- Remote dan lisensi: belum ada remote dan belum ada LICENSE. Freqtrade berlisensi GPL-3.0; strategi yang mengimpor Freqtrade kemungkinan ikut terikat ([INFERENCE], perlu penilaian hukum bila repo akan dibuka). Rekomendasi: repo privat, tanpa LICENSE, sampai Zhafron memutuskan.
+- Location: ~/Projects/trading-bot (working name, easy to change). Branch main. Commit identity follows ~/.gitconfig (the owner), without Co-Authored-By.
+- Freqtrade as a git submodule at vendor/freqtrade (the owner's directive, revision 9): url https://github.com/freqtrade/freqtrade.git, branch stable, shallow, pinned at commit 1f394eae which is tag 2026.9 (commit 568b46b). Strategy, configuration, and user data live outside vendor via --strategy-path and --userdir (Freqtrade docs), so the contents of vendor are not modified. If the engine ever needs modification: fork Freqtrade and change the url in .gitmodules to the fork. Updating the version: fetch the new tag in the submodule, checkout, commit its gitlink (steps are in the README).
+- Size: the shallow submodule is about 58 MB of working files and 41 MB of git data (measured when installed).
+- Already in the repo: README, .gitignore, .gitattributes, .editorconfig, .env.example, git hooks, example configuration without comments, copies of the plan and research in docs/. PRODUCT.md and DESIGN.md (seed) from impeccable. The impeccable skill link in .agents/skills is not committed.
+- Created in stage 0, not yet present: Freqtrade strategy, gateway, DecisionProvider adapters and voters, deepagents analyst agent, PWA, docker-compose.
+- Commits: Conventional Commits in English, subject under 72 characters. The commit-msg hook rejects wrong formats and Co-Authored-By trailers. The pre-commit hook runs the comment gate on our code (the owner's rule: no comments); the contents of vendor/freqtrade are third-party code and are not checked.
+- Branches: main and feature branches (feat/..., fix/...). Worktrees via ~/Projects/.worktrees.
+- Tests: the repo has no CI, so the full suite runs locally at most once per final SHA before push; during development only the related tests (the owner's rule).
+- Tools: Python 3.12 or newer with uv; deepagents; the PWA framework is chosen in the design stage.
+- Secrets: config/config.yaml, .env, user_data, databases, and logs are not in the repo (.gitignore).
+- Remote and license: no remote yet and no LICENSE yet. Freqtrade is licensed GPL-3.0; a strategy that imports Freqtrade is likely bound as well ([INFERENCE], needs legal assessment if the repo will be opened). Recommendation: private repo, no LICENSE, until the owner decides.
 
-## 12. UI/UX unik dengan impeccable
+## 12. Unique UI/UX with impeccable
 
-Zhafron: UI/UX harus unik dan tidak terlihat seperti AI slop; skill impeccable disiapkan.
+The owner: UI/UX must be unique and must not look like AI slop; the impeccable skill is prepared.
 
-Status (2026-10-25, mode full otonom): PRODUCT.md dan DESIGN.md (seed) sudah ditulis di ~/Projects/trading-bot dan di-commit (54ed647). Zhafron mendelegasikan tema ke Wira dan tidak menjawab wawancara; jadi isi keduanya adalah keputusan Wira yang dikoreksi Zhafron sambil jalan. Skill impeccable ditautkan ke proyek (.agents/skills, tidak di-commit); context.mjs kini membaca PRODUCT.md.
+Status (2026-10-25, full-autonomy mode): PRODUCT.md and DESIGN.md (seed) have been written in ~/Projects/trading-bot and committed (54ed647). The owner delegated the theme to the operator and did not answer the interview; so the contents of both are the operator's decisions, corrected by the owner along the way. The impeccable skill is linked to the project (.agents/skills, not committed); context.mjs now reads PRODUCT.md.
 
-Register: product. Pemakai: Zhafron saja, di PC (konfigurasi, analisa) dan di ponsel (sekilas, notifikasi, siang terik dan tengah malam).
+Register: product. User: the owner only, on the PC (configuration, analysis) and on the phone (glance, notifications, in harsh daylight and at midnight).
 
-Arah visual yang diputuskan (rincian di DESIGN.md):
-- Creative North Star: papan informasi stasiun bertemu strip kertas seismograf. Satu jawaban besar yang terbaca dari jauh (aman, ditahan, berhenti) dan satu jejak garis tentang apa yang baru terjadi.
-- Tema: terang sebagai bawaan (kontras tertinggi di bawah matahari), gelap mengikuti pengaturan sistem untuk malam; keduanya dirancang.
-- Warna: strategi Restrained. Satu warna sinyal hangat (benih seed-041 dari palette.mjs untuk kunci trading-bot, oklch(0.673 0.217 38.6)) hanya untuk rugi, batas, peringatan, dan kill switch. Untung memakai biru tua. Pasangan biru dan jingga dipilih karena tetap terbedakan bagi buta warna merah-hijau; setiap angka juga memakai tanda plus atau minus dan arah. Tombol utama memakai tinta. Tanpa pita krem atau pasir.
-- Tipografi: satu keluarga sans yang teknis dengan angka tabular wajib; keluarga konkret dipilih saat implementasi setelah dipastikan mendukung angka tabular. Skala tetap.
-- Datar, tanpa bayangan lebar; gerak 150 sampai 250 ms hanya untuk perubahan keadaan.
-- Dilarang: gaya Binance atau Robinhood, gamifikasi, template hero-metric, dasbor AI generik, tampilan bawaan FreqUI dan Nuxt UI.
-- Uji cepat: bila layar langsung ditebak sebagai "dasbor trading" dari warna dan bentuk saja, arahnya gagal.
+Visual direction decided (details in DESIGN.md):
+- Creative North Star: a station information board meets a seismograph paper strip. One big answer readable from afar (safe, held, stopped) and one trace line about what just happened.
+- Theme: light as the default (highest contrast under the sun), dark following the system setting for the night; both are designed.
+- Color: Restrained strategy. One warm signal color (seed seed-041 from palette.mjs for the key trading-bot, oklch(0.673 0.217 38.6)) only for loss, limits, warnings, and the kill switch. Profit uses dark blue. The blue and orange pairing is chosen because it stays distinguishable for red-green color blindness; every number also carries a plus or minus sign and a direction. The primary button uses ink. No cream or sand band.
+- Typography: one technical sans family with mandatory tabular figures; the concrete family is chosen at implementation after confirming it supports tabular figures. Fixed scale.
+- Flat, no wide shadows; motion of 150 to 250 ms only for state changes.
+- Forbidden: Binance or Robinhood style, gamification, hero-metric template, generic AI dashboard, default FreqUI and Nuxt UI look.
+- Quick test: if the screen is immediately guessed to be a "trading dashboard" from color and shape alone, the direction has failed.
 
-Aturan anti-slop dari skill yang berlaku untuk proyek ini:
-- Tidak ada template hero-metric (angka besar, label kecil, statistik pendukung, aksen gradient): dasbor profit biasanya persis itu, jadi harus dihindari.
-- Tidak ada grid kartu identik berulang, kartu bersarang, glassmorphism, gradient text, eyebrow kapital kecil di tiap bagian, penomoran 01/02/03 sebagai perancah, border 1px bersama bayangan lebar, radius kartu di atas 12-16px, ilustrasi SVG sketsa, latar garis diagonal.
-- Tema gelap atau terang bukan default: ditulis satu kalimat adegan fisik (siapa, di mana, cahaya apa) sebelum memilih. Warna di OKLCH, kontras teks minimal 4.5:1.
-- Product: satu keluarga huruf sudah cukup, skala tipografi tetap (bukan fluid), setiap komponen punya state default, hover, focus, active, disabled, loading, error; skeleton alih-alih spinner; empty state yang mengajar; modal bukan pilihan pertama; gerak 150-250 ms hanya untuk menyampaikan state; prefers-reduced-motion wajib.
-- Uji category-reflex dua tingkat: tingkat satu, dasbor trading yang mudah ditebak adalah tema gelap dengan hijau dan merah neon plus grafik candlestick; tingkat dua, terminal-native dark mode. Arah yang dipilih harus lolos keduanya.
+Anti-slop rules from the skill that apply to this project:
+- No hero-metric template (big number, small label, supporting stats, gradient accent): a profit dashboard is usually exactly that, so it must be avoided.
+- No repeated grid of identical cards, nested cards, glassmorphism, gradient text, small capital eyebrow on every section, 01/02/03 numbering as scaffolding, 1px border together with wide shadow, card radius above 12-16px, sketch SVG illustrations, diagonal line backgrounds.
+- Dark or light theme is not a default: one sentence of physical scene (who, where, what light) is written before choosing. Colors in OKLCH, text contrast at least 4.5:1.
+- Product: one font family is enough, fixed type scale (not fluid), every component has default, hover, focus, active, disabled, loading, error states; skeleton instead of spinner; teaching empty states; modal is not the first choice; motion of 150-250 ms only to convey state; prefers-reduced-motion mandatory.
+- Two-level category-reflex test: level one, the easily guessed trading dashboard is a dark theme with neon green and red plus candlestick charts; level two, terminal-native dark mode. The chosen direction must pass both.
 
-Warna dan semantik untung dan rugi: jangan hanya merah dan hijau (buta warna). Tambahkan tanda plus dan minus, arah panah, posisi, dan teks. Tombol utama memakai tinta, dan warna sinyal hanya untuk risiko, supaya tidak bentrok dengan semantik untung dan rugi. Benih warna sudah diambil: palette.mjs --from trading-bot memberi seed-041, dipakai sebagai warna sinyal risiko.
+Color and profit-and-loss semantics: not just red and green (color blindness). Add plus and minus signs, arrow direction, position, and text. The primary button uses ink, and the signal color is only for risk, so that it does not clash with profit and loss semantics. The color seed has been taken: palette.mjs --from trading-bot gave seed-041, used as the risk signal color.
 
-Layar yang dirancang: Dasbor, Grafik live, Aksi live, Pratinjau, Swarm, Konfigurasi, Provider dan key, Kill switch dan konfirmasi dua langkah, notifikasi, pasang PWA di iOS. Layar Provider dan key mengikuti bagian 4.5; di PWA jarak jauh kolom key tidak ada, hanya status, aktif atau nonaktif, dan uji koneksi.
+Screens designed: Dashboard, Live chart, Live actions, Preview, Swarm, Configuration, Providers and keys, Kill switch and two-step confirmation, notifications, install the PWA on iOS. The Providers and keys screen follows section 4.5; in the remote PWA the key field is absent, only status, active or inactive, and connection test.
 
-Proses: impeccable shape lalu craft untuk tiap layar; critique dan audit sebelum rilis; detect.mjs (detektor pola bawaan skill, berjalan lokal) dibaca sebelum commit UI; hasil dilihat lewat screenshot di ukuran HP dan desktop.
+Process: impeccable shape then craft for each screen; critique and audit before release; detect.mjs (the skill's built-in pattern detector, runs locally) is read before committing UI; results are viewed via screenshots at phone and desktop sizes.
 
-## 13. Fitur lengkap (must-have dan nice-to-have)
+## 13. Full features (must-have and nice-to-have)
 
-Zhafron: aplikasi full features (grafik live, aksi live, pratinjau live), ikut saran Wira. Dasar tiap fitur diperiksa di dokumen Freqtrade 2026-10-25: REST API (/status, /trades, /balance, /profit, /daily, /weekly, /monthly, /exits, /entries, /mix_tags, /stats, /performance, /pair_candles, /pair_history, /plot_config, /health, /sysinfo, /logs, /pause, /start, /stopbuy, /stop, /forceexit, /locks, /blacklist) dan WebSocket pesan di /api/v1/message/ws (subscribe whitelist, analyzed_df, serta pesan fill). Fitur bertanda kustom dibangun sendiri di gateway dan PWA.
+The owner: full-featured app (live chart, live actions, live preview), following the operator's suggestion. The basis of each feature was checked against the Freqtrade docs on 2026-10-25: REST API (/status, /trades, /balance, /profit, /daily, /weekly, /monthly, /exits, /entries, /mix_tags, /stats, /performance, /pair_candles, /pair_history, /plot_config, /health, /sysinfo, /logs, /pause, /start, /stopbuy, /stop, /forceexit, /locks, /blacklist) and WebSocket messages at /api/v1/message/ws (subscribe whitelist, analyzed_df, plus fill messages). Features marked custom are built in the gateway and PWA ourselves.
 
-Tafsiran Wira atas "live preview" (koreksi bila maksud Zhafron lain): (1) pratinjau kandidat entry beserta jawaban voter sebelum order dikirim, dan di mode shadow menampilkan apa yang akan terjadi; (2) pratinjau what-if konfigurasi sebelum diterapkan; (3) pratinjau sinyal strategi di grafik.
+The operator's interpretation of "live preview" (correct if the owner means otherwise): (1) preview of entry candidates together with voter answers before an order is sent, and in shadow mode showing what would happen; (2) what-if preview of configuration before it is applied; (3) preview of strategy signals on the chart.
 
 ### Must-have
 
-| Fitur | Dasar | Tahap |
+| Feature | Basis | Stage |
 |---|---|---|
-| Grafik live per pair: candlestick, penanda entry dan exit, overlay indikator | /pair_candles, WebSocket analyzed_df, /plot_config | 1 |
-| Posisi dan order live, untung rugi berjalan, saldo | /status, /trades, /balance, /profit | 1 |
-| Aksi live (feed waktu nyata): fill, jawaban voter, median, sebaran, kuorum, veto atau kecilkan, gerbang risiko, error, heartbeat | pesan WebSocket Freqtrade dan event kustom gateway | 1 |
-| Pratinjau kandidat entry beserta jawaban voter sebelum order | kustom | 1 |
-| Meter risiko: rugi harian dan total terhadap batas, penanda mode dry atau live | kustom, /profit | 1 |
-| Notifikasi push: fill, batas rugi terlewati, kill switch, heartbeat hilang, kuorum gagal, ringkasan harian | Web Push (iOS 16.4 atau lebih baru, Home Screen) | 1 |
-| Kesehatan: loop bot, beban sistem, status dan latensi tiap provider, heartbeat, log | /health, /sysinfo, /logs, kustom | 1 |
-| Bot A vs bot B: kurva ekuitas bertumpuk selama dry-run | dua instance, kustom | 1 sampai 2 |
-| Kontrol: jeda, lanjut, hentikan entry, force exit satu atau semua posisi, kunci pair, blacklist; yang berisiko butuh konfirmasi dua langkah | /pause, /start, /stopbuy, /forceexit, /locks, /blacklist | 2 |
-| Layar Provider dan key, registri voter, editor konfigurasi dengan validasi skema dan catatan perubahan | kustom, bagian 4.5 | 2 |
-| Tampilan swarm per keputusan dan hasil sesudahnya (apakah entry yang dilewati ternyata rugi) | kustom | 2 |
-| Riwayat trade dan statistik: harian, mingguan, bulanan, per alasan exit, per tag entry | /trades, /daily, /weekly, /monthly, /exits, /entries, /mix_tags, /stats, /performance | 2 |
-| Log audit: perubahan konfigurasi, key (tanpa nilai), mode, kontrol | kustom | 2 |
-| Laporan harian dari agen analis: ringkasan, anomali, saran | deepagents, kustom | 3 |
+| Live chart per pair: candlesticks, entry and exit markers, indicator overlays | /pair_candles, WebSocket analyzed_df, /plot_config | 1 |
+| Live positions and orders, running profit and loss, balance | /status, /trades, /balance, /profit | 1 |
+| Live actions (real-time feed): fills, voter answers, median, spread, quorum, veto or reduce, risk gate, errors, heartbeat | Freqtrade WebSocket messages and custom gateway events | 1 |
+| Preview of entry candidates together with voter answers before order | custom | 1 |
+| Risk meter: daily and total loss against limits, dry or live mode indicator | custom, /profit | 1 |
+| Push notifications: fills, loss limit exceeded, kill switch, heartbeat lost, quorum failed, daily summary | Web Push (iOS 16.4 or newer, Home Screen) | 1 |
+| Health: bot loop, system load, status and latency of each provider, heartbeat, logs | /health, /sysinfo, /logs, custom | 1 |
+| Bot A vs bot B: stacked equity curves during dry-run | two instances, custom | 1 to 2 |
+| Controls: pause, resume, stop entries, force exit one or all positions, lock pairs, blacklist; risky ones need two-step confirmation | /pause, /start, /stopbuy, /forceexit, /locks, /blacklist | 2 |
+| Providers and keys screen, voter registry, configuration editor with schema validation and change notes | custom, section 4.5 | 2 |
+| Swarm view per decision and the outcome afterwards (whether a skipped entry turned out to be a loss) | custom | 2 |
+| Trade history and statistics: daily, weekly, monthly, per exit reason, per entry tag | /trades, /daily, /weekly, /monthly, /exits, /entries, /mix_tags, /stats, /performance | 2 |
+| Audit log: configuration changes, keys (without values), mode, controls | custom | 2 |
+| Daily report from the analyst agent: summary, anomalies, suggestions | deepagents, custom | 3 |
 
 ### Nice-to-have
 
-| Fitur | Dasar |
+| Feature | Basis |
 |---|---|
-| Pratinjau what-if konfigurasi: efek batas dalam rupiah, dan putar ulang jawaban voter yang tercatat dengan kuorum atau ambang sebaran baru tanpa panggilan LLM baru | kustom |
-| Pratinjau sinyal strategi di grafik untuk rentang waktu | /pair_history |
-| Mesin waktu: geser ke keputusan lampau dengan jawaban voter di atas grafik | kustom |
-| Backtest dan hasilnya dari UI | endpoint backtest belum kuverifikasi |
-| Papan skor voter: kalibrasi dan akurasi, nonaktif otomatis bila melenceng | kustom |
-| Lapisan berita dan sentimen di grafik (RSS, Fear and Greed) | kustom |
-| Tanya agen analis (obrolan, tool baca saja), misalnya kenapa BTC dilewati jam tertentu | deepagents |
-| Uji stres: skenario turun 10 persen terhadap posisi terbuka | kustom |
-| Lencana ikon aplikasi dan tampilan terakhir saat offline (hanya baca) | PWA; Apple menyebut izin badging di iOS 16.4 |
-| Ekspor CSV riwayat trade dan ringkasan pajak sebagai informasi, bukan nasihat pajak | kustom, PMK 50/2025 |
-| Dua bahasa: Indonesia (default) dan Inggris | kustom |
-| Kanal kontrol Telegram | perintah Telegram bawaan Freqtrade |
-| Lebih dari 3 pair dan tampilan portofolio | konfigurasi |
+| What-if config preview: effect of limits in rupiah, and replay of recorded voter answers with a new quorum or spread threshold without new LLM calls | custom |
+| Strategy signal preview on the chart for a time range | /pair_history |
+| Time machine: scrub to past decisions with voter answers shown above the chart | custom |
+| Backtest and its results from the UI | backtest endpoint not yet verified by me |
+| Voter scoreboard: calibration and accuracy, auto-disabled when drifting | custom |
+| News and sentiment layer on the chart (RSS, Fear and Greed) | custom |
+| Ask the analyst agent (chat, read-only tools), for example why BTC was skipped at a certain hour | deepagents |
+| Stress test: 10 percent drop scenario against open positions | custom |
+| App icon badge and last view when offline (read-only) | PWA; Apple mentions badging permission in iOS 16.4 |
+| CSV export of trade history and tax summary as information, not tax advice | custom, PMK 50/2025 |
+| Two languages: Indonesian (default) and English | custom |
+| Telegram control channel | built-in Freqtrade Telegram commands |
+| More than 3 pairs and a portfolio view | configuration |
 
-### Sengaja tidak dibangun
+### Deliberately not built
 
-- Copy trading dan papan peringkat publik.
-- Leverage dan futures.
-- Tombol tarik dana dan tombol all-in.
-- Fitur yang menaikkan risiko secara otomatis.
-- Key yang bisa dilihat kembali.
+- Copy trading and public leaderboards.
+- Leverage and futures.
+- Withdraw-funds button and all-in button.
+- Features that raise risk automatically.
+- Keys that can be viewed again.
 
-### Transport live dan performa
+### Live transport and performance
 
-- Gateway menjaga satu koneksi WebSocket ke Freqtrade (/api/v1/message/ws dengan JWT 15 menit dari /token/login, bukan ws_token, karena log Freqtrade mencatat URL WebSocket beserta query; subscribe) dan mendorong delta ke PWA lewat WebSocket sendiri. Data kandle diambil hanya saat ada klien terhubung, supaya bot di PC tidak terbebani.
-- iOS: WebSocket hanya hidup saat aplikasi terbuka di depan; saat di latar belakang kabar datang lewat Web Push. Safari tidak mendukung push tak terlihat, jadi notifikasi harus tampil (dokumen Apple).
-- Sambungan terputus: sambung ulang dengan backoff dan tampilan menandai data basi.
-- Metrik yang diukur di tahap 1: jeda dari fill di Freqtrade sampai tampil di PWA, dan beban CPU gateway saat klien terhubung. Belum ada angka.
-- FreqUI memakai Vue dan Nuxt UI (README FreqUI) dan ECharts (package.json). Memakainya ulang bertentangan dengan permintaan UI unik, jadi PWA dibuat sendiri. Pustaka grafik dipilih di tahap desain.
+- The gateway keeps one WebSocket connection to Freqtrade (/api/v1/message/ws with a 15-minute JWT from /token/login, not ws_token, because the Freqtrade log records the WebSocket URL along with its query; subscribe) and pushes deltas to the PWA over its own WebSocket. Candle data is fetched only while a client is connected, so the bot on the PC is not burdened.
+- iOS: the WebSocket is only alive while the app is open in the foreground; in the background, updates arrive via Web Push. Safari does not support silent push, so notifications must be shown (Apple documentation).
+- Connection dropped: reconnect with backoff and the display marks data as stale.
+- Metrics measured in stage 1: delay from a fill in Freqtrade to appearing in the PWA, and gateway CPU load while a client is connected. No numbers yet.
+- FreqUI uses Vue and Nuxt UI (FreqUI README) and ECharts (package.json). Reusing it contradicts the request for a unique UI, so the PWA is built from scratch. The chart library is chosen in the design stage.
 
-### Urutan penyampaian
+### Delivery order
 
-Tahap 1 (demo): semua fitur bertahap 1, hanya baca. Tahap 2: kontrol, konfigurasi, provider dan key, swarm, riwayat, audit. Tahap 3: laporan harian dan kontrol mode live. Nice-to-have menyusul, urutannya mengikuti data pemakaian. Full features berarti cakupan besar; estimasi waktu belum ada karena belum diukur, dan urutan ini menjaga bot tetap bisa dites lebih dulu.
+Stage 1 (demo): all stage 1 features, read-only. Stage 2: controls, configuration, providers and keys, swarm, history, audit. Stage 3: daily report and live-mode controls. Nice-to-have follows, in an order driven by usage data. Full features means a large scope; there is no time estimate because it has not been measured, and this order keeps the bot testable first.
 
-## Sumber
+## Sources
 
-Bukti dan tautan lengkap ada di dokumen research-swarm-pwa pada issue ini. Sumber revisi 1 dan 2 (AI-Trader, Hummingbot, NautilusTrader, TradingAgents, claude-trading-skills, Freqtrade, Indodax API, alternative.me, OpenRouter Jev) tetap berlaku.
+Full evidence and links are in the research-swarm-pwa document on this issue. The sources of revisions 1 and 2 (AI-Trader, Hummingbot, NautilusTrader, TradingAgents, claude-trading-skills, Freqtrade, Indodax API, alternative.me, OpenRouter Jev) remain valid.

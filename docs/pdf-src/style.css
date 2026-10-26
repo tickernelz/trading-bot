@@ -1,6 +1,6 @@
 @page { size: A4; margin: 16mm 14mm 18mm 14mm;
-  @bottom-left { content: "Plan bot trading otonom 24 jam · draf v3 · 2026-10-25"; font-size: 7.5pt; color: #555; }
-  @bottom-right { content: "hal. " counter(page) " / " counter(pages); font-size: 7.5pt; color: #555; } }
+  @bottom-left { content: "Plan for a 24-hour autonomous trading bot · draft v3 · 2026-10-25"; font-size: 7.5pt; color: #555; }
+  @bottom-right { content: "p. " counter(page) " / " counter(pages); font-size: 7.5pt; color: #555; } }
 @page :first { @bottom-left { content: none; } @bottom-right { content: none; } }
 html { font-family: "Noto Sans","Liberation Sans",sans-serif; font-size: 9.3pt; color: #1d2330; line-height: 1.36; }
 body { margin: 0; max-width: none; padding: 0; }
