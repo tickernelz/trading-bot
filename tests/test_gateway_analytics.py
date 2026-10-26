@@ -168,7 +168,7 @@ def test_apply_from_a_control_session_on_loopback_disables_the_voter_and_writes_
     assert voters_enabled(config)["v1"] is False
     rows = [row for row in gateway.ledger.audit_rows(10) if row["action"].startswith("analytics.")]
     assert [(row["action"], row["result"], row["actor"], row["ip"], row["idempotency_key"]) for row in rows] == [
-        ("analytics.scoreboard.apply", "ok", "control_session", "127.0.0.1", "key-0001")
+        ("analytics.scoreboard.apply", "ok", "owner", "127.0.0.1", "key-0001")
     ]
     assert rows[0]["targets"] == ["B"]
 

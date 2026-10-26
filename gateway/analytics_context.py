@@ -51,9 +51,11 @@ class AnalyticsContext:
         token = self.gateway.token_of(request)
         return is_local(request) and token is not None and self.gateway.ledger.session_scope(token) == "control"
 
-    def actor_of(self, request: Request | None) -> str:
+    def actor_of(self, request: Request | None, result: str) -> str:
         if request is None:
             return "gateway"
+        if result != "forbidden":
+            return "owner"
         token = self.gateway.token_of(request)
         return f"{self.gateway.ledger.session_scope(token) if token else None}_session"
 
@@ -62,7 +64,7 @@ class AnalyticsContext:
     ) -> None:
         raw_key = request.headers.get("idempotency-key") if request is not None else None
         row = self.gateway.ledger.audit(
-            actor=self.actor_of(request),
+            actor=self.actor_of(request, result),
             action=action,
             targets=targets,
             result=result,
