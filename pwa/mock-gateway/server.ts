@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import webpush, { type PushSubscription } from "web-push";
 import { WebSocket, WebSocketServer } from "ws";
-import { buildCandles, buildDecision, COLUMNS, HOUR, iso, isoMs, PAIRS, rng, type Row, START_CAPITAL, STAKE_RATIO } from "./data";
+import { buildCandles, buildDecision, buildNews, buildSentiment, COLUMNS, HOUR, iso, isoMs, PAIRS, rng, type Row, START_CAPITAL, STAKE_RATIO } from "./data";
 
 type Scenario = "aman" | "ditahan" | "berhenti";
 
@@ -150,10 +150,13 @@ function equitySeries(bot: string, label: string, strategy: string, from: number
 }
 
 const decisions: ReturnType<typeof buildDecision>[] = [];
-for (let i = 6; i >= 1; i--) {
+for (let i = 96; i >= 1; i--) {
   const pair = PAIRS[i % 3].pair;
-  decisions.unshift(buildDecision(random, pair, lastHour - i * 3 * HOUR, lastHour - i * 3 * HOUR + 125000, i === 4));
+  decisions.unshift(buildDecision(random, pair, lastHour - i * 3 * HOUR, lastHour - i * 3 * HOUR + 125000, i === 4 || i % 17 === 0));
 }
+const newsAt = Date.now();
+const news = new Map(PAIRS.map((p, i) => [p.pair, buildNews(rng(101 + i), p.pair, newsAt)]));
+const sentiment = buildSentiment(rng(211), newsAt);
 
 function health() {
   const last = buffer.at(-1);
@@ -340,8 +343,25 @@ const server = createServer(async (req, res) => {
             ],
           });
         }
-        case "/gw/v1/decisions":
-          return json(res, 200, decisions.slice(0, Number(url.searchParams.get("limit") ?? 20)));
+        case "/gw/v1/decisions": {
+          const pair = url.searchParams.get("pair");
+          const before = url.searchParams.get("before");
+          const limit = Math.min(500, Math.max(1, Number(url.searchParams.get("limit") ?? 20)));
+          const rows = decisions.filter((d) => (!pair || d.pair === pair) && (!before || Date.parse(d.candle) < Date.parse(before)));
+          return json(res, 200, rows.slice(0, limit));
+        }
+        case "/gw/v1/news": {
+          const pair = url.searchParams.get("pair");
+          const limit = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") ?? 50)));
+          if (pair && !news.has(pair)) return fail(res, 404, "not_found", "Pair tidak ada di whitelist");
+          const all = pair ? news.get(pair)! : [...news.values()][0];
+          const items = pair ? all.items : [...news.values()].flatMap((n) => n.items).sort((a, b) => b.published.localeCompare(a.published));
+          return json(res, 200, { ...all, items: items.slice(0, limit) });
+        }
+        case "/gw/v1/sentiment": {
+          const days = Math.min(365, Math.max(1, Number(url.searchParams.get("days") ?? 30)));
+          return json(res, 200, { ...sentiment, points: sentiment.points.slice(-days) });
+        }
         case "/gw/v1/sysinfo":
           return json(res, 200, { cpu_pct: [12 + random() * 20, 8 + random() * 15, 20 + random() * 30, 5 + random() * 10].map((v) => Number(v.toFixed(1))), ram_pct: Number((38 + random() * 6).toFixed(1)) });
         case "/gw/v1/logs":
@@ -464,7 +484,7 @@ function script() {
   if (phase === 0 || phase === 2) {
     const d = buildDecision(random, pair, lastHour, Date.now(), phase === 2 && random() < 0.3);
     decisions.unshift(d);
-    decisions.splice(20);
+    decisions.splice(500);
     emit("gw.decision", d);
     return;
   }

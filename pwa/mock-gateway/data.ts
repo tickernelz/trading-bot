@@ -182,3 +182,54 @@ export function buildDecision(random: () => number, pair: string, candleMs: numb
     },
   };
 }
+
+const NEWS_SOURCES = [
+  { id: "coindesk", name: "CoinDesk", url: "https://www.coindesk.com/", feed: "https://www.coindesk.com/arc/outboundfeeds/rss/" },
+  { id: "cointelegraph", name: "Cointelegraph", url: "https://cointelegraph.com/", feed: "https://cointelegraph.com/rss" },
+];
+
+export function buildNews(random: () => number, pair: string, now: number) {
+  const asset = pair.split("/")[0];
+  const items = Array.from({ length: 10 }, (_, k) => {
+    const source = NEWS_SOURCES[k % 2];
+    const published = now - Math.round((k * 19 + random() * 14 + 2) * HOUR);
+    return {
+      id: "n_contoh_" + asset.toLowerCase() + "_" + k,
+      source: source.id,
+      title: "Judul berita contoh " + (k + 1) + " tentang " + asset + " (bukan berita sungguhan)",
+      url: source.url,
+      published: iso(published),
+      assets: [asset],
+    };
+  });
+  return {
+    as_of: iso(now),
+    enabled: true,
+    sources: NEWS_SOURCES.map((s, i) => ({ ...s, ok: i === 0, error: i === 0 ? null : "contoh: HTTPError 503", fetched_at: iso(now - (i === 0 ? 4 : 47) * 60000) })),
+    items,
+  };
+}
+
+const FNG_CLASSES = [
+  [25, "Extreme Fear"],
+  [46, "Fear"],
+  [55, "Neutral"],
+  [75, "Greed"],
+  [101, "Extreme Greed"],
+] as const;
+
+export function buildSentiment(random: () => number, now: number) {
+  const today = Math.floor(now / (24 * HOUR)) * 24 * HOUR;
+  let value = 48;
+  const points = Array.from({ length: 60 }, (_, k) => {
+    value = Math.max(5, Math.min(95, Math.round(value + (random() - 0.5) * 14)));
+    const classification = FNG_CLASSES.find(([limit]) => value < limit)![1];
+    return { date: iso(today - (59 - k) * 24 * HOUR).slice(0, 10), value, classification };
+  });
+  return {
+    as_of: iso(now),
+    enabled: true,
+    source: { name: "Fear & Greed Index", provider: "alternative.me", url: "https://alternative.me/crypto/fear-and-greed-index/", ok: true, error: null, fetched_at: iso(now - 12 * 60000) },
+    points,
+  };
+}

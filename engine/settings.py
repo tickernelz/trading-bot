@@ -120,13 +120,29 @@ class Compute(Strict):
 
 
 class Data(Strict):
-    news_rss: list[str]
+    news_rss: list[Literal["coindesk", "cointelegraph"]]
     fear_greed: bool
     social: bool
 
 
+class Telegram(Strict):
+    enabled: bool = False
+    token_env: EnvName = "TELEGRAM_BOT_TOKEN"
+    chat_id: Annotated[str, Field(pattern=r"^-?[0-9]+$")] | None = None
+    authorized_users: list[Annotated[str, Field(pattern=r"^[0-9]+$")]] = []
+
+    @model_validator(mode="after")
+    def _addressed_when_enabled(self) -> Telegram:
+        if self.enabled and self.chat_id is None:
+            raise ValueError("notify.telegram.chat_id is required when telegram is enabled")
+        if self.enabled and not self.authorized_users:
+            raise ValueError("notify.telegram.authorized_users must name at least one user when telegram is enabled")
+        return self
+
+
 class Notify(Strict):
     web_push: bool
+    telegram: Telegram = Telegram()
 
 
 class Api(Strict):

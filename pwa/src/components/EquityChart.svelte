@@ -3,6 +3,7 @@
   import { onDestroy, onMount } from "svelte";
   import { chartOptions, cssColor, onSchemeChange } from "../lib/chartTheme";
   import { parseTs } from "../lib/format";
+  import { t } from "../lib/i18n";
   import type { Equity } from "../lib/types";
 
   let { equity }: { equity: Equity } = $props();
@@ -24,7 +25,7 @@
       line.setData(s.points.map(([ts, v]) => ({ time: Math.floor(parseTs(ts) / 1000) as UTCTimestamp, value: v })));
       return line;
     });
-    lines[0]?.createPriceLine({ price: equity.start_equity, color: cssColor("--rule-strong"), lineWidth: 1, lineStyle: LineStyle.Dotted, axisLabelVisible: true, title: "modal awal" });
+    lines[0]?.createPriceLine({ price: equity.start_equity, color: cssColor("--rule-strong"), lineWidth: 1, lineStyle: LineStyle.Dotted, axisLabelVisible: true, title: t("chart.start_capital") });
     chart.timeScale().fitContent();
   }
 
@@ -51,7 +52,7 @@
   });
 </script>
 
-<div class="chart" bind:this={host} role="img" aria-label="Kurva ekuitas bot A dan bot B, tujuh hari"></div>
+<div class="chart" bind:this={host} role="img" aria-label={t("chart.equity_label")}></div>
 
 <style>
   .chart {

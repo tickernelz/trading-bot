@@ -1,5 +1,6 @@
 <script lang="ts">
   import { percent } from "../lib/format";
+  import { t } from "../lib/i18n";
 
   let { name, value, limit, stale = false }: { name: string; value: number; limit: number; stale?: boolean } = $props();
 
@@ -12,7 +13,7 @@
 <div class="meter" class:stale>
   <div class="head">
     <span>{name}</span>
-    <span class="num"><b class:warn-text={hot && !stale}>{percent(value)}</b> dari batas {percent(limit, 1)}</span>
+    <span class="num"><b class:warn-text={hot && !stale}>{percent(value)}</b> {t("meter.of_limit", { limit: percent(limit, 1) })}</span>
   </div>
   <div
     class="track"
@@ -21,15 +22,15 @@
     aria-valuemin={0}
     aria-valuemax={limit}
     aria-valuenow={value}
-    aria-valuetext="{percent(value)} dari batas {percent(limit, 1)}"
+    aria-valuetext={percent(value) + " " + t("meter.of_limit", { limit: percent(limit, 1) })}
   >
     <i class:hot style="inline-size:{ratio * 100}%"></i>
   </div>
   <div class="foot num">
     {#if reached}
-      Batas tercapai. Entry baru ditahan.
+      {t("meter.reached")}
     {:else}
-      {hot ? "Tinggal" : "Sisa"} {percent(left)} sebelum entry baru ditahan
+      {t(hot ? "meter.only_left" : "meter.left", { left: percent(left) })}
     {/if}
   </div>
 </div>

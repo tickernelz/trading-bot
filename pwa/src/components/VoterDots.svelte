@@ -1,5 +1,7 @@
 <script lang="ts">
   import { decimal } from "../lib/format";
+  import { t } from "../lib/i18n";
+  import { choiceText } from "../lib/words";
   import type { Decision } from "../lib/types";
 
   let { decision }: { decision: Decision } = $props();
@@ -32,9 +34,8 @@
   const action = $derived(decision.aggregate?.questions.action);
   const median = $derived(action?.median_probabilities?.izinkan ?? null);
   const label = $derived(
-    "Peluang izinkan per voter. " +
-      placed.map((v) => v.id + " " + decimal(v.p) + " " + v.choice).join(", ") +
-      (median === null ? "." : ". Median " + decimal(median) + ", selisih kuartil " + decimal(action!.spread.iqr) + "."),
+    t("dots.label", { voters: placed.map((v) => v.id + " " + decimal(v.p) + " " + choiceText(v.choice)).join(", ") }) +
+      (median === null ? "" : " " + t("dots.median", { median: decimal(median), iqr: decimal(action!.spread.iqr) })),
   );
 </script>
 
@@ -46,9 +47,9 @@
   {/if}
   <line x1={x(0.5)} x2={x(0.5)} y1="8" y2={AX} stroke="var(--rule-strong)" stroke-dasharray="3 3" />
   <line x1={PL} x2={W - PR} y1={AX} y2={AX} stroke="var(--ink2)" />
-  {#each [0, 0.5, 1] as t (t)}
-    <line x1={x(t)} x2={x(t)} y1={AX - 4} y2={AX + 4} stroke="var(--ink2)" />
-    <text x={x(t)} y={AX + 20} text-anchor={t === 0 ? "start" : t === 1 ? "end" : "middle"}>{t === 0 ? "0 lewati" : t === 1 ? "1 izinkan" : "0,5"}</text>
+  {#each [0, 0.5, 1] as tick (tick)}
+    <line x1={x(tick)} x2={x(tick)} y1={AX - 4} y2={AX + 4} stroke="var(--ink2)" />
+    <text x={x(tick)} y={AX + 20} text-anchor={tick === 0 ? "start" : tick === 1 ? "end" : "middle"}>{tick === 0 ? "0 " + t("choice.lewati") : tick === 1 ? "1 " + t("choice.izinkan") : decimal(0.5, 1)}</text>
   {/each}
   {#if median !== null}
     <line x1={x(median)} x2={x(median)} y1="8" y2={AX} stroke="var(--ink)" stroke-width="3" />
@@ -59,7 +60,7 @@
   {/each}
 </svg>
 </div>
-<p class="note">Titik penuh: voter menjawab izinkan; titik kosong: kecilkan. Garis tebal: median. Pita abu: selisih kuartil (sebaran).</p>
+<p class="note">{t("dots.legend")}</p>
 
 <style>
   .wrap {

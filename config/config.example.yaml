@@ -170,6 +170,11 @@ data:
   social: off
 notify:
   web_push: true
+  telegram:
+    enabled: false
+    token_env: TELEGRAM_BOT_TOKEN
+    chat_id: null
+    authorized_users: []
 api:
   listen: 127.0.0.1
   port: 8080

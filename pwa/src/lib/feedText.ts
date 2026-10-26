@@ -1,7 +1,11 @@
-import { MINUS, outcomeWord, price, rupiah, signedPercent } from "./format";
+import { decimal, MINUS, outcomeWord, price, rupiah, signedPercent } from "./format";
+import { t, type Key } from "./i18n";
 import type { Decision, FeedEvent } from "./types";
+import { choiceText } from "./words";
 
-export type FeedKind = "Order" | "Swarm" | "Risiko" | "Sistem";
+export type FeedKind = "order" | "swarm" | "risk" | "system";
+
+export const FEED_KINDS: Record<FeedKind, Key> = { order: "feed.kind_order", swarm: "feed.kind_swarm", risk: "feed.kind_risk", system: "feed.kind_system" };
 
 export interface FeedItem {
   seq: number;
@@ -17,31 +21,33 @@ type Data = Record<string, unknown>;
 const num = (v: unknown): number => (typeof v === "number" ? v : Number(v));
 const str = (v: unknown): string => (v === null || v === undefined ? "" : String(v));
 
-const STATUS_WORD: Record<string, string> = {
-  running: "berjalan",
-  stopped: "berhenti",
-  paused: "dijeda",
-  reload_config: "memuat ulang konfigurasi",
+const STATUS_WORD: Record<string, Key> = {
+  running: "status.running",
+  stopped: "status.stopped",
+  paused: "status.paused",
+  reload_config: "status.reload_config",
 };
 
-const EXIT_REASON: Record<string, string> = {
-  roi: "target ROI",
-  stop_loss: "stop loss",
-  stoploss_on_exchange: "stop loss",
-  trailing_stop_loss: "trailing stop",
-  exit_signal: "sinyal keluar",
-  force_exit: "keluar paksa",
-  emergency_exit: "keluar darurat",
+const EXIT_REASON: Record<string, Key> = {
+  roi: "exit.roi",
+  stop_loss: "exit.stop_loss",
+  stoploss_on_exchange: "exit.stop_loss",
+  trailing_stop_loss: "exit.trailing_stop_loss",
+  exit_signal: "exit.exit_signal",
+  force_exit: "exit.force_exit",
+  emergency_exit: "exit.emergency_exit",
 };
 
 export function exitReason(value: string | null | undefined): string {
   if (!value) return "-";
-  return EXIT_REASON[value] ?? value;
+  const key = EXIT_REASON[value];
+  return key ? t(key) : value;
 }
 
 export function statusWord(value: string | null | undefined): string {
-  if (!value) return "tidak diketahui";
-  return STATUS_WORD[value] ?? value;
+  if (!value) return t("status.unknown");
+  const key = STATUS_WORD[value];
+  return key ? t(key) : value;
 }
 
 export function describe(event: FeedEvent, dryRun: boolean): FeedItem | null {
@@ -50,43 +56,43 @@ export function describe(event: FeedEvent, dryRun: boolean): FeedItem | null {
   const base = { seq: event.seq, ts: event.ts, warn: false };
   switch (event.type) {
     case "entry":
-      return { ...base, kind: "Order", text: "Order beli " + str(d.pair) + " dikirim di " + price(num(d.limit)) + tail };
+      return { ...base, kind: "order", text: t("feed.entry", { pair: str(d.pair), price: price(num(d.limit)) }) + tail };
     case "entry_fill":
-      return { ...base, kind: "Order", text: "Beli " + str(d.pair) + " terisi di " + price(num(d.open_rate)) + ", " + rupiah(num(d.stake_amount)) + tail };
+      return { ...base, kind: "order", text: t("feed.entry_fill", { pair: str(d.pair), price: price(num(d.open_rate)), stake: rupiah(num(d.stake_amount)) }) + tail };
     case "exit":
-      return { ...base, kind: "Order", text: "Order jual " + str(d.pair) + " dikirim, alasan " + exitReason(str(d.exit_reason)) + tail };
+      return { ...base, kind: "order", text: t("feed.exit", { pair: str(d.pair), reason: exitReason(str(d.exit_reason)) }) + tail };
     case "exit_fill": {
       const pct = num(d.profit_ratio) * 100;
-      return {
-        ...base,
-        kind: "Order",
-        text: "Jual " + str(d.pair) + " terisi, " + signedPercent(pct) + " " + outcomeWord(pct) + tail,
-        outcome: pct,
-      };
+      return { ...base, kind: "order", text: t("feed.exit_fill", { pair: str(d.pair), pct: signedPercent(pct), word: outcomeWord(pct) }) + tail, outcome: pct };
     }
     case "status":
-      return { ...base, kind: "Sistem", text: "Status bot: " + statusWord(str(d.status)) };
+      return { ...base, kind: "system", text: t("feed.status", { status: statusWord(str(d.status)) }) };
     case "warning":
-      return { ...base, kind: "Sistem", text: str(d.status), warn: true };
+      return { ...base, kind: "system", text: str(d.status), warn: true };
     case "whitelist":
-      return { ...base, kind: "Sistem", text: "Daftar pair: " + (Array.isArray(event.data) ? event.data.join(", ") : "") };
+      return { ...base, kind: "system", text: t("feed.whitelist", { pairs: Array.isArray(event.data) ? event.data.join(", ") : "" }) };
     case "gw.risk_denied": {
       const breaches = Array.isArray(d.breaches) ? (d.breaches as string[]) : [];
-      const reason = breaches.includes("total_drawdown") ? "rugi total melewati batas" : "rugi harian melewati batas";
-      return { ...base, kind: "Risiko", text: "Entry " + str(d.pair) + " ditolak: " + reason + " (" + MINUS + num(d.daily_loss_pct).toFixed(2).replace(".", ",") + "%)", warn: true };
+      const reason = breaches.includes("total_drawdown") ? t("feed.breach_total") : t("feed.breach_daily");
+      return { ...base, kind: "risk", text: t("feed.risk_denied", { pair: str(d.pair), reason, loss: MINUS + decimal(num(d.daily_loss_pct)) + "%" }), warn: true };
     }
     case "gw.decision": {
       const dec = event.data as Decision;
       const quorum = dec.status === "skip" && dec.reason === "quorum_not_met";
       return {
         ...base,
-        kind: "Swarm",
-        text: dec.pair + ": " + (quorum ? "kuorum gagal, entry dilewati" : dec.verdict) + (dec.mode === "shadow" ? " (bayangan)" : "") + ", " + dec.answered + " dari " + dec.voters.length + " voter menjawab",
+        kind: "swarm",
+        text: t(dec.mode === "shadow" ? "feed.decision_shadow" : "feed.decision", {
+          pair: dec.pair,
+          verdict: quorum ? t("feed.quorum_failed") : choiceText(dec.verdict),
+          answered: dec.answered,
+          total: dec.voters.length,
+        }),
         warn: quorum,
       };
     }
     case "gw.error":
-      return { ...base, kind: "Sistem", text: "Gateway: " + str(d.message), warn: true };
+      return { ...base, kind: "system", text: t("feed.gw_error", { message: str(d.message) }), warn: true };
     default:
       return null;
   }

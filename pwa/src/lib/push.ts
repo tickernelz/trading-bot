@@ -1,4 +1,5 @@
 import type { Api } from "./api";
+import { t } from "./i18n";
 
 export type PushSupport = "supported" | "ios-needs-home-screen" | "unsupported";
 
@@ -25,12 +26,12 @@ function keyBytes(base64url: string): Uint8Array<ArrayBuffer> {
 }
 
 export const PUSH_KINDS = [
-  { kind: "fill", label: "Order terisi (beli atau jual)" },
-  { kind: "risk_breach", label: "Batas rugi harian atau total terlewati" },
-  { kind: "kill_switch", label: "Kill switch aktif atau bot berhenti" },
-  { kind: "heartbeat_lost", label: "Heartbeat bot hilang" },
-  { kind: "quorum_failed", label: "Kuorum swarm gagal" },
-  { kind: "daily_summary", label: "Ringkasan harian" },
+  { kind: "fill", label: t("push.fill") },
+  { kind: "risk_breach", label: t("push.risk_breach") },
+  { kind: "kill_switch", label: t("push.kill_switch") },
+  { kind: "heartbeat_lost", label: t("push.heartbeat_lost") },
+  { kind: "quorum_failed", label: t("push.quorum_failed") },
+  { kind: "daily_summary", label: t("push.daily_summary") },
 ] as const;
 
 export async function currentSubscription(): Promise<PushSubscription | null> {

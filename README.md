@@ -10,6 +10,7 @@ Status: tahap 0a (mesin dasar). Belum ada akun atau uang yang terhubung, belum a
 - engine/: launcher, skema konfigurasi, lapisan risiko, strategi
 - engine/settings.py: skema tunggal config/config.yaml, divalidasi sebelum mesin start
 - engine/risk.py: batas rugi harian, batas drawdown, ukuran posisi berbasis risiko
+- engine/news.py: pengambil judul RSS CoinDesk dan Cointelegraph serta Fear and Greed alternative.me untuk lapisan grafik (cache 15 menit dan 1 jam, diambil hanya saat diminta)
 - engine/strategies/swing_ema_rsi.py: strategi swing 1h (EMA 20/50 + RSI) dengan gerbang risiko
 - engine/launch.py: validasi config, render config Freqtrade, exec Freqtrade
 - docker/Dockerfile, docker-compose.yml: image turunan dari vendor/freqtrade, jaringan host
@@ -52,6 +53,23 @@ Perintah Freqtrade lain memakai launcher yang sama, sehingga validasi tetap berl
     docker run --rm --network host --env-file .env -v ./config:/opt/trading-bot/config:ro -v ./user_data:/freqtrade/user_data trading-bot/engine:dev show-config
 
 Jaringan: network_mode host dipakai supaya bot bisa menjangkau provider LLM yang hanya listen di 127.0.0.1 host (dibuktikan di WSL2: 127.0.0.1:62173 dan 127.0.0.1:20128 menjawab 401 dari dalam kontainer, sedangkan host.docker.internal dengan host-gateway hanya menghasilkan 000). Jalur Docker Desktop di Windows belum diuji. api.listen dibatasi skema ke 127.0.0.1 atau ::1, jadi REST tidak pernah terbuka ke LAN; untuk Docker Desktop rencananya jaringan bridge dengan publish 127.0.0.1:8080:8080, tetap belum diuji.
+
+## Kanal Telegram (nonaktif bawaan)
+
+Kanal kontrol memakai Telegram bawaan Freqtrade (perintah /status, /profit, /balance, /daily, /stopentry, /start, /stop, /forceexit, /reload_config, /help, dan lainnya). Bawaannya mati. Untuk menyalakan, isi di config/config.yaml:
+
+    notify:
+      telegram:
+        enabled: true
+        token_env: TELEGRAM_BOT_TOKEN
+        chat_id: "<id chat>"
+        authorized_users: ["<id user Telegram>"]
+
+lalu isi TELEGRAM_BOT_TOKEN di .env. Token hanya lewat variabel lingkungan (FREQTRADE__TELEGRAM__TOKEN), tidak pernah ditulis ke config Freqtrade yang dirender. Launcher menolak start bila kanal menyala tanpa chat_id, tanpa authorized_users, atau tanpa token. Hanya perintah trade yang memuat kanal ini.
+
+Risiko yang diterima saat menyalakan: perintah Telegram dijalankan Freqtrade langsung, tanpa konfirmasi dua langkah dan tanpa log audit gateway (docs/gateway-api.md bagian 3). /forcelong tetap tertolak selama api.force_entry false. Pesan dari chat atau user lain diabaikan Freqtrade.
+
+Bukti: tests/test_telegram_channel.py menjalankan modul Telegram Freqtrade asli terhadap Bot API tiruan lokal (chat pemilik mendapat jawaban /status, /stopentry, /help; /stopentry dari chat lain tidak mengubah keadaan). Belum terbukti dengan bot Telegram sungguhan karena belum ada token.
 
 ## Tes
 
