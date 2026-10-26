@@ -30,9 +30,11 @@ from engine.logredact import redact
 from engine.risk import day_start
 from engine.settings import ConfigError, Settings, load_settings
 from gateway import VERSION
+from gateway.analyst import AnalystLink, install_analyst
 from gateway.events import FILL_SIDES, translate
 from gateway.feed import Client, Hub, now_iso
 from gateway.ledger import Ledger, LoginThrottle
+from gateway.modeapi import ModeDesk, install_mode
 from gateway.settings import BotRef, GatewaySettings
 from gateway.upstream import ApiError, Upstream
 from gateway.views import (
@@ -86,6 +88,7 @@ class Gateway:
         if missing:
             raise ConfigError(f"set environment variables: {', '.join(missing)}")
         self.settings = settings
+        self.env = env
         self.password = password
         self.started = time.monotonic()
         self.ledger = Ledger(Path(settings.state_dir) / "gateway.sqlite")
@@ -108,6 +111,8 @@ class Gateway:
         self.cpu_recent: float | None = None
         self.http = httpx.AsyncClient(timeout=5.0)
         self.tasks: list[asyncio.Task] = []
+        self.analyst = AnalystLink(self)
+        self.modes = ModeDesk(self)
 
     def primary(self) -> BotRef:
         return self.settings.bots[0]
@@ -569,6 +574,7 @@ class Gateway:
             (60, self.probe_exchange),
             (30, self.probe_shadows),
             (10, self.sample_cpu),
+            (60, self.analyst.tick),
         ):
             self.tasks.append(asyncio.create_task(self.every(seconds, action)))
 
@@ -579,6 +585,7 @@ class Gateway:
         for upstream in self.upstreams.values():
             await upstream.aclose()
         await self.http.aclose()
+        await self.analyst.aclose()
         for store in self.stores.values():
             store.close()
         self.ledger.close()
@@ -914,4 +921,6 @@ def create_app(gateway: Gateway) -> FastAPI:
                 },
             )
 
+    install_analyst(app, gateway, reader, reader)
+    install_mode(app, gateway, reader)
     return app
