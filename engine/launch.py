@@ -13,6 +13,7 @@ from engine.settings import ConfigError, Settings, load_settings
 STRATEGY = "SwingEmaRsi"
 STRATEGY_COMMANDS = {"trade", "backtesting", "webserver"}
 API_COMMANDS = {"trade", "webserver"}
+TELEGRAM_COMMANDS = {"trade"}
 ENGINE_ROOT = Path(__file__).resolve().parent
 
 
@@ -20,7 +21,7 @@ class MissingSecret(Exception):
     """Raised when a required environment variable is unset or empty."""
 
 
-def freqtrade_config(settings: Settings, serve_api: bool = True) -> dict[str, Any]:
+def freqtrade_config(settings: Settings, serve_api: bool = True, telegram: bool = False) -> dict[str, Any]:
     """Translate validated settings into a Freqtrade configuration without secrets."""
     config: dict[str, Any] = {
         "bot_name": "trading-bot",
@@ -73,17 +74,32 @@ def freqtrade_config(settings: Settings, serve_api: bool = True) -> dict[str, An
             "CORS_origins": [],
         }
         config["apiserver"] = {"allow_custom_messages": True}
+    if telegram:
+        channel = settings.notify.telegram
+        config["telegram"] = {
+            "enabled": True,
+            "token": "",
+            "chat_id": channel.chat_id,
+            "authorized_users": list(channel.authorized_users),
+            "allow_custom_messages": True,
+        }
     return config
 
 
-def secret_env(settings: Settings, environ: dict[str, str]) -> dict[str, str]:
-    """Map the API credentials named in settings onto Freqtrade environment overrides."""
+def telegram_enabled(settings: Settings, command: str) -> bool:
+    return command in TELEGRAM_COMMANDS and settings.notify.telegram.enabled
+
+
+def secret_env(settings: Settings, environ: dict[str, str], telegram: bool = False) -> dict[str, str]:
+    """Map the credentials named in settings onto Freqtrade environment overrides."""
     names = {
         "FREQTRADE__API_SERVER__USERNAME": settings.api.username_env,
         "FREQTRADE__API_SERVER__PASSWORD": settings.api.password_env,
         "FREQTRADE__API_SERVER__JWT_SECRET_KEY": settings.api.jwt_secret_env,
         "FREQTRADE__API_SERVER__WS_TOKEN": settings.api.ws_token_env,
     }
+    if telegram:
+        names["FREQTRADE__TELEGRAM__TOKEN"] = settings.notify.telegram.token_env
     missing = [source for source in names.values() if not environ.get(source)]
     if missing:
         raise MissingSecret(f"set environment variables: {', '.join(missing)}")
@@ -106,13 +122,14 @@ def main(argv: list[str]) -> int:
     try:
         settings = load_settings(config_file)
         serve_api = argv[0] in API_COMMANDS
-        overrides = secret_env(settings, dict(os.environ)) if serve_api else {}
+        telegram = telegram_enabled(settings, argv[0])
+        overrides = secret_env(settings, dict(os.environ), telegram) if serve_api else {}
     except (ConfigError, MissingSecret) as exc:
         print(f"trading-bot: refusing to start: {exc}", file=sys.stderr)
         return 2
     rendered = Path(userdir) / "trading-bot.freqtrade.json"
     rendered.parent.mkdir(parents=True, exist_ok=True)
-    rendered.write_text(json.dumps(freqtrade_config(settings, serve_api), indent=2), encoding="utf-8")
+    rendered.write_text(json.dumps(freqtrade_config(settings, serve_api, telegram), indent=2), encoding="utf-8")
     command = build_argv(argv[0], argv[1:], rendered, userdir)
     os.execvpe(command[0], command, {**os.environ, **overrides})
 
