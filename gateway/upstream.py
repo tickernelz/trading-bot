@@ -23,12 +23,31 @@ StateHandler = Callable[[str, bool], Awaitable[None]]
 
 
 class ApiError(Exception):
-    def __init__(self, status: int, code: str, message: str, retry_after_ms: int | None = None) -> None:
+    def __init__(
+        self,
+        status: int,
+        code: str,
+        message: str,
+        retry_after_ms: int | None = None,
+        extra: dict[str, Any] | None = None,
+    ) -> None:
         super().__init__(message)
         self.status = status
         self.code = code
         self.message = message
         self.retry_after_ms = retry_after_ms
+        self.extra = extra
+
+
+def upstream_reason(response: httpx.Response) -> str | None:
+    try:
+        body = response.json()
+    except ValueError:
+        return None
+    if not isinstance(body, dict):
+        return None
+    reason = body.get("error") or body.get("detail")
+    return str(reason)[:200] if reason else None
 
 
 class Upstream:
@@ -42,16 +61,22 @@ class Upstream:
         self.reconnects = 0
 
     async def get(self, path: str, **params: Any) -> Any:
+        return await self.send("GET", path, params=params)
+
+    async def send(self, method: str, path: str, *, params: dict[str, Any] | None = None, body: Any = None) -> Any:
+        query = {k: v for k, v in (params or {}).items() if v is not None}
         try:
-            response = await self.client.get(path, params={k: v for k, v in params.items() if v is not None})
+            response = await self.client.request(method, path, params=query, json=body)
         except httpx.TimeoutException as exc:
             raise ApiError(503, "upstream_unavailable", "Freqtrade API did not answer within 5s", 2000) from exc
         except httpx.HTTPError as exc:
             raise ApiError(503, "upstream_unavailable", "Freqtrade API is not reachable", 2000) from exc
-        if response.status_code == 404:
+        if response.status_code == 404 and method == "GET":
             raise ApiError(404, "not_found", f"Freqtrade has no {path}")
         if response.status_code >= 400:
-            raise ApiError(502, "upstream_error", f"Freqtrade answered {response.status_code} for {path}")
+            reason = upstream_reason(response)
+            suffix = f": {reason}" if reason else ""
+            raise ApiError(502, "upstream_error", f"Freqtrade answered {response.status_code} for {path}{suffix}")
         return response.json()
 
     async def access_token(self) -> str:
