@@ -98,6 +98,16 @@ def test_offline_commands_run_without_api_server_or_secrets(monkeypatch, tmp_pat
     assert "apiserver" not in rendered
 
 
+@pytest.mark.parametrize(("available", "expected"), [(True, None), (False, "jsongz")])
+def test_candle_files_fall_back_to_jsongz_only_without_pyarrow(monkeypatch, available, expected):
+    monkeypatch.setattr(launch, "pyarrow_available", lambda: available)
+    rendered = launch.freqtrade_config(load_settings(EXAMPLE))
+    assert rendered.get("dataformat_ohlcv") == expected
+    assert rendered.get("dataformat_trades") == expected
+    rendered["api_server"].update(username="bot", password="pw", jwt_secret_key="j" * 32, ws_token="w")
+    validate_config_schema(rendered)
+
+
 def test_rendered_config_has_no_secrets():
     rendered = json.dumps(launch.freqtrade_config(load_settings(EXAMPLE)))
     for key in ("password", "jwt_secret_key", "ws_token", "username"):

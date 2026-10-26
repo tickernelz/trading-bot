@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import sys
@@ -18,6 +19,10 @@ TELEGRAM_COMMANDS = {"trade"}
 ENGINE_ROOT = Path(__file__).resolve().parent
 DRY_RUN_DB = "tradesv3.dryrun.sqlite"
 TRADABLE_BALANCE_RATIO = 0.99
+
+
+def pyarrow_available() -> bool:
+    return importlib.util.find_spec("pyarrow") is not None
 
 
 class MissingSecret(Exception):
@@ -73,6 +78,9 @@ def freqtrade_config(
             "risk": settings.risk.model_dump(),
         },
     }
+    if not pyarrow_available():
+        config["dataformat_ohlcv"] = "jsongz"
+        config["dataformat_trades"] = "jsongz"
     if settings.strategy.rule is not None:
         config["trading_bot"]["rule"] = settings.strategy.rule.model_dump()
     if serve_api:

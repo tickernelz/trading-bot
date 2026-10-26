@@ -85,6 +85,8 @@ On Windows unzip the archive and run `trading-bot.exe run`. The first start crea
 | Windows | `win-x64`, `win-arm64` (`.zip`) | `%LOCALAPPDATA%\TradingBot` |
 | macOS | `mac-x64` (Intel), `mac-arm64` (Apple silicon) (`.tar.gz`) | `~/Library/Application Support/TradingBot` |
 
+On Windows on ARM the bundle is native too. `pyarrow` has no wheel there and its source package needs a prebuilt Arrow C++ library, so it is left out: downloaded candles are stored as `jsongz` instead of `feather`. `cryptography` and `python-rapidjson` are built from source on the release runner.
+
 The data folder holds `config/` (one YAML file per bot and for the gateway), `secrets/` (generated passwords and the files for provider keys), `run/` (databases) and `logs/`. Options: `--home <folder>` uses another data folder, `--port-base <n>` sets the first of the local ports (default 8080; the panel is on n+10) when the folder is created, `--version` prints the versions of the bundled libraries. Provider keys for the swarm and the analyst go into `secrets/swarm.env` and `secrets/analyst.env` as `NAME=value` lines, or into the panel's configuration editor; without keys the shadow swarm and the analyst refuse to start and the log in `logs/` says why, while the bots and the panel keep running.
 
 ### First open without code signing
