@@ -8,6 +8,7 @@ session_days: 30
 models_yml: ~/.omp/agent/models.yml
 heartbeat_lost_s: 180
 exchange_probe_url: https://indodax.com/api/server_time
+analysis_url: http://127.0.0.1:8092
 bots:
   - id: A
     label: Bot A

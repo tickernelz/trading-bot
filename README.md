@@ -140,7 +140,7 @@ Tes berjalan di dalam image turunan Freqtrade, jadi versi Freqtrade, ccxt, dan p
 
 ## Analitik
 
-Paket analytics/ menyediakan pratinjau what-if batas risiko dan putar ulang jawaban voter, papan skor voter, uji stres turun 10 persen, ekspor CSV dan ringkasan pajak sebagai informasi, portofolio per pair, serta sinyal strategi dan backtest lewat instans Freqtrade mode webserver. Bentuk endpoint ada di bagian 13 docs/gateway-api.md; ambang dan tarif diatur di bagian analytics config. Rutenya belum dipasang ke gateway (ZHA-3798).
+Paket analytics/ menyediakan pratinjau what-if batas risiko dan putar ulang jawaban voter, papan skor voter, uji stres turun 10 persen, ekspor CSV dan ringkasan pajak sebagai informasi, portofolio per pair, serta sinyal strategi dan backtest lewat instans Freqtrade mode webserver. Bentuk endpoint ada di bagian 13 docs/gateway-api.md; ambang dan tarif diatur di bagian analytics config. Rutenya dipasang ke gateway lewat `gateway/analytics_context.py`; `analysis_url` di config gateway menunjuk instans webserver (port 8092 di contoh) yang config-nya memakai `api.port: 8092`.
 
 Sinyal dan backtest butuh instans mode webserver dengan data OHLCV di userdir-nya (bot mode trade menjawab 503 untuk /pair_history dan /backtest):
 
