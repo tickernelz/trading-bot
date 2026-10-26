@@ -23,7 +23,7 @@ describe("signed values", () => {
 describe("feed text", () => {
   it("labels a losing exit fill with sign, word, and dry-run", () => {
     const item = feedText({ type: "exit_fill", seq: 4, ts: "2026-10-25T17:07:12.401Z", data: { pair: "BTC/IDR", profit_ratio: -0.004000681725188243 } }, true);
-    expect(item).toMatchObject({ kind: "Order", text: "Jual BTC/IDR terisi, " + MINUS + "0,40% rugi (dry-run)" });
+    expect(item).toMatchObject({ kind: "order", text: "Jual BTC/IDR terisi, " + MINUS + "0,40% rugi (dry-run)" });
   });
 
   it("flags a quorum failure as a warning", () => {
@@ -36,6 +36,6 @@ describe("feed text", () => {
       },
       true,
     );
-    expect(item).toMatchObject({ kind: "Swarm", warn: true, text: "ETH/IDR: kuorum gagal, entry dilewati (bayangan), 2 dari 7 voter menjawab" });
+    expect(item).toMatchObject({ kind: "swarm", warn: true, text: "ETH/IDR: kuorum gagal, entry dilewati (bayangan), 2 dari 7 voter menjawab" });
   });
 });

@@ -1,5 +1,6 @@
 import { ColorType, TickMarkType, type ChartOptions, type DeepPartial, type Time } from "lightweight-charts";
 import { price } from "./format";
+import { locale } from "./i18n";
 
 let probe: CanvasRenderingContext2D | null = null;
 
@@ -15,9 +16,9 @@ export function cssColor(name: string): string {
   return "rgba(" + r + "," + g + "," + b + "," + (a / 255).toFixed(3) + ")";
 }
 
-const hm = new Intl.DateTimeFormat("id-ID", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
-const dm = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short" });
-const full = new Intl.DateTimeFormat("id-ID", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+const hm = new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+const dm = new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" });
+const full = new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 
 const toDate = (time: Time) => new Date((time as number) * 1000);
 
@@ -50,7 +51,7 @@ export function chartOptions(): DeepPartial<ChartOptions> {
       horzLine: { color: ink2, labelBackgroundColor: cssColor("--ink") },
     },
     localization: {
-      locale: "id-ID",
+      locale: locale,
       priceFormatter: (p: number) => price(p),
       timeFormatter: (time: Time) => full.format(toDate(time)),
     },

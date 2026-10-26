@@ -43,7 +43,7 @@ Kontrol negatif: mematikan `ToolAllowlist` (middleware kosong) membuat uji gagal
 
 ## 3. Kontrol mode live
 
-`engine/modectl.py` (mesin status) dan `gateway/modeapi.py` (endpoint, `docs/gateway-api.md` bagian 12.3). Syarat live, diperiksa di langkah 1 dan lagi di langkah 2: mesin mencatat bahwa ia start dengan key exchange (hanya boolean di `capabilities.json`; gateway tidak memegang key exchange) dan `LIVE_ENGINE_PROVEN` true. Hal lain yang gagal tertutup: `mode.json` yang tidak terbaca atau berisi nilai asing dibaca dry_run; `capabilities.json` yang hilang atau salah bentuk dibaca "tanpa key"; mesin menolak start bila `mode.json` mencatat live.
+`engine/modectl.py` (mesin status) dan `gateway/modeapi.py` (endpoint, `docs/gateway-api.md` bagian 14.3). Syarat live, diperiksa di langkah 1 dan lagi di langkah 2: mesin mencatat bahwa ia start dengan key exchange (hanya boolean di `capabilities.json`; gateway tidak memegang key exchange) dan `LIVE_ENGINE_PROVEN` true. Hal lain yang gagal tertutup: `mode.json` yang tidak terbaca atau berisi nilai asing dibaca dry_run; `capabilities.json` yang hilang atau salah bentuk dibaca "tanpa key"; mesin menolak start bila `mode.json` mencatat live.
 
 `LIVE_ENGINE_PROVEN` false di build ini, jadi live tidak bisa menyala walau key ada. Alasan: jalur order live Indodax lewat Freqtrade belum pernah dijalankan (Indodax bukan exchange resmi Freqtrade 2026.9, bagian "Batasan Indodax" di README); mengaktifkannya adalah keputusan tahap live kecil bersama pembuktian jalur order dengan uang sungguhan, di luar pekerjaan otonom.
 

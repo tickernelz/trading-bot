@@ -97,7 +97,10 @@ def test_serving_commands_pass_api_secrets_through_env(monkeypatch, tmp_path, ex
     launch.main([command])
     [(_, argv, env)] = exec_calls
     assert argv[1] == command
-    assert ("--strategy" in argv) is (command in launch.STRATEGY_COMMANDS)
+    assert ("--strategy" in argv) is (command == "trade")
+    assert ("--strategy-path" in argv) is (command == "trade")
+    rendered = json.loads((tmp_path / "user_data" / "trading-bot.freqtrade.json").read_text(encoding="utf-8"))
+    assert rendered["strategy_path"] == str(launch.ENGINE_ROOT / "strategies")
 
 
 def test_valid_config_execs_freqtrade_with_strategy(monkeypatch, tmp_path, exec_calls):
@@ -187,3 +190,15 @@ def test_launch_records_whether_exchange_keys_exist_without_their_values(
     recorded = json.loads((userdir / "capabilities.json").read_text())
     assert recorded["exchange_key_configured"] is expected
     assert "k-1" not in json.dumps(recorded) and "s-1" not in json.dumps(recorded)
+@pytest.mark.parametrize("command", ["webserver", "backtesting"])
+def test_only_trade_renders_the_shadow_service(monkeypatch, tmp_path, exec_calls, command):
+    for name, value in SECRETS.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.delenv("SHADOW_TOKEN")
+    monkeypatch.setenv("TRADING_BOT_CONFIG", str(EXAMPLE))
+    monkeypatch.setenv("TRADING_BOT_USERDIR", str(tmp_path / "user_data"))
+    launch.main([command])
+    assert len(exec_calls) == 1
+    rendered = json.loads((tmp_path / "user_data" / "trading-bot.freqtrade.json").read_text(encoding="utf-8"))
+    assert rendered["trading_bot"]["shadow_url"] is None
+    assert rendered["trading_bot"]["shadow_token_env"] is None

@@ -17,6 +17,8 @@ def test_example_config_is_valid():
     assert settings.data.social is False
     assert settings.bot_id == "A"
     assert settings.shadow.url == "http://127.0.0.1:8091"
+    assert {"systemone", "openai-decisions"} <= {provider.type for provider in settings.providers}
+    assert len({voter.provider for voter in settings.swarm.voters if voter.enabled}) == 7
 
 
 def test_rules_only_bot_needs_no_shadow_service(example_raw, write_config):
@@ -121,6 +123,8 @@ def _mutations():
 
     def analyst_token_env_lowercase(raw):
         raw["analyst"]["token_env"] = "analyst_token"
+    def analyst_on_decision_provider(raw):
+        raw["llm"]["analyst_model"] = "experientiallabs-systemone:jev-latest"
 
     return [
         veto_not_implemented,
@@ -132,6 +136,7 @@ def _mutations():
         analyst_directory_escapes_userdir,
         analyst_report_time_out_of_range,
         analyst_token_env_lowercase,
+        analyst_on_decision_provider,
         unknown_key,
         live_mode,
         daily_above_total,

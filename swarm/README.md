@@ -41,6 +41,7 @@ if outcome.proceed:
 | --- | --- | --- |
 | `llm_structured` | `openai-completions`, `openai-responses`, `anthropic-messages` | chat model + JSON tervalidasi |
 | `systemone` | `systemone` | `POST {base_url}/v1/systemone` |
+| `openai_decisions` | `openai-decisions` | `POST {base_url}/v1/decisions` |
 | `openrouter_decisions` | `openrouter-decisions` | `POST {base_url}/api/alpha/decisions` |
 
 Kunci API diambil dari variabel lingkungan (`api_key_env`) atau `api_key` di konfigurasi lokal yang di-gitignore. Kunci yang tidak ada membuat voter itu gagal dengan jenis error `auth`, dan kuorum memutuskan apakah keputusan tetap boleh jalan.
