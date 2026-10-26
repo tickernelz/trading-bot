@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
   echo "usage: RUN_DIR=<dir> IMAGE=<image> [UNIT_PREFIX=<prefix>] $0 start|stop|status [component...]" >&2
-  echo "components: bot-a bot-b shadow-b gateway (default: all)" >&2
+  echo "components: bot-a bot-b shadow-b analyst-b gateway (default: all)" >&2
   exit 2
 }
 
@@ -11,10 +11,26 @@ usage() {
 action=$1
 shift
 components=("$@")
-[ ${#components[@]} -gt 0 ] || components=(bot-a bot-b shadow-b gateway)
+[ ${#components[@]} -gt 0 ] || components=(bot-a bot-b shadow-b analyst-b gateway)
 prefix=${UNIT_PREFIX:-trading-bot-stage1}
 run_dir=${RUN_DIR:?set RUN_DIR}
 mount=/opt/trading-bot/run
+
+data_dirs() {
+  case $1 in
+    bot-a) echo bot-a ;;
+    bot-b | shadow-b | analyst-b) echo bot-b ;;
+    gateway) echo gateway bot-a bot-b ;;
+    *) usage ;;
+  esac
+}
+
+mount_args() {
+  printf '%s' "-v $run_dir/config:$mount/config:ro"
+  for dir in $(data_dirs "$1"); do
+    printf '%s' " -v $run_dir/$dir:$mount/$dir"
+  done
+}
 
 container_args() {
   case $1 in
@@ -33,6 +49,11 @@ container_args() {
       echo "-e TRADING_BOT_CONFIG=$mount/config/bot-b.yaml -e TRADING_BOT_USERDIR=$mount/bot-b"
       echo "--entrypoint python ${IMAGE:?set IMAGE} -m engine.shadow"
       ;;
+    analyst-b)
+      echo "--memory 512m --memory-swap 512m --env-file $run_dir/secrets/analyst.env"
+      echo "-e TRADING_BOT_CONFIG=$mount/config/bot-b.yaml -e TRADING_BOT_USERDIR=$mount/bot-b"
+      echo "--entrypoint python ${IMAGE:?set IMAGE} -m engine.analyst_service"
+      ;;
     gateway)
       echo "--memory 512m --memory-swap 512m --env-file $run_dir/secrets/gateway.env"
       echo "-e GATEWAY_CONFIG=$mount/config/gateway.yaml"
@@ -48,9 +69,11 @@ for component in "${components[@]}"; do
   case $action in
     start)
       args=$(container_args "$component" | tr '\n' ' ')
+      mounts=$(mount_args "$component")
+      for dir in $(data_dirs "$component"); do mkdir -p "$run_dir/$dir"; done
       systemd-run --user --collect --unit "$unit" \
         -p Restart=always -p RestartSec=15 -p TimeoutStopSec=90 \
-        bash -c "docker rm -f $name >/dev/null 2>&1; exec docker run --rm --name $name --network host -v $run_dir:$mount $args"
+        bash -c "docker rm -f $name >/dev/null 2>&1; exec docker run --rm --name $name --network host $mounts $args"
       ;;
     stop) systemctl --user stop "$unit" ;;
     status) systemctl --user --no-pager --lines 0 status "$unit" || true ;;

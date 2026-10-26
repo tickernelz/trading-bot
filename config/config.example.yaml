@@ -187,6 +187,14 @@ shadow:
   port: 8091
   database: swarm_decisions.sqlite
   token_env: SHADOW_TOKEN
+analyst:
+  listen: 127.0.0.1
+  port: 8092
+  token_env: ANALYST_TOKEN
+  data_dir: analyst_data
+  reports_dir: analyst_reports
+  language: id
+  report_at: "00:10"
 analytics:
   scoreboard:
     enabled: true

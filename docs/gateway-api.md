@@ -58,7 +58,7 @@ Aturan yang dibangun di ZHA-3774 (`gateway/control.py`, `Gateway.execute` di `ga
 
 - Token konfirmasi sekali pakai dan terikat pada nama aksi, bot, parameter aksi (path, query, dan body tanpa `confirm`), dan sesi yang memintanya. Token tak dikenal, sudah dipakai, untuk aksi atau parameter lain, atau dari sesi lain: `409 confirmation_invalid`. Lewat 60 detik: `409 confirmation_expired`. Freqtrade tidak dipanggil pada semua penolakan itu. Token disimpan di memori gateway, jadi restart gateway membatalkan semua token yang belum dipakai.
 - `Idempotency-Key` wajib di semua endpoint kontrol (8-128 karakter `[A-Za-z0-9_-]`); tanpa itu `400 invalid_request`. Hasil setiap eksekusi yang melewati pemeriksaan gateway (lokal, konfirmasi, pemeriksaan `trades`) disimpan 24 jam per kunci, sukses maupun galat, termasuk `503 upstream_unavailable` saat Freqtrade tidak terjangkau. Request ulang dengan kunci dan parameter yang sama mengembalikan hasil tersimpan tanpa memanggil Freqtrade lagi (audit `replayed`); kunci yang sama untuk request lain `409 invalid_request`. Langkah 1 (`confirmation_required`) tidak disimpan, jadi langkah 2 boleh memakai kunci yang sama. Mencoba lagi aksi yang gagal butuh kunci baru dan, untuk aksi berisiko, konfirmasi baru.
-- Perubahan konfigurasi: `risky_changes(old, new)` di `gateway/control.py` mengembalikan kunci yang butuh dua langkah: kenaikan `risk.max_daily_loss_pct`, `risk.max_total_drawdown_pct`, `risk.risk_per_trade_pct`, `risk.max_open_trades`, perubahan `mode` ke arah mana pun, dan `api.force_entry` dari `false` ke `true`. Daftar kosong berarti perubahan berlaku langsung (termasuk menurunkan batas). `PATCH /gw/v1/settings` (bagian 16.2) memakai fungsi ini bersama `Confirmations`, `is_local`, dan penyimpanan idempotensi yang sama.
+- Perubahan konfigurasi: `risky_changes(old, new)` di `gateway/control.py` mengembalikan kunci yang butuh dua langkah: kenaikan `risk.max_daily_loss_pct`, `risk.max_total_drawdown_pct`, `risk.risk_per_trade_pct`, `risk.max_open_trades`, perubahan `mode` ke arah mana pun, dan `api.force_entry` dari `false` ke `true`. Daftar kosong berarti perubahan berlaku langsung (termasuk menurunkan batas). `PATCH /gw/v1/settings` (bagian 17.2) memakai fungsi ini bersama `Confirmations`, `is_local`, dan penyimpanan idempotensi yang sama.
 
 ## 4. Envelope respons
 
@@ -76,7 +76,7 @@ Contoh: rancangan, gateway belum ada; nilai mengikuti tangkapan Freqtrade bila a
 }
 ```
 
-Kode yang dipakai: `unauthorized`, `forbidden_local_only`, `confirmation_required`, `confirmation_expired`, `confirmation_invalid` (ZHA-3774: token tak dikenal, sudah dipakai, atau untuk aksi, parameter, atau sesi lain; dipisah dari `confirmation_expired` supaya PWA bisa membedakan waktu habis dari token yang salah), `invalid_request`, `upstream_error`, `upstream_unavailable`, `risk_limit_breached`, `not_found`, `rate_limited`.
+Kode yang dipakai: `unauthorized`, `live_blocked` (422, ZHA-3779: tak ada key exchange atau jalur order live belum terbukti; membawa daftar `blockers`), `forbidden_local_only`, `confirmation_required`, `confirmation_expired`, `confirmation_invalid` (ZHA-3774: token tak dikenal, sudah dipakai, atau untuk aksi, parameter, atau sesi lain; dipisah dari `confirmation_expired` supaya PWA bisa membedakan waktu habis dari token yang salah), `invalid_request`, `upstream_error`, `upstream_unavailable`, `risk_limit_breached`, `not_found`, `rate_limited`.
 
 ## 5. Endpoint baca
 
@@ -321,7 +321,7 @@ Diteruskan dari `/sysinfo` (CPU, RAM, disk). Dipakai kartu kesehatan PWA.
 
 ### 5.15 `GET /gw/v1/settings` dan `PATCH /gw/v1/settings`
 
-Baca: konfigurasi aktif dengan rahasia dipangkas (`api_key`, `api_key_env`, `password`, `jwt_secret_key`, `ws_token` selalu `null` plus penanda `configured: true|false`). Tulis: `PATCH` dengan bentuk dan aturan di bagian 16.2 (hanya dari loopback, validasi skema `engine/settings.py`, `409 risk_limit_breached`, `restart_required`).
+Baca: konfigurasi aktif dengan rahasia dipangkas (`api_key`, `api_key_env`, `password`, `jwt_secret_key`, `ws_token` selalu `null` plus penanda `configured: true|false`). Tulis: `PATCH` dengan bentuk dan aturan di bagian 17.2 (hanya dari loopback, validasi skema `engine/settings.py`, `409 risk_limit_breached`, `restart_required`).
 
 ## 6. Endpoint kontrol
 
@@ -612,7 +612,7 @@ Kode: `gateway/` (FastAPI dan uvicorn dari image Freqtrade yang sama). Konfigura
 - `/gw/v1/settings` hanya membaca: `providers[].api_key` selalu `null` plus `api_key_configured`. Kredensial API Freqtrade tidak ada di berkas konfigurasi (hanya nama variabel lingkungan), jadi tidak ada yang perlu disensor di bagian `api`.
 - Event turunan baru: `gw.heartbeat` (tiap 60 detik per bot), `gw.heartbeat_lost` (umur heartbeat di atas `heartbeat_lost_s`, bawaan 180 detik), `gw.bot_restart`, `gw.startup_check` (dari `strategy_msg` saat bot start), `gw.audit`.
 - Endpoint baru:
-  - `GET /gw/v1/costs?window=day|7d|total`: jumlah keputusan, panggilan voter, token masuk, keluar, dan reasoning, biaya per bot dan per provider, plus `cap` (`max_cost_idr_per_day`, `enforced: false`). Hanya informasi; tidak membatasi apa pun. `cost` adalah angka yang dilaporkan provider; nutaraline tidak melaporkan biaya, jadi `null`.
+  - `GET /gw/v1/costs?window=day|7d|total`: jumlah keputusan, panggilan voter, token masuk, keluar, dan reasoning, biaya per bot dan per provider, plus `cap` (`max_cost_idr_per_day`, `enforced: false`). Hanya informasi; tidak membatasi apa pun. `cost` adalah angka yang dilaporkan provider; nutaraline tidak melaporkan biaya, jadi `null`. Token analis ada di baris sendiri `analyst` (`reports` dan `asks`: `calls`, token masuk, keluar, reasoning, `cost`), dihitung dari audit `analyst.report` dan `analyst.ask` berhasil dalam jendela yang sama (semua bot, termasuk laporan pencatat waktu); tidak masuk ke jumlah keputusan, voter, dan token voter di atas, dan `cost` tetap `null` selama provider tidak melaporkannya (tidak ada biaya rupiah yang dikarang).
   - `GET /gw/v1/audit?limit=50`: log audit. Isinya: `session.create` (`ok` atau `denied`) dan `session.delete` dengan IP; `config.observed` dan `config.changed` untuk berkas konfigurasi tiap bot (diperiksa tiap 10 detik dengan SHA-256; `detail.changes` berisi kunci yang berubah dengan nilai lama dan baru, `api_key` hanya `<set>` atau `null`; `result: invalid` bila berkas baru tidak lolos skema).
   - `GET /gw/v1/metrics`: `fill_latency_ms` (n, p50, p95, min, maks, 20 sampel terakhir), beban gateway, status tiap koneksi upstream, nomor urut feed.
 
@@ -628,9 +628,10 @@ Saat `entry_fill` atau `exit_fill` tiba dari Freqtrade, gateway mencatat waktu t
 
 ### 12.4 Belum dibangun
 
-- Kontrol bagian 3 dan 6 dan lingkup `control` dibangun di ZHA-3774 (bagian 14). `PATCH /gw/v1/settings`, provider, key, voter: ZHA-3775 (bagian 16).
+- Kontrol bagian 3 dan 6 dan lingkup `control` dibangun di ZHA-3774 (bagian 14). `PATCH /gw/v1/settings`, provider, key, voter: ZHA-3775 (bagian 17).
 - Web Push bagian 11.3: `/gw/v1/push/*` menjawab `404 not_found`; PWA hanya bisa memakai Web Push dengan gateway tiruan.
 - `sample_data` selalu `false`.
+
 
 ## 13. Analitik N1 (ZHA-3780)
 
@@ -772,18 +773,18 @@ Satu bot dry-run Indodax (`trading-bot/engine` dengan `api.force_entry: true` ha
 ### 14.4 Belum terbukti
 
 - Jendela antara Freqtrade start dan kill switch dikirim ulang: koneksi ulang WebSocket gateway memakai backoff 1, 2, 4, ... sampai 30 detik, jadi bot bisa berjalan tanpa kill switch beberapa detik setelah restart.
-- Klasifikasi perubahan konfigurasi (`risky_changes`) terhubung ke `PATCH /gw/v1/settings` di bagian 16.2.
+- Klasifikasi perubahan konfigurasi (`risky_changes`) terhubung ke `PATCH /gw/v1/settings` di bagian 17.2.
 - Kontrol dari PWA jarak jauh sengaja tidak ada (hanya loopback); bila nanti kill switch harus bisa dari ponsel lewat tunnel, itu keputusan keamanan baru.
 - Deteksi tunnel bergantung pada header forward. Cloudflare Tunnel menambah `CF-Connecting-IP` dan `X-Forwarded-For` menurut dokumentasinya, tetapi belum diuji dengan tunnel sungguhan. Tunnel yang tidak menambah header (misalnya `ssh -L`) terlihat sebagai lokal. uvicorn juga menulis ulang alamat klien dari `X-Forwarded-For` bila koneksi datang dari 127.0.0.1 (uji hidup: baris audit mencatat IP dari header itu), jadi aturan lokal tertolak dua kali untuk request semacam itu.
 
 ## 15. PWA tahap 2 (ZHA-3777)
 
-Layar tahap 2 (Kontrol, Konfigurasi, Provider dan key, Swarm per keputusan, Riwayat, A vs B, Audit) memakai kontrak gateway yang sudah dibangun di cabang tugasnya, apa adanya, dan hanya menulis rancangan untuk endpoint yang belum dimiliki cabang mana pun. Saat ditulis (2026-10-26) gateway tahap 1 (ZHA-3764) dan 2a (ZHA-3774, bagian 14) sudah di `main`, sedangkan 2b dan 2c belum. Bagian 2b ada di bagian 16 dokumen ini; `main` memakai nomor 12 dua kali (N2 dan gateway tahap 1), jadi rujukan ke keduanya memakai nama tugas.
+Layar tahap 2 (Kontrol, Konfigurasi, Provider dan key, Swarm per keputusan, Riwayat, A vs B, Audit) memakai kontrak gateway yang sudah dibangun di cabang tugasnya, apa adanya, dan hanya menulis rancangan untuk endpoint yang belum dimiliki cabang mana pun. Saat ditulis (2026-10-26) gateway tahap 1 (ZHA-3764) dan 2a (ZHA-3774, bagian 14) sudah di `main`, sedangkan 2b dan 2c belum. Bagian 2b ada di bagian 17 dokumen ini; `main` memakai nomor 12 dua kali (N2 dan gateway tahap 1), jadi rujukan ke keduanya memakai nama tugas.
 
 ### 15.1 Kontrak yang dipakai apa adanya
 
 - Kontrol dan audit: ZHA-3774 (bagian 2, 3, 6, dan 14 di dokumen ini, `main` a63e1e3). Lingkup sesi dari `scope` login (`control` hanya dari loopback langsung, selain itu `read`); `Idempotency-Key` UUID v4 baru per tekan; `409 confirmation_required` menampilkan langkah 2 dari `error.confirmation`; langkah 2 mengulang permintaan yang sama dengan kunci yang sama dan body `{"confirm": "<id>"}`, termasuk pada `DELETE`; `confirmation_expired` dan `confirmation_invalid` kembali ke langkah 1. Kill switch "Hentikan entry baru" memanggil `stop-entry`; menurut bagian 14.1 `stop-entry`, `pause`, dan `stop` sama-sama dicatat gateway dan dipasang ulang setelah bot restart, hanya `resume` yang menghapusnya.
-- Konfigurasi, provider, key, voter, peran, impor: ZHA-3775 (bagian 16). PWA mengirim `PATCH /gw/v1/settings?bot=` dengan `changes` bersarang yang hanya memuat kunci yang berubah, tanpa `mode`, `bot_id`, `api`, `shadow`, `providers`, `swarm.voters`; voter lewat `PUT` dan `DELETE /gw/v1/voters/{id}`; analis lewat `PUT /gw/v1/roles`; provider lewat `PUT` dan `DELETE /gw/v1/providers/{id}`; key lewat `PUT` dan `DELETE /gw/v1/providers/{id}/key`; impor lewat `GET` dan `POST /gw/v1/providers/import`; catatan perubahan dari `GET /gw/v1/settings/changes`. Dua langkah mengikuti `raising_keys` 2b (empat batas risiko dan `capital.initial_idr` naik). Galat skema `400 invalid_request` membawa `loc: pesan` di `message`; PWA memetakan `loc` ke kolom yang sama namanya dan menampilkan sisanya di atas formulir. `restart_required: true` ditampilkan sebagai "berlaku setelah bot di-restart".
+- Konfigurasi, provider, key, voter, peran, impor: ZHA-3775 (bagian 17). PWA mengirim `PATCH /gw/v1/settings?bot=` dengan `changes` bersarang yang hanya memuat kunci yang berubah, tanpa `mode`, `bot_id`, `api`, `shadow`, `providers`, `swarm.voters`; voter lewat `PUT` dan `DELETE /gw/v1/voters/{id}`; analis lewat `PUT /gw/v1/roles`; provider lewat `PUT` dan `DELETE /gw/v1/providers/{id}`; key lewat `PUT` dan `DELETE /gw/v1/providers/{id}/key`; impor lewat `GET` dan `POST /gw/v1/providers/import`; catatan perubahan dari `GET /gw/v1/settings/changes`. Dua langkah mengikuti `raising_keys` 2b (empat batas risiko dan `capital.initial_idr` naik). Galat skema `400 invalid_request` membawa `loc: pesan` di `message`; PWA memetakan `loc` ke kolom yang sama namanya dan menampilkan sisanya di atas formulir. `restart_required: true` ditampilkan sebagai "berlaku setelah bot di-restart".
 - Registri provider dan voter per bot (`?bot=`): PWA memakai pemilih Bot di layar Konfigurasi dan Provider, dan mengingatkan bahwa dua bot diubah dua kali.
 
 ### 15.2 Yang sengaja tidak ada di PWA
@@ -807,21 +808,66 @@ Isi `rancangan`, menunggu ZHA-3776 (swarm per keputusan, riwayat, A vs B). Dipak
 - `GET /gw/v1/equity` menambah `window=total` (sejak start dry-run, satu titik per jam). `GET /gw/v1/profit?window=total&bot=B` meneruskan `max_drawdown` (rasio) dan `max_drawdown_abs` dari `/profit` Freqtrade.
 - `GET /gw/v1/overview?bot=` menambah `state` (`running`, `paused`, `stopped`) dari `/show_config` bot itu, supaya layar Kontrol membaca keadaan Bot B. Tanpa itu PWA memakai `/gw/v1/health` untuk bot pertama dan menulis "keadaan tidak terbaca" untuk bot lain.
 
-## 16. Gateway tahap 2b: konfigurasi, provider, key, voter (ZHA-3775)
+## 16. Tahap 3a: agen analis dan kontrol mode live
+
+Endpoint di bagian ini dibangun di `gateway/analyst.py` dan `gateway/modeapi.py` dan diuji lewat gateway nyata dengan klien uji (`tests/test_gateway_analyst.py`, `tests/test_gateway_mode.py`). Bentuk laporan dan jawaban ditangkap dari uji hidup 2026-10-26 pada model `deepseek-v4.1-flash-1017` di nutaraline; PWA belum memanggilnya (tahap 2d).
+
+Pembagian proses: gateway tidak memegang key provider. Gateway menulis snapshot data ke `<userdir bot>/<analyst.data_dir>` (`metrics.json`, `trades.jsonl`, `voter_decisions.jsonl`), lalu meneruskan permintaan ke layanan analis (`python -m engine.analyst_service`, loopback, header `X-Analyst-Token`) yang memegang key model dan hanya punya tiga tool baca. Token layanan (`ANALYST_TOKEN`) ada di lingkungan gateway dan layanan, key model hanya di layanan.
+
+### 16.1 Laporan harian
+
+- `GET /gw/v1/analyst/reports?bot=B` (baca): `{"bot": "B", "report_at": "00:10", "days": ["2026-10-26"]}`, terbaru dulu.
+- `GET /gw/v1/analyst/reports/{day}?bot=B` (baca): satu laporan; `404 not_found` bila belum ada, `400 invalid_request` bila `day` bukan tanggal.
+- `POST /gw/v1/analyst/reports?bot=B` body `{"day": "2026-10-26"}` (aksi kontrol tahap 2a: sesi `control`, klien loopback, `Idempotency-Key` wajib; mengulang kunci yang sama mengembalikan laporan yang sama tanpa menjalankan model lagi; `day` kosong berarti hari ini menurut zona waktu risiko): menyegarkan snapshot, menjalankan analis, menyimpan laporan, menulis baris audit `analyst.report`. Satu laporan per hari; membuat ulang dengan kunci baru menggantikan yang lama. `day` harus tanggal nyata dari 13 hari lalu sampai hari ini (`400 invalid_request` selain itu, sebelum model dipanggil). Memakai anggaran per menit yang sama dengan tanya (bagian 16.2). `409 invalid_request` bila laporan hari itu sedang dibuat. Layanan analis memberi satu tenggat total 90 detik (termasuk antre dan perbaikan sekali), di bawah tenggat gateway 120 detik.
+- Pencatat waktu gateway membuat laporan kemarin sekali per hari setelah `analyst.report_at` (default 00:10), mencoba lagi paling cepat 15 menit setelah gagal, audit `analyst.report` dengan `actor: scheduler`. Baris audit `ok` laporan, manual maupun terjadwal, memuat `day`, `model`, `tokens` dan `latency_s`; `/gw/v1/costs` menjumlah `tokens` dari baris itu.
+
+Contoh: tangkapan uji hidup 2026-10-26 (hari tanpa data bot; teks dipangkas).
+
+```json
+{"day": "2026-10-26", "generated_at": "2026-10-26T01:09:00Z", "model": "deepseek-v4.1-flash-1017", "language": "id", "summary": "Tidak ada data untuk 2026-10-26 (timezone Asia/Jakarta). ...", "anomalies": [], "suggestions": [], "tools_used": [{"name": "get_metrics", "args": {}}, {"name": "get_trade_history", "args": {"day": "2026-10-26"}}, {"name": "get_voter_log", "args": {"day": "2026-10-26"}}], "usage": {"input_tokens": 2788, "output_tokens": 363, "reasoning_tokens": 0, "cost": null}, "latency_s": 11.263}
+```
+
+Tiap elemen `anomalies` dan `suggestions` berbentuk `{"title", "detail", "evidence": ["dec_18_btc", "22"], "grounded": true}`. `grounded` dihitung oleh kode layanan analis (`tb_swarm.analyst`), bukan oleh model: true hanya bila `evidence` tidak kosong dan setiap entri sama persis dengan satu nama kunci atau satu nilai skalar di JSON yang dikembalikan tool saat laporan itu dibuat, bukan potongan teks: "22" tidak terverifikasi hanya karena muncul di dalam cap waktu, dan catatan atau pesan galat tool bukan bukti. Angka pendek dan nama kunci umum (mis. `22`, `status`) bisa cocok tanpa mendukung klaim temuan, jadi `grounded` hanya berarti setiap bukti benar-benar dikembalikan tool; ia bukan bukti bahwa isi temuan benar. PWA menampilkan yang false sebagai "belum terverifikasi" dan tidak boleh menampilkan true sebagai "terbukti". Saran adalah nasihat; tidak ada jalur yang menerapkannya.
+
+### 16.2 Tanya agen analis
+
+`POST /gw/v1/analyst/ask` (baca) body `{"question": "Kenapa BTC dilewati jam 02:00?", "history": [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}], "bot": "B"}`. Pertanyaan 1 sampai 2.000 karakter, riwayat paling banyak 20 giliran (server tidak menyimpan percakapan; klien mengirim ulang riwayatnya). Respons `{"answer", "model", "tools_used", "usage", "latency_s"}`. Paling banyak 6 pertanyaan atau pembuatan laporan manual per menit untuk seluruh gateway, sisanya `429 rate_limited` dengan `retry_after_ms`. Audit `analyst.ask` mencatat nama tool, token, dan latensi, bukan teks pertanyaan. Snapshot disegarkan paling sering tiap 30 detik. Keluaran tool dibatasi 20.000 karakter: baris terbaru dipertahankan dan baris pertama keluaran menyebut berapa baris yang ditampilkan dari berapa yang cocok; ringkasan per hari di `metrics.json` ditampilkan hari terbaru dulu dengan daftar hari yang dihilangkan, dan `get_metrics(day=...)` membaca satu hari tertentu.
+
+Contoh: tangkapan uji hidup 2026-10-26 (permintaan membaca `.env` ditolak; teks dipangkas).
+
+```json
+{"answer": "Saya tidak bisa menunjukkan isi file `.env` atau kunci API provider. Alasannya: saya hanya ...", "model": "deepseek-v4.1-flash-1017", "tools_used": [], "usage": {"input_tokens": 696, "output_tokens": 190, "reasoning_tokens": 0, "cost": null}, "latency_s": 2.341}
+```
+
+Galat dari bagian ini: `404 not_found` (bot tanpa bagian `analyst` di config-nya), `503 upstream_unavailable` (layanan analis tidak terjangkau), `503 upstream_error` (`ANALYST_TOKEN` tidak ada di lingkungan gateway), `502 upstream_error` (provider gagal; pesan hanya memuat jenis galat, tidak pernah key atau isi respons provider), `504 upstream_unavailable` (layanan tidak menjawab dalam 120 detik).
+
+### 16.3 Mode live
+
+- `GET /gw/v1/mode?bot=B` (baca): `{"bot": "B", "mode": "dry_run", "live_allowed": false, "exchange_key_configured": false, "blockers": [{"code": "exchange_key_missing", "message": "..."}, {"code": "live_engine_unproven", "message": "..."}]}`. `state_problem` muncul bila `mode.json` tidak terbaca (dibaca sebagai dry_run).
+- `POST /gw/v1/control/mode?bot=B` body `{"mode": "live", "confirm": null}`: aksi kontrol tahap 2a (bagian 14) tanpa aturan sendiri. Butuh sesi lingkup `control` (lahir hanya dari login loopback), klien loopback tanpa header penerusan (7 header di `gateway/control.py`, termasuk `CF-Ray` dan `X-Forwarded-Host`), dan `Idempotency-Key` berformat `^[A-Za-z0-9_-]{8,128}$`; selain itu `403 forbidden_local_only` atau `400 invalid_request`, tercatat di audit dan kunci yang cacat tidak pernah disimpan. Idempotensi, konfirmasi, dan galatnya sama dengan aksi lain: kunci yang sama dengan permintaan lain `409 invalid_request`, token konfirmasi tak dikenal, sudah dipakai, atau milik sesi atau parameter lain `409 confirmation_invalid`, kedaluwarsa (60 detik) `409 confirmation_expired`.
+  1. Tanpa `confirm` ke live: bila live diizinkan, `409 confirmation_required` dengan objek `confirmation` (aksi `mode.change`, sasaran `live`); mode tidak berubah. Bila tidak diizinkan, `422 live_blocked` dengan `blockers` (semua syarat yang belum terpenuhi, alasan pertama di `message`).
+  2. Ulangi dengan `confirm: "cf_..."` dan kunci baru: syarat diperiksa lagi di dalam `ModeController.apply` (jadi tak ada jalur yang melewatinya), lalu `200` dengan status mode. Mode sama dengan yang tercatat bukan perubahan dan tidak minta konfirmasi.
+  3. Kembali ke `dry_run` hanya satu langkah (menurunkan risiko, bagian 3).
+- Syarat live (semua harus terpenuhi, diperiksa di langkah 1 dan 2): (a) mesin mencatat bahwa ia start dengan `INDODAX_API_KEY` dan `INDODAX_API_SECRET` terisi (`capabilities.json` di userdir, hanya boolean; gateway tidak memegang key exchange); (b) `engine.modectl.LIVE_ENGINE_PROVEN` bernilai true. (b) bernilai false di build ini: jalur order live Indodax belum pernah dibuktikan, jadi live tidak bisa diaktifkan lewat endpoint ini walau key ada. Mengubah nilainya adalah keputusan tahap live kecil, bersama pembuktian jalur order.
+- Audit `mode.change` (bentuk bagian 14) tiap percobaan: `ok`, `rejected` (kode `live_blocked`, `confirmation_invalid`, dan lain-lain), `forbidden`, `confirmation_required`; audit penolakan `live_blocked` memuat `error` dan `message` (pesan blocker pertama), bukan kode blocker dan bukan nilai key. Mesin menolak start bila `mode.json` mencatat live sementara `LIVE_ENGINE_PROVEN` false.
+
+Perubahan kontrak: kode galat baru `live_blocked` (422) di daftar bagian 4. Mode dan pembuatan laporan manual memakai `gateway.execute` tahap 2a (lokal-saja, lingkup `control`, `Idempotency-Key` di ledger, konfirmasi `Confirmations`) lewat `Action.run`, aksi lokal yang tidak diteruskan ke Freqtrade; tidak ada aturan kontrol kedua. Alasan: key exchange tidak boleh ada di proses gateway yang menghadap PWA, dan dua aturan lokal-saja di namespace `/gw/v1/control/*` akan menyimpang.
+
+## 17. Gateway tahap 2b: konfigurasi, provider, key, voter (ZHA-3775)
 
 Kode: `gateway/admin.py` (rute), `gateway/configstore.py` (baca, validasi, selisih, tulis atomik), `gateway/providers.py` (provider, impor, uji koneksi), `gateway/redact.py`. Semua rute di bawah `/gw/v1`. Parameter `?bot=A|B` memilih berkas konfigurasi bot; tanpa itu dipakai bot pertama. Registri provider dan voter ada di berkas tiap bot, jadi PWA yang mengubahnya untuk dua bot memanggil dua kali.
 
-### 16.1 Aturan akses
+### 17.1 Aturan akses
 
 - Semua tulis di bagian ini (PATCH, PUT, DELETE, impor, dan pratinjau impor) memakai mekanisme 2a (bagian 2, 3, 14): sesi berlingkup `control` dan permintaan yang datang langsung dari mesin bot. Gagal salah satu: `403 forbidden_local_only` dan satu baris audit `admin.denied` (hasil `forbidden`, aktor `<lingkup>_session`, `detail`: metode, jalur, alasan `not_local` atau `scope`). Lingkup `owner` tidak ada (dilebur ke `control` oleh 2a).
-- `control.is_local` (satu definisi untuk login, rute kontrol 2a, dan tulis 2b) menuntut: alamat peer `127.0.0.1` atau `::1`, tanpa header relai (`FORWARD_HEADERS`), header `Host` `127.0.0.1`, `localhost`, atau `[::1]`, dan `Origin` (bila ada) loopback. Batasnya: `Host` dan `Origin` dikirim klien, jadi syarat itu menahan browser yang masuk lewat tunnel, bukan klien yang memalsukan header. Lewat forward TCP mentah (`ssh -R`, `frp` atau `ngrok tcp`, `socat`) alamat peer tetap `127.0.0.1` dan klien bebas mengirim `Host: 127.0.0.1` tanpa `Origin`. Perlindungan nyata adalah port gateway tidak diekspos lewat forward TCP (16.8). Alamat peer `::ffff:127.0.0.1` ditolak (gateway hanya listen di `127.0.0.1` atau `::1`).
-- Menurunkan batas risiko juga hanya dari lokal (bagian 5.15 lebih ketat daripada plan 4.2 aturan 2). PWA jarak jauh hanya bisa membaca dan menguji koneksi (16.3).
-- `Idempotency-Key` wajib di semua tulis bagian 16 (8 sampai 128 karakter `[A-Za-z0-9_-]`, sama dengan 2a); tanpa itu `400 invalid_request`. Hasil sukses (`200`) disimpan 24 jam per kunci di ledger (`Ledger.store_result`, tahan restart). Kunci dan permintaan yang sama: hasil tersimpan dikembalikan tanpa menulis ulang (audit `replayed`). Kunci yang sama dengan permintaan lain: `409 invalid_request`. Kunci yang sedang berjalan: `409 invalid_request`. Baris audit menyimpan header `Idempotency-Key` hanya bila bentuknya sah (`control.loggable_key`), selain itu `null`. Penolakan (400, 409) tidak disimpan. Yang disimpan sebagai pembanding hanya SHA-256 dari permintaan; untuk penulisan key itu termasuk nilai key yang dikirim (hash, bukan nilai).
+- `control.is_local` (satu definisi untuk login, rute kontrol 2a, dan tulis 2b) menuntut: alamat peer `127.0.0.1` atau `::1`, tanpa header relai (`FORWARD_HEADERS`), header `Host` `127.0.0.1`, `localhost`, atau `[::1]`, dan `Origin` (bila ada) loopback. Batasnya: `Host` dan `Origin` dikirim klien, jadi syarat itu menahan browser yang masuk lewat tunnel, bukan klien yang memalsukan header. Lewat forward TCP mentah (`ssh -R`, `frp` atau `ngrok tcp`, `socat`) alamat peer tetap `127.0.0.1` dan klien bebas mengirim `Host: 127.0.0.1` tanpa `Origin`. Perlindungan nyata adalah port gateway tidak diekspos lewat forward TCP (17.8). Alamat peer `::ffff:127.0.0.1` ditolak (gateway hanya listen di `127.0.0.1` atau `::1`).
+- Menurunkan batas risiko juga hanya dari lokal (bagian 5.15 lebih ketat daripada plan 4.2 aturan 2). PWA jarak jauh hanya bisa membaca dan menguji koneksi (17.3).
+- `Idempotency-Key` wajib di semua tulis bagian 17 (8 sampai 128 karakter `[A-Za-z0-9_-]`, sama dengan 2a); tanpa itu `400 invalid_request`. Hasil sukses (`200`) disimpan 24 jam per kunci di ledger (`Ledger.store_result`, tahan restart). Kunci dan permintaan yang sama: hasil tersimpan dikembalikan tanpa menulis ulang (audit `replayed`). Kunci yang sama dengan permintaan lain: `409 invalid_request`. Kunci yang sedang berjalan: `409 invalid_request`. Baris audit menyimpan header `Idempotency-Key` hanya bila bentuknya sah (`control.loggable_key`), selain itu `null`. Penolakan (400, 409) tidak disimpan. Yang disimpan sebagai pembanding hanya SHA-256 dari permintaan; untuk penulisan key itu termasuk nilai key yang dikirim (hash, bukan nilai).
 - Satu tulis berjalan sekaligus per bot (kunci per bot), baca-ubah-tulis tidak saling menimpa.
 
-### 16.2 Perubahan konfigurasi
+### 17.2 Perubahan konfigurasi
 
-`PATCH /gw/v1/settings?bot=A`, body `{"changes": {...}, "confirm": "cf_..."}`. `changes` digabung ke dalam: objek digabung per kunci, nilai lain (termasuk daftar) menggantikan. Berkas hasil harus lolos skema `engine/settings.py` yang sama dengan mesin; bila tidak, `400 invalid_request` dengan `loc: pesan` (nilai kiriman tidak pernah dikembalikan dan tidak masuk audit), berkas tidak berubah. Tidak bisa diubah lewat rute ini (`400`): `mode`, `bot_id`, `api`, `shadow`, `providers` (pakai 16.3 dan 16.4), `swarm.voters` (pakai 16.5).
+`PATCH /gw/v1/settings?bot=A`, body `{"changes": {...}, "confirm": "cf_..."}`. `changes` digabung ke dalam: objek digabung per kunci, nilai lain (termasuk daftar) menggantikan. Berkas hasil harus lolos skema `engine/settings.py` yang sama dengan mesin; bila tidak, `400 invalid_request` dengan `loc: pesan` (nilai kiriman tidak pernah dikembalikan dan tidak masuk audit), berkas tidak berubah. Tidak bisa diubah lewat rute ini (`400`): `mode`, `bot_id`, `api`, `shadow`, `providers` (pakai 17.3 dan 17.4), `swarm.voters` (pakai 17.5).
 
 Dua langkah (bagian 3) memakai `control.risky_changes(old, new)` pada berkas lama dan baru: kenaikan `risk.max_daily_loss_pct`, `risk.max_total_drawdown_pct`, `risk.risk_per_trade_pct`, `risk.max_open_trades`. Tambahan 2b: kenaikan `capital.initial_idr` (modal lebih besar menaikkan semua batas dalam rupiah). Satu permintaan yang memuat satu kenaikan saja seluruhnya butuh konfirmasi; menurunkan berlaku langsung. Pasangan, biaya, swarm, data, dan notifikasi bukan batas risiko.
 
@@ -849,7 +895,7 @@ Berkas ditulis atomik (berkas sementara, fsync, rename, fsync direktori) dengan 
 
 `GET /gw/v1/settings` (5.15) menambah `providers[].api_key_last4`. `api_key` tetap `null`. `api_key_env` (hanya nama variabel) ikut tampil, berbeda dari kalimat 5.15 yang menyebutnya `null`, karena layar Provider perlu menampilkan nama variabel yang dibaca.
 
-### 16.3 Provider
+### 17.3 Provider
 
 `GET /gw/v1/providers?bot=A` (`read`):
 
@@ -867,16 +913,16 @@ Berkas ditulis atomik (berkas sementara, fsync, rename, fsync direktori) dengan 
 - `POST /gw/v1/providers/{id}/test`, body opsional `{"model": "..."}` (harus ada di daftar model provider; bawaan model pertama), lingkup `read` cukup (plan 4.5 butir 4: PWA jarak jauh boleh menguji). Satu panggilan kecil dengan perintah `Reply with the single word: ok` (kata `ping` dihindari: nutaraline menjawab `403` "Ping/probe inference dinonaktifkan" untuk prompt `ping`, terukur 2026-10-26): `openai-completions` ke `{base}/chat/completions` (`max_tokens` 16), `openai-responses` ke `{base}/responses` (`max_output_tokens` 16), `anthropic-messages` ke `{base}/messages` bila `base` berakhiran `/v1`, selain itu `{base}/v1/messages`; tipe decision memakai wire adapter swarm dengan satu pertanyaan `noul` (`predicate` untuk `openai-decisions`): `systemone` ke `{base}/v1/systemone`, `openai-decisions` ke `{base}/v1/decisions` (badan `input` dan `questions` berupa daftar), `openrouter-decisions` ke `{base}/api/alpha/decisions`. Terbukti hidup 2026-10-26 untuk `systemone` (`jev-latest`, 200) dan `openai-decisions` (`gpt-6-luna-decisions`, 200) di `api.experientiallabs.ai`; `openrouter-decisions` hanya diuji dengan transport tiruan (tidak ada key OpenRouter). Key hanya dikirim ke `base_url` tersimpan, tidak pernah ke alamat dari body; redirect tidak diikuti. Hasil: `{"bot", "provider", "model", "ok", "status", "latency_ms", "error", "detail", "tested_at"}`. `ok` benar bila status 2xx dan badan JSON. `error`: `unauthorized`, `not_found`, `rate_limited`, `rejected`, `upstream_error`, `timeout`, `connect_error`, `invalid_response`, `no_key`, `base_url_unresolved`. `detail` memuat pesan galat provider (maks 160 karakter) setelah disaring. Jeda 5 detik per provider (`429 rate_limited` dengan `retry_after_ms`); maksimal 2 uji berjalan bersamaan; batas waktu 30 detik. `base_url: from_import` tidak ditebak dari `models.yml`: mesin dan swarm juga tidak menyelesaikannya, jadi hasilnya `base_url_unresolved`.
 - Hasil uji dicatat di audit: `provider.test`, `targets: [bot, provider]`, hasil `ok` atau `failed`, `actor` `owner` atau `remote`.
 
-### 16.4 Key
+### 17.4 Key
 
-Hanya lokal dan `control` (16.1).
+Hanya lokal dan `control` (17.1).
 
-- `PUT /gw/v1/providers/{id}/key` body `{"api_key": "..."}` atau `{"api_key_env": "NAMA_VARIABEL"}` (tepat salah satu; yang satu lagi dikosongkan di berkas). `api_key`: 8 sampai 1024 karakter tanpa spasi. `api_key_env`: huruf besar, angka, `_`. Jawaban memuat `provider` (bentuk 16.3) dan selisih dengan `api_key` tampil `****` plus 4 karakter terakhir (atau `<set>` bila kunci pendek).
+- `PUT /gw/v1/providers/{id}/key` body `{"api_key": "..."}` atau `{"api_key_env": "NAMA_VARIABEL"}` (tepat salah satu; yang satu lagi dikosongkan di berkas). `api_key`: 8 sampai 1024 karakter tanpa spasi. `api_key_env`: huruf besar, angka, `_`. Jawaban memuat `provider` (bentuk 17.3) dan selisih dengan `api_key` tampil `****` plus 4 karakter terakhir (atau `<set>` bila kunci pendek).
 - `DELETE /gw/v1/providers/{id}/key`: kosongkan keduanya.
 - Kunci mentah ditulis hanya ke berkas konfigurasi bot. Bila berkas itu berada di dalam git work tree dan tidak di-ignore (atau git tidak bisa memastikan), gateway menolak (`400`, pakai `api_key_env`). Tidak ada endpoint yang mengembalikan kunci utuh; galat validasi tidak memantulkan nilai kiriman.
 - Log: `gateway/redact.py` dipasang pada setiap record log proses gateway (`python -m gateway`). Yang disaring: nilai kunci yang dikenal gateway (dari berkas dan variabel lingkungan yang dirujuk), `Authorization` (Bearer dan Basic), `?token=` dan sejenis di URL (termasuk `?token=` feed WebSocket), `x-api-key`, pola `sk-...`, dan traceback.
 
-### 16.5 Voter dan peran
+### 17.5 Voter dan peran
 
 Registri voter adalah `swarm.voters` di berkas konfigurasi; menambah atau mengganti voter hanya mengubah berkas (tanpa kode).
 
@@ -885,20 +931,20 @@ Registri voter adalah `swarm.voters` di berkas konfigurasi; menambah atau mengga
 - `DELETE /gw/v1/voters/{id}`: `404` bila tidak ada; `400` bila kuorum jadi tidak terpenuhi.
 - `GET /gw/v1/roles` dan `PUT /gw/v1/roles` body `{"analyst": {"provider", "model"}, "voters": {"v1": {"provider", "model"}}}`: pilih provider dan model untuk agen analis (`llm.analyst_model`) dan tiap voter dalam satu tulis atomik dan satu baris audit. Voter yang tidak dikenal: `404`.
 
-Setiap tulis di bagian 16 menulis satu baris audit `config.update`, `config.provider.upsert|delete|key|import`, `config.voter.upsert|delete`, atau `config.roles` (`actor`, `ip`, `idempotency_key`, hasil `ok`, `rejected`, `forbidden`, `replayed`, atau `confirmation_required`, `detail.changes` berisi kunci, nilai lama, dan nilai baru dengan `api_key` tersamar) dan menyiarkan event `gw.audit`.
+Setiap tulis di bagian 17 menulis satu baris audit `config.update`, `config.provider.upsert|delete|key|import`, `config.voter.upsert|delete`, atau `config.roles` (`actor`, `ip`, `idempotency_key`, hasil `ok`, `rejected`, `forbidden`, `replayed`, atau `confirmation_required`, `detail.changes` berisi kunci, nilai lama, dan nilai baru dengan `api_key` tersamar) dan menyiarkan event `gw.audit`.
 
-### 16.6 Impor dari omp models.yml
+### 17.6 Impor dari omp models.yml
 
 Berkas dibaca lokal oleh gateway dari `models_yml` di `config/gateway.yaml` (bawaan `~/.omp/agent/models.yml`); jalurnya tidak bisa diberikan lewat permintaan.
 
 - `GET /gw/v1/providers/import?bot=A`: pratinjau, per provider `{name, id, type, base_url, host, models, key_source, exists, blocker}`. `key_source`: `literal`, `env` (nilai berupa nama variabel huruf besar), `command` (nilai berawalan `!`), `none`. Nilai key tidak pernah ada di jawaban. `blocker` terisi untuk tipe API yang tidak didukung, URL bukan http(s), tanpa model, atau nama yang tidak bisa jadi id.
-- `POST /gw/v1/providers/import` body `{"providers": [{"name", "with_key": false, "models": null, "replace": false}]}`: satu tulis atomik. Tanpa `with_key`, provider memakai `api_key_env` bawaan (16.3) dan nilai key di `models.yml` tidak dibaca ke konfigurasi. `with_key: true` menyalin key hanya untuk provider yang dicentang: `literal` menjadi `api_key`, `env` menjadi `api_key_env`; `command` ditolak (`400`, perintah tidak dijalankan), `none` ditolak. `models` (bila diisi) harus himpunan bagian tidak kosong dari model berkas. Provider yang sudah ada dilewati kecuali `replace: true` (memperbarui tipe, URL, model; key tetap kecuali dicentang). Jawaban: `results: [{name, id, result: created|updated|skipped, reason?, with_key}]`.
+- `POST /gw/v1/providers/import` body `{"providers": [{"name", "with_key": false, "models": null, "replace": false}]}`: satu tulis atomik. Tanpa `with_key`, provider memakai `api_key_env` bawaan (17.3) dan nilai key di `models.yml` tidak dibaca ke konfigurasi. `with_key: true` menyalin key hanya untuk provider yang dicentang: `literal` menjadi `api_key`, `env` menjadi `api_key_env`; `command` ditolak (`400`, perintah tidak dijalankan), `none` ditolak. `models` (bila diisi) harus himpunan bagian tidak kosong dari model berkas. Provider yang sudah ada dilewati kecuali `replace: true` (memperbarui tipe, URL, model; key tetap kecuali dicentang). Jawaban: `results: [{name, id, result: created|updated|skipped, reason?, with_key}]`.
 
-### 16.7 Kode galat tambahan
+### 17.7 Kode galat tambahan
 
 `config_unwritable` (500). `forbidden_local_only`, `confirmation_required`, `confirmation_invalid`, `confirmation_expired`, `risk_limit_breached`, `rate_limited`, `not_found`, `invalid_request` sudah ada (bagian 4 dan 14).
 
-### 16.8 Belum terbukti
+### 17.8 Belum terbukti
 
 - Muat ulang konfigurasi tanpa restart (sebab `restart_required` selalu `true`).
 - Uji koneksi terhadap provider nyata selain yang tercatat di komentar penutup ZHA-3775; tipe `openai-responses` dan `anthropic-messages` dengan key nyata hanya diuji bila disebut di sana.

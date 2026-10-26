@@ -5,6 +5,7 @@
 !swarm
 !tests
 !pyproject.toml
+!scripts/stage1.sh
 !config/config.example.yaml
 !config/gateway.example.yaml
 **/__pycache__
