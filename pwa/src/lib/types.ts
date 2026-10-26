@@ -16,8 +16,11 @@ export interface RiskBlock {
   breaches: string[];
 }
 
+export type BotState = "running" | "paused" | "stopped";
+
 export interface Overview {
   mode: Mode;
+  state?: BotState;
   as_of: string;
   capital: { initial_idr: number; compounding: boolean; tradable_ratio: number };
   balance: { stake_currency: string; total: number; bot_owned: number; note?: string };
@@ -159,17 +162,35 @@ export interface Decision {
   iqr_limit: number;
   aggregate: { questions: Record<string, QuestionResult>; voters: number } | null;
   voters: VoterRecord[];
+  bot?: string;
+  outcome?: DecisionOutcome;
+}
+
+export interface DecisionOutcome {
+  state: "pending" | "insufficient_data" | "settled";
+  basis: "trade" | "price";
+  horizon_h: number;
+  price_at: number | null;
+  price_after: number | null;
+  return_pct: number | null;
+  return_after_fees_pct: number | null;
+  trade_id: number | null;
+  is_open: boolean | null;
+  profit_abs: number | null;
+  profit_pct: number | null;
+  settles_at: string | null;
 }
 
 export interface FeedEvent<T = unknown> {
   type: string;
+  bot?: string;
   seq: number;
   ts: string;
   data: T;
 }
 
 export interface ErrorEnvelope {
-  error: { code: string; message: string; retry_after_ms?: number };
+  error: { code: string; message: string; retry_after_ms?: number; [extra: string]: unknown };
 }
 
 export interface NewsSource {
@@ -214,3 +235,255 @@ export interface Sentiment {
 }
 
 export type PushKind = "fill" | "risk_breach" | "kill_switch" | "heartbeat_lost" | "quorum_failed" | "daily_summary";
+
+export type Scope = "read" | "control";
+
+export interface SessionInfo {
+  token: string;
+  scope: Scope;
+  expires_at: string;
+}
+
+export interface Confirmation {
+  id: string;
+  action: string;
+  targets: string[];
+  summary: string;
+  expires_at: string;
+}
+
+export interface ControlResult {
+  status?: string;
+  result?: string;
+  [field: string]: unknown;
+}
+
+export interface Lock {
+  id: number;
+  pair: string;
+  side: string;
+  active: boolean;
+  reason: string | null;
+  lock_time: string;
+  lock_end_time: string;
+}
+
+export interface Pairs {
+  whitelist: { pairs: string[] };
+  blacklist: { pairs: string[] };
+  locks: { lock_count: number; locks: Lock[] };
+}
+
+export type ProviderType = "openai-completions" | "openai-responses" | "anthropic-messages";
+
+export interface ProviderSetting {
+  id: string;
+  type: string;
+  base_url: string;
+  api_key_env: string | null;
+  api_key: null;
+  api_key_configured?: boolean;
+  api_key_last4?: string | null;
+  models: string[];
+}
+
+export interface VoterFields {
+  adapter: "llm_structured" | "systemone" | "openrouter_decisions" | "openai_decisions";
+  provider: string;
+  model: string;
+  variation: "option_order" | "temperature" | "prompt_variant";
+  timeout_s: number;
+  weight: number;
+  enabled: boolean;
+}
+
+export interface VoterSetting extends VoterFields {
+  id: string;
+}
+
+export interface Settings {
+  mode: string;
+  capital: { initial_idr: number; compounding: boolean };
+  risk: {
+    max_daily_loss_pct: number;
+    max_total_drawdown_pct: number;
+    risk_per_trade_pct: number;
+    max_open_trades: number;
+    leverage: string;
+    on_breach: string;
+    daily_reset_timezone: string;
+  };
+  exchange: { name: string; pairs: string[]; timeframe: string; fee_pct: number };
+  providers: ProviderSetting[];
+  swarm: {
+    enabled: boolean;
+    mode: "shadow" | "veto";
+    shuffle_options: boolean;
+    min_voters_answered: number;
+    max_spread: number | null;
+    voters: VoterSetting[];
+  };
+  llm: { backend: string; analyst_model: string };
+  compute: { max_cost_idr_per_day: false | number; on_exceed: string; log_cost: boolean };
+  data: { news_rss: string[]; fear_greed: boolean; social: boolean };
+  notify: { web_push: boolean; [extra: string]: unknown };
+  [section: string]: unknown;
+}
+
+export interface Change {
+  key: string;
+  old: unknown;
+  new: unknown;
+}
+
+export interface WriteResult {
+  bot: string;
+  changes: Change[];
+  restart_required: boolean;
+  audit_id?: number;
+}
+
+export interface ChangeEntry extends Change {
+  audit_id: number;
+  ts: string;
+  actor: string;
+  ip: string | null;
+  action: string;
+  bot: string | null;
+}
+
+export interface ProviderTest {
+  tested_at: string;
+  model: string | null;
+  ok: boolean;
+  status: number | null;
+  latency_ms: number | null;
+  error: string | null;
+  detail: string | null;
+}
+
+export interface KeyState {
+  source: "config" | "env" | "none";
+  configured: boolean;
+  last4: string | null;
+  env_name: string | null;
+  env_set: boolean | null;
+}
+
+export interface Provider {
+  id: string;
+  type: string;
+  base_url: string;
+  host: string | null;
+  models: string[];
+  active_models: string[];
+  key: KeyState;
+  last_test: ProviderTest | null;
+}
+
+export interface ProviderList {
+  bot: string;
+  providers: Provider[];
+}
+
+export interface ImportCandidate {
+  name: string;
+  id: string;
+  type: string | null;
+  base_url: string | null;
+  host: string | null;
+  models: string[];
+  key_source: "literal" | "env" | "command" | "none";
+  exists: boolean;
+  blocker: string | null;
+}
+
+export interface ImportResult {
+  name: string;
+  id: string;
+  result: "created" | "updated" | "skipped";
+  reason?: string;
+  with_key: boolean;
+}
+
+export interface VoterView extends VoterSetting {
+  last_test: ProviderTest | null;
+}
+
+export interface VoterList {
+  bot: string;
+  swarm: { enabled: boolean; mode: string; min_voters_answered: number; enabled_voters: number };
+  voters: VoterView[];
+}
+
+export interface Roles {
+  bot: string;
+  analyst: { provider: string; model: string };
+  voters: { id: string; provider: string; model: string; enabled: boolean }[];
+}
+
+export interface AuditRow {
+  id: number;
+  ts: string;
+  actor: string;
+  ip: string | null;
+  action: string;
+  targets: string[];
+  idempotency_key: string | null;
+  result: string;
+  detail: Record<string, unknown> | null;
+}
+
+export interface ProfitTotal {
+  window: "total";
+  stake_currency: string;
+  profit_closed_coin: number;
+  profit_closed_percent: number;
+  profit_all_coin?: number;
+  profit_all_percent: number;
+  trade_count: number;
+  closed_trade_count: number;
+  winning_trades: number;
+  losing_trades: number;
+  best_pair: string | null;
+  worst_pair: string | null;
+  max_drawdown?: number;
+  max_drawdown_abs?: number;
+}
+
+export interface ProfitPeriod {
+  date: string;
+  abs_profit: number;
+  rel_profit: number;
+  starting_balance: number;
+  trade_count: number;
+}
+
+export interface ProfitWindow {
+  window: "daily" | "weekly" | "monthly";
+  stake_currency: string;
+  data: ProfitPeriod[];
+}
+
+export interface Stats {
+  durations: { wins: number | null; draws: number | null; losses: number | null };
+  exit_reasons: Record<string, { wins: number; losses: number; draws: number }>;
+}
+
+export interface PerformanceRow {
+  profit_pct: number;
+  profit_abs: number;
+  count: number;
+}
+
+export interface Performance {
+  per_pair: (PerformanceRow & { pair: string; profit_ratio?: number })[];
+  by_enter_tag: (PerformanceRow & { enter_tag: string })[];
+  by_exit_reason: (PerformanceRow & { exit_reason: string })[];
+}
+
+export interface BotInfo {
+  id: string;
+  label: string;
+  strategy?: string;
+}

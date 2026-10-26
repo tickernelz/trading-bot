@@ -4,11 +4,17 @@ import { describe, type FeedItem } from "./feedText";
 import { parseTs } from "./format";
 import { decodeView, storeView, VIEW_KEY, type SavedView } from "./savedView";
 import { carriesData, faultOf, greetingMessages, isStale, loadSnapshot, safetyOf, type Fault, type PanelName, type SafetyState } from "./state";
-import type { CandleFrame, Decision, Equity, FeedEvent, Health, LogLine, News, Overview, Risk, Sentiment, Sysinfo, Trade } from "./types";
+import type { AuditRow, BotInfo, CandleFrame, Decision, Equity, FeedEvent, Health, LogLine, News, Overview, Risk, Scope, SessionInfo, Sentiment, Sysinfo, Trade } from "./types";
+
+const DEFAULT_BOTS: BotInfo[] = [
+  { id: "A", label: "Bot A" },
+  { id: "B", label: "Bot B" },
+];
 
 const FEED_LIMIT = 200;
 const RECOVERY_REFRESH_MS = 10000;
 const TOKEN_KEY = "tb.session";
+const SCOPE_KEY = "tb.scope";
 const OVERLAY_TTL_MS = 15 * 60 * 1000;
 const HISTORY_LIMIT = 200;
 
@@ -66,6 +72,10 @@ class Gateway {
   upstreamFault = $state<Fault | null>(null);
   panelFaults = $state<Partial<Record<PanelName | LazyPanel, Fault>>>({});
   pending = $state<PendingOrder[]>([]);
+  scope = $state<Scope | null>(sessionStorage.getItem(SCOPE_KEY) === "control" ? "control" : sessionStorage.getItem(TOKEN_KEY) ? "read" : null);
+  bots = $state<BotInfo[]>(DEFAULT_BOTS);
+  auditLive = $state<AuditRow[]>([]);
+  stateTick = $state(0);
   news = $state<Record<string, News>>({});
   sentiment = $state<Sentiment | null>(null);
   history = $state<Record<string, Decision[]>>({});
@@ -130,6 +140,10 @@ class Gateway {
     return safetyOf(this.health, this.risk);
   }
 
+  get canControl(): boolean {
+    return this.scope === "control";
+  }
+
   openSaved(): void {
     const saved = savedViewFromStorage();
     if (saved) this.applySaved(saved);
@@ -178,10 +192,16 @@ class Gateway {
   }
 
   async login(password: string): Promise<void> {
-    const session = await this.api.post<{ token: string; expires_at: string }>("/gw/v1/session", { password });
+    const session = await this.api.post<SessionInfo>("/gw/v1/session", { password });
     this.token = session.token;
+    this.scope = session.scope === "control" ? "control" : "read";
     sessionStorage.setItem(TOKEN_KEY, session.token);
+    sessionStorage.setItem(SCOPE_KEY, this.scope);
     this.start();
+  }
+
+  touchState(): void {
+    this.stateTick++;
   }
 
   reconnect(): void {
@@ -190,7 +210,9 @@ class Gateway {
 
   logout(): void {
     this.token = null;
+    this.scope = null;
     sessionStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(SCOPE_KEY);
     localStorage.removeItem(VIEW_KEY);
     this.savedAt = null;
     this.viewingSaved = false;
@@ -333,6 +355,7 @@ class Gateway {
         break;
       case "gw.hello":
         this.sampleData = Boolean(data.sample_data);
+        if (Array.isArray(data.bots) && data.bots.length > 0) this.bots = data.bots as BotInfo[];
         void this.refresh();
         for (const pair of this.watchedPairs) void this.loadCandles(pair);
         break;
@@ -361,7 +384,11 @@ class Gateway {
         }
         break;
       case "status":
-        if (this.health) this.health = { ...this.health, freqtrade: { ...this.health.freqtrade, state: String(data.status) } };
+        if (this.health && (!event.bot || event.bot === this.bots[0]?.id)) this.health = { ...this.health, freqtrade: { ...this.health.freqtrade, state: String(data.status) } };
+        this.stateTick++;
+        break;
+      case "gw.audit":
+        this.auditLive = [event.data as AuditRow, ...this.auditLive.filter((r) => r.id !== (event.data as AuditRow).id)].slice(0, 50);
         break;
       case "whitelist":
         if (this.overview && Array.isArray(event.data)) this.overview = { ...this.overview, pairs: { ...this.overview.pairs, whitelist: event.data as string[] } };

@@ -89,8 +89,8 @@ def check_timerange(value: str) -> str:
     return value
 
 
-def control(ctx: Context, action: str) -> Callable[[Request], None]:
-    def guard(request: Request) -> None:
+def control(ctx: Context, action: str) -> Callable[[Request], Awaitable[None]]:
+    async def guard(request: Request) -> None:
         if not ctx.can_control(request):
             ctx.audit(action, "forbidden", request=request, targets=[], detail={})
             raise AnalyticsError(403, "forbidden_local_only", "this action is accepted only on the bot machine itself")

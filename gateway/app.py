@@ -26,6 +26,8 @@ from fastapi.responses import JSONResponse
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from analytics.freqtrade import AnalysisClient
+from analytics.routes import install as install_analytics
 from engine.decisions import DecisionStore
 from engine.heartbeat import read_heartbeat
 from engine.launch import TRADABLE_BALANCE_RATIO
@@ -34,6 +36,7 @@ from engine.risk import day_start
 from engine.settings import ConfigError, Settings, load_settings
 from gateway import VERSION
 from gateway.analyst import AnalystLink, install_analyst
+from gateway.analytics_context import AnalyticsContext
 from gateway.control import IDEMPOTENCY_KEY, Confirmations, digest, idempotency_key, is_local, sanitize
 from gateway.events import FILL_SIDES, translate
 from gateway.feed import Client, Hub, now_iso
@@ -179,6 +182,12 @@ class Gateway:
         self.cpu_recent: float | None = None
         self.http = httpx.AsyncClient(timeout=5.0)
         self.tasks: list[asyncio.Task] = []
+        analysis = (
+            AnalysisClient(settings.analysis_url, env[settings.ft_username_env], env[settings.ft_password_env])
+            if settings.analysis_url
+            else None
+        )
+        self.analytics = AnalyticsContext(self, analysis)
         self.confirmations = Confirmations()
         self.inflight: set[str] = set()
         self.analyst = AnalystLink(self)
@@ -773,6 +782,7 @@ class Gateway:
             (60, self.analyst.tick),
         ):
             self.tasks.append(asyncio.create_task(self.every(seconds, action)))
+        self.spawn(self.analytics.run_auto_disable())
 
     async def stop(self) -> None:
         for task in list(self.tasks):
@@ -782,6 +792,7 @@ class Gateway:
             await upstream.aclose()
         await self.http.aclose()
         await self.analyst.aclose()
+        await self.analytics.aclose()
         for store in self.stores.values():
             store.close()
         self.ledger.close()
@@ -829,6 +840,8 @@ def create_app(gateway: Gateway) -> FastAPI:
         if not token or gateway.ledger.session_scope(token) is None:
             raise ApiError(401, "unauthorized", "sign in again")
         return token
+
+    install_analytics(app, gateway.analytics, reader)
 
     @app.post("/gw/v1/session")
     async def login(body: Login, request: Request) -> dict[str, str]:

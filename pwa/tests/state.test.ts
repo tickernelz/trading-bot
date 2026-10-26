@@ -11,8 +11,8 @@ const fresh: Freshness = { linkOpen: true, lastDataAt: 1000, now: 2000, upstream
 
 describe("data freshness", () => {
   it("advances only on events that come from the Freqtrade feed", () => {
-    for (const type of FEED_TOPICS.filter((t) => t !== "gw.decision")) expect(carriesData(type)).toBe(true);
-    for (const type of ["gw.decision", "gw.hello", "gw.resync", "gw.error", "pong"]) expect(carriesData(type)).toBe(false);
+    for (const type of FEED_TOPICS.filter((t) => t !== "gw.decision" && t !== "gw.audit")) expect(carriesData(type)).toBe(true);
+    for (const type of ["gw.decision", "gw.audit", "gw.hello", "gw.resync", "gw.error", "pong"]) expect(carriesData(type)).toBe(false);
   });
 
   it("marks the last known state stale when the gateway reports the bot unreachable", () => {
