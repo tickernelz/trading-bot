@@ -12,7 +12,7 @@ from fastapi import Request
 from analytics.freqtrade import AnalysisClient
 from analytics.service import BotSource, auto_disable_loop
 from engine.launch import DRY_RUN_DB
-from gateway.control import IDEMPOTENCY_KEY, is_local
+from gateway.control import is_local, loggable_key
 
 if TYPE_CHECKING:
     from gateway.app import Gateway
@@ -69,7 +69,7 @@ class AnalyticsContext:
             targets=targets,
             result=result,
             ip=request.client.host if request is not None and request.client else None,
-            idempotency_key=raw_key if raw_key is not None and IDEMPOTENCY_KEY.match(raw_key) else None,
+            idempotency_key=loggable_key(raw_key),
             detail=detail,
         )
         known = {bot.id for bot in self.gateway.settings.bots}

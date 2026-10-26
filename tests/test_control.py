@@ -111,6 +111,18 @@ def post(client: TestClient, path: str, token: str, key: str | None, body: dict 
     return client.post(path, json=body, headers=headers)
 
 
+def test_a_control_session_with_a_foreign_host_header_cannot_control(setup):
+    gateway, fake, client, _, _ = setup
+    token = login(client)["token"]
+    response = client.post(
+        "/gw/v1/control/stop-entry",
+        headers={"Authorization": f"Bearer {token}", "Idempotency-Key": "key-foreign-host", "Host": "bot.example.test"},
+    )
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "forbidden_local_only"
+    assert fake.calls == []
+
+
 def test_only_a_direct_loopback_login_may_control(setup):
     gateway, fake, client, _, _ = setup
     assert login(client)["scope"] == "control"

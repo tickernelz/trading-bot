@@ -173,6 +173,16 @@ def test_apply_from_a_control_session_on_loopback_disables_the_voter_and_writes_
     assert rows[0]["targets"] == ["B"]
 
 
+def test_apply_with_a_foreign_host_header_is_refused_for_a_control_session(stack):
+    gateway, _, config = stack
+    before = config.read_bytes()
+    headers = {**bearer(gateway, "control"), "Idempotency-Key": "key-0002", "Host": "bot.example.test"}
+    response = call(gateway, "POST", f"{PREFIX}/scoreboard/apply?bot=B", headers=headers)
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "forbidden_local_only"
+    assert config.read_bytes() == before
+
+
 @pytest.mark.parametrize(
     ("host", "extra", "scope"),
     [
