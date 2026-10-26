@@ -264,10 +264,9 @@ async def test_ask_cannot_use_write_tools_or_read_secrets(data_dir):
 async def test_a_run_cannot_spend_more_than_the_tool_budget(data_dir):
     from langchain_core.messages import ToolMessage
 
-    from tb_swarm.agents import MAX_TOOL_CALLS, TOOL_CALLS
+    from tb_swarm.agents import MAX_TOOL_CALLS
 
     script = [tool_call("get_metrics", {}, f"c{n}") for n in range(MAX_TOOL_CALLS + 4)] + [final("answer from data")]
-    TOOL_CALLS.set([0])
     result = await build_analyst(RecorderModel(script=script, calls=[]), data_dir).ainvoke(
         {"messages": [("user", "loop forever?")]}
     )
@@ -276,6 +275,50 @@ async def test_a_run_cannot_spend_more_than_the_tool_budget(data_dir):
     last_error = [m for m in result["messages"] if isinstance(m, ToolMessage)][-1]
     assert "tool budget" in last_error.content
     assert result["messages"][-1].content == "answer from data"
+
+
+def test_a_direct_sync_invoke_is_budgeted_too(data_dir):
+    from langchain_core.messages import ToolMessage
+
+    from tb_swarm.agents import MAX_TOOL_CALLS
+
+    script = [tool_call("get_metrics", {}, f"c{n}") for n in range(MAX_TOOL_CALLS + 4)] + [final("answer from data")]
+    result = build_analyst(RecorderModel(script=script, calls=[]), data_dir).invoke(
+        {"messages": [("user", "loop forever?")]}
+    )
+    statuses = [m.status for m in result["messages"] if isinstance(m, ToolMessage)]
+    assert statuses == ["success"] * MAX_TOOL_CALLS + ["error"] * 4
+
+
+async def test_each_direct_call_gets_a_fresh_budget_and_leaves_none_behind(data_dir):
+    from langchain_core.messages import ToolMessage
+
+    from tb_swarm.agents import MAX_TOOL_CALLS, TOOL_CALLS
+
+    for _ in range(2):
+        script = [tool_call("get_metrics", {}, f"c{n}") for n in range(MAX_TOOL_CALLS)] + [final("done")]
+        result = await build_analyst(RecorderModel(script=script, calls=[]), data_dir).ainvoke(
+            {"messages": [("user", "again")]}
+        )
+        assert [m.status for m in result["messages"] if isinstance(m, ToolMessage)] == ["success"] * MAX_TOOL_CALLS
+        assert TOOL_CALLS.get() is None
+
+
+async def test_the_tool_budget_refuses_when_no_counter_is_set(data_dir):
+    from deepagents import create_deep_agent
+    from langchain_core.messages import ToolMessage
+
+    from tb_swarm.agents import ANALYST_TOOL_NAMES, ToolAllowlist, ToolBudget
+
+    graph = create_deep_agent(
+        model=RecorderModel(script=[tool_call("get_metrics", {}, "c0"), final("done")], calls=[]),
+        tools=read_only_tools(data_dir),
+        middleware=[ToolAllowlist(ANALYST_TOOL_NAMES), ToolBudget()],
+    )
+    result = await graph.ainvoke({"messages": [("user", "go")]})
+    refused = [m for m in result["messages"] if isinstance(m, ToolMessage)]
+    assert [m.status for m in refused] == ["error"]
+    assert "tool budget" in refused[0].content
 
 
 async def test_the_tool_budget_is_per_run_not_per_runner(data_dir):

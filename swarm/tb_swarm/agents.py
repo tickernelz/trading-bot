@@ -90,7 +90,7 @@ class ToolBudget(AgentMiddleware):
     def _spent(self) -> bool:
         counter = TOOL_CALLS.get()
         if counter is None:
-            return False
+            return True
         counter[0] += 1
         return counter[0] > self._limit
 
@@ -271,12 +271,35 @@ def read_only_tools(data_dir: str | Path, timezone: str = DEFAULT_TIMEZONE) -> l
     return [get_metrics, get_trade_history, get_voter_log]
 
 
-def build_analyst(model: BaseChatModel | str, data_dir: str | Path, timezone: str = DEFAULT_TIMEZONE) -> Any:
-    return create_deep_agent(
-        model=model,
-        tools=read_only_tools(data_dir, timezone),
-        system_prompt=ANALYST_PROMPT,
-        middleware=[ToolAllowlist(ANALYST_TOOL_NAMES), ToolBudget()],
+class BudgetedAgent:
+    """Runs the analyst graph with a fresh tool-call counter per invocation; it exposes no unbudgeted entry point."""
+
+    def __init__(self, graph: Any) -> None:
+        self._graph = graph
+
+    def invoke(self, *args: Any, **kwargs: Any) -> Any:
+        token = TOOL_CALLS.set([0])
+        try:
+            return self._graph.invoke(*args, **kwargs)
+        finally:
+            TOOL_CALLS.reset(token)
+
+    async def ainvoke(self, *args: Any, **kwargs: Any) -> Any:
+        token = TOOL_CALLS.set([0])
+        try:
+            return await self._graph.ainvoke(*args, **kwargs)
+        finally:
+            TOOL_CALLS.reset(token)
+
+
+def build_analyst(model: BaseChatModel | str, data_dir: str | Path, timezone: str = DEFAULT_TIMEZONE) -> BudgetedAgent:
+    return BudgetedAgent(
+        create_deep_agent(
+            model=model,
+            tools=read_only_tools(data_dir, timezone),
+            system_prompt=ANALYST_PROMPT,
+            middleware=[ToolAllowlist(ANALYST_TOOL_NAMES), ToolBudget()],
+        )
     )
 
 

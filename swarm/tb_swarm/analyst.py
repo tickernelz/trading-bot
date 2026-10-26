@@ -14,7 +14,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from tb_swarm.agents import DEFAULT_TIMEZONE, TOOL_CALLS, build_analyst
+from tb_swarm.agents import DEFAULT_TIMEZONE, build_analyst
 from tb_swarm.config import ProviderSpec
 from tb_swarm.errors import ConfigError, ProviderError
 from tb_swarm.models import Usage
@@ -207,7 +207,6 @@ class AnalystRunner:
         started = time.monotonic()
 
         async def run() -> Any:
-            TOOL_CALLS.set([0])
             async with self._slots:
                 return await self._agent.ainvoke(
                     {"messages": list(messages)}, config={"recursion_limit": RECURSION_LIMIT}
