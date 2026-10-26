@@ -1,4 +1,4 @@
-"""Gateway between the PWA and the Freqtrade bots: auth, read API, live feed, health, cost and audit."""
+"""Gateway between the PWA and the Freqtrade bots: auth, read API, control, live feed, health, cost and audit."""
 
 from __future__ import annotations
 
@@ -9,30 +9,38 @@ import logging
 import os
 import secrets
 import time
+from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager, suppress
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any, Literal
 
 import httpx
 import psutil
 import yaml
-from fastapi import Depends, FastAPI, Query, Request, WebSocket, WebSocketDisconnect
+from fastapi import Body, Depends, FastAPI, Query, Request, WebSocket, WebSocketDisconnect
+from fastapi import Path as PathParam
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from analytics.freqtrade import AnalysisClient
+from analytics.routes import install as install_analytics
 from engine.decisions import DecisionStore, linked_trades
 from engine.heartbeat import read_heartbeat
 from engine.launch import DRY_RUN_DB, TRADABLE_BALANCE_RATIO
+from engine.logredact import redact
 from engine.risk import day_start
 from engine.settings import ConfigError, Settings, load_settings
 from gateway import VERSION
+from gateway.analytics_context import AnalyticsContext
+from gateway.control import IDEMPOTENCY_KEY, Confirmations, digest, idempotency_key, is_local, sanitize
 from gateway.events import FILL_SIDES, translate
 from gateway.feed import Client, Hub, now_iso
 from gateway.history import periods
-from gateway.ledger import Ledger, LoginThrottle
+from gateway.ledger import Ledger, LoginThrottle, iso
 from gateway.outcomes import Candle, by_open_time, explain
 from gateway.settings import BotRef, GatewaySettings
 from gateway.upstream import ApiError, Upstream
@@ -52,17 +60,73 @@ from gateway.views import (
 logger = logging.getLogger("trading_bot.gateway")
 
 CACHE_TTL_S = 2.0
+TRADE_PAGE = 500
 CANDLE_SECONDS = 3600
 HEARTBEAT_EVENT_S = 60
 SECRET_KEYS = ("api_key",)
-TRADE_PAGE = 500
 CANDLE_TTL_S = 60.0
 ROUND_TRIP_COST_PCT = 0.82
 MAX_HORIZON = 48
+DEFAULT_HORIZONS = (1, 2, 4)
+
+
+Pair = Annotated[str, Field(pattern=r"^[A-Z0-9]+/[A-Z0-9]+$")]
+ERROR_TEXT_LIMIT = 300
 
 
 class Login(BaseModel):
     password: str
+
+
+class Confirm(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    confirm: str | None = None
+
+
+class ForceEnter(Confirm):
+    pair: Pair
+    side: Literal["long"] = "long"
+    stake_amount: Annotated[float, Field(gt=0)] | None = None
+    entry_tag: Annotated[str, Field(max_length=64)] | None = None
+
+
+class LockPair(Confirm):
+    pair: Pair
+    until: AwareDatetime
+    side: Literal["long", "short", "*"] = "*"
+    reason: Annotated[str, Field(max_length=200)] | None = None
+
+
+class LockDelete(Confirm):
+    pair: Pair | None = None
+    lockid: Annotated[int, Field(ge=1)] | None = None
+
+    @model_validator(mode="after")
+    def _one_target(self) -> LockDelete:
+        if (self.pair is None) == (self.lockid is None):
+            raise ValueError("give exactly one of pair or lockid")
+        return self
+
+
+class BlacklistAdd(Confirm):
+    pairs: Annotated[list[Pair], Field(min_length=1, max_length=50)]
+
+
+@dataclass(frozen=True)
+class Action:
+    name: str
+    bot: BotRef
+    params: dict[str, Any]
+    targets: list[str]
+    summary: str
+    method: str
+    path: str
+    risky: bool = False
+    query: dict[str, Any] | None = None
+    body: Any = None
+    expect_key: str | None = None
+    entries_stopped: bool | None = None
+    precheck: Callable[[], Awaitable[None]] | None = None
 
 
 def balance_summary(balance: dict[str, Any]) -> dict[str, Any]:
@@ -74,11 +138,19 @@ def balance_summary(balance: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def error_response(status: int, code: str, message: str, retry_after_ms: int | None = None) -> JSONResponse:
+def error_body(
+    code: str, message: str, retry_after_ms: int | None = None, extra: dict[str, Any] | None = None
+) -> dict[str, Any]:
     body: dict[str, Any] = {"code": code, "message": message}
     if retry_after_ms is not None:
         body["retry_after_ms"] = retry_after_ms
-    return JSONResponse({"error": body}, status_code=status)
+    return {"error": {**body, **(extra or {})}}
+
+
+def error_response(
+    status: int, code: str, message: str, retry_after_ms: int | None = None, extra: dict[str, Any] | None = None
+) -> JSONResponse:
+    return JSONResponse(error_body(code, message, retry_after_ms, extra), status_code=status)
 
 
 class Gateway:
@@ -113,6 +185,14 @@ class Gateway:
         self.http = httpx.AsyncClient(timeout=5.0)
         self.tasks: list[asyncio.Task] = []
         self.clock = lambda: datetime.now(UTC)
+        analysis = (
+            AnalysisClient(settings.analysis_url, env[settings.ft_username_env], env[settings.ft_password_env])
+            if settings.analysis_url
+            else None
+        )
+        self.analytics = AnalyticsContext(self, analysis)
+        self.confirmations = Confirmations()
+        self.inflight: set[str] = set()
 
     def primary(self) -> BotRef:
         return self.settings.bots[0]
@@ -144,28 +224,33 @@ class Gateway:
     async def ft(self, bot: BotRef, path: str, ttl: float = CACHE_TTL_S, **params: Any) -> Any:
         key = (bot.id, path + json.dumps(params, sort_keys=True))
         cached = self.cache.get(key)
-        if cached and time.monotonic() - cached[0] < ttl:
+        if cached and cached[0] > time.monotonic():
             return cached[1]
         value = await self.upstreams[bot.id].get(path, **params)
-        self.cache[key] = (time.monotonic(), value)
+        now = time.monotonic()
+        self.cache = {item: entry for item, entry in self.cache.items() if entry[0] > now}
+        self.cache[key] = (now + ttl, value)
         return value
 
     async def closed_trades(self, bot: BotRef) -> list[dict[str, Any]]:
-        """Every closed trade, paged by id so later pages never skip the earliest trades."""
-        trades: dict[int, dict[str, Any]] = {}
-        offset = 0
+        """Every closed trade, paged from Freqtrade; fails closed when the pages do not add up to the total."""
+        rows: dict[int, dict[str, Any]] = {}
+        total = 0
         while True:
-            page = await self.ft(bot, "/trades", limit=TRADE_PAGE, offset=offset, order_by_id=True)
-            rows = page.get("trades", [])
-            for trade in rows:
-                trades[trade["trade_id"]] = trade
-            offset += len(rows)
-            if len(rows) < TRADE_PAGE or offset >= page.get("total_trades", offset):
-                return list(trades.values())
+            page = await self.ft(bot, "/trades", limit=TRADE_PAGE, offset=len(rows), order_by_id=True)
+            total = page.get("total_trades", 0)
+            batch = page.get("trades", [])
+            for trade in batch:
+                rows[trade["trade_id"]] = trade
+            if len(rows) >= total or len(batch) < TRADE_PAGE:
+                break
+        if len(rows) != total:
+            raise ApiError(502, "upstream_error", f"Freqtrade returned {len(rows)} of {total} closed trades", 2000)
+        return list(rows.values())
 
     async def closed_and_open(self, bot: BotRef) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-        history, status = await asyncio.gather(self.closed_trades(bot), self.ft(bot, "/status"))
-        return history, status
+        closed, status = await asyncio.gather(self.closed_trades(bot), self.ft(bot, "/status"))
+        return closed, status
 
     async def risk(self, bot: BotRef) -> dict[str, Any]:
         settings = self.engine_settings(bot)
@@ -189,6 +274,7 @@ class Gateway:
         return {
             "bot": bot.id,
             "mode": "dry_run" if config.get("dry_run") else "live",
+            "state": config.get("state"),
             "as_of": now_iso(),
             "capital": {
                 "initial_idr": settings.capital.initial_idr,
@@ -305,7 +391,7 @@ class Gateway:
     async def equity(self, window: str, bot_ids: list[str]) -> dict[str, Any]:
         now = self.clock()
         bots = [self.bot(bot_id) for bot_id in bot_ids]
-        common = await self.run_start(bots, now) if window == "run" else None
+        common = await self.run_start(bots, now) if window == "total" else None
         series = []
         unavailable = []
         start_equity = None
@@ -437,7 +523,9 @@ class Gateway:
             self.spawn(self.record_fill(bot_id, int(data["trade_id"]), FILL_SIDES[kind], received_ms))
 
     async def on_state(self, bot_id: str, connected: bool) -> None:
-        if not connected:
+        if connected:
+            self.spawn(self.reapply_entry_stop(self.bot(bot_id)))
+        else:
             self.hub.emit(
                 "gw.error",
                 {"code": "upstream_unavailable", "message": "Freqtrade websocket closed", "retry_ms": 2000},
@@ -457,6 +545,126 @@ class Gateway:
             logger.info("bot %s trade %d %s fill reached gateway after %d ms", bot_id, trade_id, side, latency)
         self.cache.clear()
         await self.publish_risk(bot)
+
+    def audit_control(
+        self,
+        action: Action,
+        result: str,
+        *,
+        actor: str = "owner",
+        ip: str | None = None,
+        key: str | None = None,
+        **detail: Any,
+    ) -> dict[str, Any]:
+        row = self.ledger.audit(
+            actor=actor,
+            ip=ip,
+            action=action.name,
+            targets=[action.bot.id, *action.targets],
+            idempotency_key=key,
+            result=result,
+            detail={"params": sanitize(action.params), **detail},
+        )
+        self.hub.emit("gw.audit", row, bot=action.bot.id)
+        return row
+
+    async def execute(self, request: Request, token: str, action: Action, confirm: str | None) -> Any:
+        """Run one control action: local-only, idempotent per key, two-step for risky actions, always audited."""
+        ip = request.client.host if request.client else None
+        raw_key = request.headers.get("idempotency-key")
+        scope = self.ledger.session_scope(token)
+        if not is_local(request) or scope != "control":
+            stored_key = raw_key if raw_key is not None and IDEMPOTENCY_KEY.match(raw_key) else None
+            self.audit_control(action, "forbidden", actor=f"{scope}_session", ip=ip, key=stored_key)
+            raise ApiError(403, "forbidden_local_only", "control actions are accepted only on the bot machine itself")
+        try:
+            key = idempotency_key(raw_key)
+        except ApiError as exc:
+            self.audit_control(action, "rejected", ip=ip, error=exc.code)
+            raise
+        request_hash = digest({"action": action.name, "bot": action.bot.id, "params": action.params})
+        stored = self.ledger.stored_result(key)
+        if stored is not None:
+            if stored[0] != request_hash:
+                self.audit_control(action, "rejected", ip=ip, key=key, error="idempotency_key_reused")
+                raise ApiError(409, "invalid_request", "Idempotency-Key was already used for another request")
+            self.audit_control(action, "replayed", ip=ip, key=key, status=stored[1])
+            return JSONResponse(stored[2], status_code=stored[1])
+        if key in self.inflight:
+            raise ApiError(409, "invalid_request", "a request with this Idempotency-Key is still running")
+        self.inflight.add(key)
+        try:
+            return await self._execute(action, request_hash, token, key, ip, confirm)
+        finally:
+            self.inflight.discard(key)
+
+    async def _execute(
+        self, action: Action, request_hash: str, token: str, key: str, ip: str | None, confirm: str | None
+    ) -> Any:
+        try:
+            if action.precheck is not None:
+                await action.precheck()
+            if action.risky:
+                binding = digest({"request": request_hash, "session": digest(token)})
+                if confirm is None:
+                    pending = self.confirmations.issue(action.name, action.targets, action.summary, binding)
+                    self.audit_control(action, "confirmation_required", ip=ip, key=key)
+                    raise ApiError(
+                        409,
+                        "confirmation_required",
+                        f"{action.name} needs confirmation",
+                        extra={"confirmation": pending.public()},
+                    )
+                self.confirmations.redeem(confirm, binding)
+        except ApiError as exc:
+            if exc.code != "confirmation_required":
+                self.audit_control(action, "rejected", ip=ip, key=key, error=exc.code, message=exc.message)
+            raise
+        try:
+            result = await self.upstreams[action.bot.id].send(
+                action.method, action.path, params=action.query, body=action.body
+            )
+            if action.expect_key is not None and not (isinstance(result, dict) and action.expect_key in result):
+                status = result.get("status") if isinstance(result, dict) else None
+                raise ApiError(502, "upstream_error", str(status or "Freqtrade did not carry out the action"))
+        except ApiError as exc:
+            self.cache.clear()
+            self.ledger.store_result(
+                key, request_hash, exc.status, error_body(exc.code, exc.message, exc.retry_after_ms)
+            )
+            self.audit_control(action, "failed", ip=ip, key=key, error=exc.code, message=exc.message[:ERROR_TEXT_LIMIT])
+            raise
+        self.cache.clear()
+        self.ledger.store_result(key, request_hash, 200, result)
+        if action.entries_stopped is not None:
+            self.ledger.set_entries_stopped(action.bot.id, action.entries_stopped)
+        self.audit_control(action, "ok", ip=ip, key=key)
+        return result
+
+    async def reapply_entry_stop(self, bot: BotRef) -> None:
+        """Freqtrade restarts in the running state, so a stop-entry that was in force is sent again."""
+        if not self.ledger.entries_stopped(bot.id):
+            return
+        action = Action(
+            name="control.stop_entry",
+            bot=bot,
+            params={"reason": "reapplied after the Freqtrade feed reconnected"},
+            targets=[],
+            summary=f"Stop new entries on {bot.label}",
+            method="POST",
+            path="/stopentry",
+        )
+        upstream = self.upstreams[bot.id]
+        try:
+            config = await upstream.get("/show_config")
+            if config.get("state") != "running":
+                return
+            await upstream.send("POST", "/stopentry")
+        except ApiError as exc:
+            self.audit_control(action, "failed", actor="gateway", error=exc.code, message=exc.message)
+            return
+        self.cache.clear()
+        self.audit_control(action, "ok", actor="gateway")
 
     async def publish_risk(self, bot: BotRef) -> None:
         risk = await self.risk(bot)
@@ -562,7 +770,15 @@ class Gateway:
             if last is None:
                 self.decision_seq[bot.id] = store.last_settle_seq()
                 continue
-            for seq, decision in store.settled_after(last):
+            settled = store.settled_after(last)
+            if not settled:
+                continue
+            plain = [decision for _, decision in settled]
+            try:
+                shown = await self.explained(bot, plain, list(DEFAULT_HORIZONS), ROUND_TRIP_COST_PCT)
+            except ApiError:
+                shown = plain
+            for (seq, _), decision in zip(settled, shown, strict=True):
                 self.decision_seq[bot.id] = seq
                 self.hub.emit("gw.decision", decision, bot=bot.id)
 
@@ -647,6 +863,7 @@ class Gateway:
             (10, self.sample_cpu),
         ):
             self.tasks.append(asyncio.create_task(self.every(seconds, action)))
+        self.spawn(self.analytics.run_auto_disable())
 
     async def stop(self) -> None:
         for task in list(self.tasks):
@@ -655,6 +872,7 @@ class Gateway:
         for upstream in self.upstreams.values():
             await upstream.aclose()
         await self.http.aclose()
+        await self.analytics.aclose()
         for store in self.stores.values():
             store.close()
         self.ledger.close()
@@ -680,7 +898,7 @@ def create_app(gateway: Gateway) -> FastAPI:
 
     @app.exception_handler(ApiError)
     async def api_error(_: Request, exc: ApiError) -> JSONResponse:
-        return error_response(exc.status, exc.code, exc.message, exc.retry_after_ms)
+        return error_response(exc.status, exc.code, exc.message, exc.retry_after_ms, exc.extra)
 
     @app.exception_handler(RequestValidationError)
     async def invalid(_: Request, exc: RequestValidationError) -> JSONResponse:
@@ -703,6 +921,8 @@ def create_app(gateway: Gateway) -> FastAPI:
             raise ApiError(401, "unauthorized", "sign in again")
         return token
 
+    install_analytics(app, gateway.analytics, reader)
+
     @app.post("/gw/v1/session")
     async def login(body: Login, request: Request) -> dict[str, str]:
         ip = request.client.host if request.client else None
@@ -713,9 +933,12 @@ def create_app(gateway: Gateway) -> FastAPI:
             gateway.throttle.fail()
             gateway.ledger.audit(actor="anonymous", ip=ip, action="session.create", targets=[], result="denied")
             raise ApiError(401, "unauthorized", "wrong password")
-        token, expires = gateway.ledger.create_session("read", gateway.settings.session_days, ip)
-        gateway.ledger.audit(actor="owner", ip=ip, action="session.create", targets=[], result="ok")
-        return {"token": token, "expires_at": expires}
+        scope = "control" if is_local(request) else "read"
+        token, expires = gateway.ledger.create_session(scope, gateway.settings.session_days, ip)
+        gateway.ledger.audit(
+            actor="owner", ip=ip, action="session.create", targets=[], result="ok", detail={"scope": scope}
+        )
+        return {"token": token, "expires_at": expires, "scope": scope}
 
     @app.delete("/gw/v1/session")
     async def logout(request: Request, token: str = Depends(reader)) -> dict[str, bool]:
@@ -743,10 +966,15 @@ def create_app(gateway: Gateway) -> FastAPI:
         limit: int = Query(100, ge=1, le=500),
         offset: int = Query(0, ge=0),
         pair: str | None = None,
+        state: str | None = Query(None, pattern="^closed$"),
     ) -> list[dict[str, Any]]:
-        history = await gateway.closed_trades(gateway.bot(bot))
-        rows = [trade for trade in history if pair is None or trade.get("pair") == pair]
-        rows.sort(key=lambda trade: (trade.get("close_timestamp") or 0, trade.get("trade_id", 0)), reverse=True)
+        closed, opened = await gateway.closed_and_open(gateway.bot(bot))
+        rows = [
+            trade
+            for trade in (closed if state == "closed" else [*opened, *closed])
+            if pair is None or trade.get("pair") == pair
+        ]
+        rows.sort(key=lambda trade: trade.get("trade_id", 0), reverse=True)
         return rows[offset : offset + limit]
 
     @app.get("/gw/v1/trades/{trade_id}", dependencies=[Depends(reader)])
@@ -823,7 +1051,13 @@ def create_app(gateway: Gateway) -> FastAPI:
 
     @app.get("/gw/v1/logs", dependencies=[Depends(reader)])
     async def logs(bot: str | None = None, limit: int = Query(50, ge=1, le=500)) -> dict[str, Any]:
-        return await gateway.ft(gateway.bot(bot), "/logs", limit=limit)
+        data = await gateway.ft(gateway.bot(bot), "/logs", limit=limit)
+        return {
+            **data,
+            "logs": [
+                [redact(field) if isinstance(field, str) else field for field in line] for line in data.get("logs", [])
+            ],
+        }
 
     @app.get("/gw/v1/sysinfo", dependencies=[Depends(reader)])
     async def sysinfo(bot: str | None = None) -> dict[str, Any]:
@@ -834,7 +1068,7 @@ def create_app(gateway: Gateway) -> FastAPI:
         return redacted_settings(gateway.engine_settings(gateway.bot(bot)))
 
     @app.get("/gw/v1/equity", dependencies=[Depends(reader)])
-    async def equity(window: str = Query("day", pattern="^(day|7d|run)$"), bots: str | None = None) -> dict[str, Any]:
+    async def equity(window: str = Query("day", pattern="^(day|7d|total)$"), bots: str | None = None) -> dict[str, Any]:
         ids = [item for item in (bots or gateway.primary().id).split(",") if item]
         return await gateway.equity(window, ids)
 
@@ -844,14 +1078,16 @@ def create_app(gateway: Gateway) -> FastAPI:
             raise ApiError(400, "invalid_request", f"horizons must be between 1 and {MAX_HORIZON} candles")
         return values
 
-    horizons_query = Query("1,2,4", pattern=r"^\d{1,2}(,\d{1,2}){0,3}$")
+    horizons_query = Query(",".join(map(str, DEFAULT_HORIZONS)), pattern=r"^\d{1,2}(,\d{1,2}){0,3}$")
     cost_query = Query(ROUND_TRIP_COST_PCT, ge=0, le=10)
 
     @app.get("/gw/v1/decisions", dependencies=[Depends(reader)])
     async def decisions(
         bot: str | None = None,
         limit: int = Query(20, ge=1, le=500),
-        outcome: bool = False,
+        pair: str | None = None,
+        before: AwareDatetime | None = None,
+        status: str | None = Query(None, pattern="^(ok|skip)$"),
         horizons: str = horizons_query,
         cost_pct: float = cost_query,
     ) -> list[dict[str, Any]]:
@@ -862,8 +1098,8 @@ def create_app(gateway: Gateway) -> FastAPI:
             store = gateway.store(ref)
             if store is None:
                 continue
-            recent = store.recent(limit)
-            rows += await gateway.explained(ref, recent, steps, cost_pct) if outcome else recent
+            recent = store.recent(limit, pair=pair, before=before, status=status)
+            rows += await gateway.explained(ref, recent, steps, cost_pct)
         rows.sort(key=lambda row: row["ts"], reverse=True)
         return rows[:limit]
 
@@ -884,8 +1120,248 @@ def create_app(gateway: Gateway) -> FastAPI:
         return gateway.costs(window)
 
     @app.get("/gw/v1/audit", dependencies=[Depends(reader)])
-    async def audit(limit: int = Query(50, ge=1, le=500)) -> list[dict[str, Any]]:
-        return gateway.ledger.audit_rows(limit)
+    async def audit(
+        limit: int = Query(50, ge=1, le=500),
+        before_id: int | None = Query(None, ge=1),
+        action: str | None = Query(None, min_length=1, max_length=64),
+        result: str | None = Query(None, min_length=1, max_length=32),
+        actor: str | None = Query(None, min_length=1, max_length=32),
+        target: str | None = Query(None, min_length=1, max_length=64),
+        since: AwareDatetime | None = None,
+        until: AwareDatetime | None = None,
+    ) -> list[dict[str, Any]]:
+        return gateway.ledger.audit_rows(
+            limit,
+            before_id=before_id,
+            action=action,
+            result=result,
+            actor=actor,
+            target=target,
+            since=iso(since) if since else None,
+            until=iso(until) if until else None,
+        )
+
+    async def run(request: Request, token: str, action: Action, body: Confirm | None) -> Any:
+        return await gateway.execute(request, token, action, body.confirm if body else None)
+
+    def bot_state_route(route: str, name: str, path: str, summary: str, **options: Any) -> None:
+        async def endpoint(
+            request: Request, bot: str | None = None, body: Confirm | None = Body(None), token: str = Depends(reader)
+        ) -> Any:
+            ref = gateway.bot(bot)
+            action = Action(
+                name=name,
+                bot=ref,
+                params={},
+                targets=[],
+                summary=summary.format(bot=ref.label),
+                method="POST",
+                path=path,
+                **options,
+            )
+            return await run(request, token, action, body)
+
+        app.post(f"/gw/v1/control/{route}", name=name)(endpoint)
+
+    bot_state_route("pause", "control.pause", "/pause", "Pause new entries on {bot}", entries_stopped=True)
+    bot_state_route("stop-entry", "control.stop_entry", "/stopentry", "Stop new entries on {bot}", entries_stopped=True)
+    bot_state_route("resume", "control.resume", "/start", "Resume {bot}", entries_stopped=False)
+    bot_state_route(
+        "stop",
+        "control.stop",
+        "/stop",
+        "Stop {bot}; open trades are no longer managed",
+        risky=True,
+        entries_stopped=True,
+    )
+    bot_state_route("reload-config", "control.reload_config", "/reload_config", "Reload the Freqtrade config of {bot}")
+
+    @app.post("/gw/v1/trades")
+    async def force_enter(
+        request: Request,
+        body: ForceEnter,
+        bot: str | None = None,
+        token: str = Depends(reader),
+    ) -> Any:
+        ref = gateway.bot(bot)
+
+        async def precheck() -> None:
+            if not gateway.engine_settings(ref).api.force_entry:
+                raise ApiError(409, "invalid_request", "forced entries are disabled (api.force_entry is false)")
+            whitelist = (await gateway.ft(ref, "/whitelist")).get("whitelist", [])
+            if body.pair not in whitelist:
+                raise ApiError(422, "invalid_request", f"{body.pair} is not on the whitelist")
+            risk = await gateway.risk(ref)
+            if not risk["entries_allowed"]:
+                raise ApiError(409, "risk_limit_breached", f"entries are blocked by {', '.join(risk['breaches'])}")
+
+        params = body.model_dump(exclude={"confirm"})
+        action = Action(
+            name="trade.enter",
+            bot=ref,
+            params=params,
+            targets=[body.pair],
+            summary=f"Enter {body.side} {body.pair} at market on {ref.label}",
+            method="POST",
+            path="/forceenter",
+            risky=True,
+            body={"pair": body.pair, "side": body.side, "stakeamount": body.stake_amount, "entry_tag": body.entry_tag},
+            expect_key="trade_id",
+            precheck=precheck,
+        )
+        return await run(request, token, action, body)
+
+    @app.post("/gw/v1/trades/exit-all")
+    async def force_exit_all(
+        request: Request,
+        bot: str | None = None,
+        body: Confirm | None = Body(None),
+        token: str = Depends(reader),
+    ) -> Any:
+        ref = gateway.bot(bot)
+        action = Action(
+            name="trade.exit_all",
+            bot=ref,
+            params={},
+            targets=["all"],
+            summary=f"Exit every open trade on {ref.label} at market",
+            method="POST",
+            path="/forceexit",
+            risky=True,
+            body={"tradeid": "all"},
+        )
+        return await run(request, token, action, body)
+
+    @app.post("/gw/v1/trades/{trade_id}/exit")
+    async def force_exit(
+        request: Request,
+        trade_id: Annotated[int, PathParam(ge=1)],
+        bot: str | None = None,
+        body: Confirm | None = Body(None),
+        token: str = Depends(reader),
+    ) -> Any:
+        ref = gateway.bot(bot)
+        action = Action(
+            name="trade.exit",
+            bot=ref,
+            params={"trade_id": trade_id},
+            targets=[str(trade_id)],
+            summary=f"Exit trade {trade_id} on {ref.label} at market",
+            method="POST",
+            path="/forceexit",
+            risky=True,
+            body={"tradeid": str(trade_id)},
+        )
+        return await run(request, token, action, body)
+
+    @app.post("/gw/v1/locks")
+    async def lock_pair(
+        request: Request,
+        body: LockPair,
+        bot: str | None = None,
+        token: str = Depends(reader),
+    ) -> Any:
+        ref = gateway.bot(bot)
+        if body.until <= datetime.now(UTC):
+            raise ApiError(400, "invalid_request", "until must lie in the future")
+        lock = {"pair": body.pair, "until": iso(body.until), "side": body.side, "reason": body.reason}
+        action = Action(
+            name="pair.lock",
+            bot=ref,
+            params=lock,
+            targets=[body.pair],
+            summary=f"Lock {body.pair} on {ref.label} until {lock['until']}",
+            method="POST",
+            path="/locks",
+            body=[lock],
+        )
+        return await run(request, token, action, body)
+
+    @app.delete("/gw/v1/locks/{lock_id}")
+    async def unlock(
+        request: Request,
+        lock_id: Annotated[int, PathParam(ge=1)],
+        bot: str | None = None,
+        body: Confirm | None = Body(None),
+        token: str = Depends(reader),
+    ) -> Any:
+        ref = gateway.bot(bot)
+        action = Action(
+            name="pair.unlock",
+            bot=ref,
+            params={"lockid": lock_id},
+            targets=[f"lock:{lock_id}"],
+            summary=f"Remove lock {lock_id} on {ref.label}",
+            method="DELETE",
+            path=f"/locks/{lock_id}",
+            risky=True,
+        )
+        return await run(request, token, action, body)
+
+    @app.post("/gw/v1/locks/delete")
+    async def unlock_by(
+        request: Request,
+        body: LockDelete,
+        bot: str | None = None,
+        token: str = Depends(reader),
+    ) -> Any:
+        ref = gateway.bot(bot)
+        params = body.model_dump(exclude={"confirm"}, exclude_none=True)
+        target = body.pair or f"lock:{body.lockid}"
+        action = Action(
+            name="pair.unlock",
+            bot=ref,
+            params=params,
+            targets=[target],
+            summary=f"Remove locks of {target} on {ref.label}",
+            method="POST",
+            path="/locks/delete",
+            risky=True,
+            body=params,
+        )
+        return await run(request, token, action, body)
+
+    @app.post("/gw/v1/blacklist")
+    async def blacklist_add(
+        request: Request,
+        body: BlacklistAdd,
+        bot: str | None = None,
+        token: str = Depends(reader),
+    ) -> Any:
+        ref = gateway.bot(bot)
+        action = Action(
+            name="pair.blacklist",
+            bot=ref,
+            params={"pairs": body.pairs},
+            targets=list(body.pairs),
+            summary=f"Blacklist {', '.join(body.pairs)} on {ref.label}",
+            method="POST",
+            path="/blacklist",
+            body={"blacklist": body.pairs},
+        )
+        return await run(request, token, action, body)
+
+    @app.delete("/gw/v1/blacklist")
+    async def blacklist_remove(
+        request: Request,
+        pairs: Annotated[list[Pair], Query(min_length=1, max_length=50)],
+        bot: str | None = None,
+        body: Confirm | None = Body(None),
+        token: str = Depends(reader),
+    ) -> Any:
+        ref = gateway.bot(bot)
+        action = Action(
+            name="pair.unblacklist",
+            bot=ref,
+            params={"pairs": pairs},
+            targets=list(pairs),
+            summary=f"Remove {', '.join(pairs)} from the blacklist of {ref.label}",
+            method="DELETE",
+            path="/blacklist",
+            risky=True,
+            query={"pairs_to_delete": pairs},
+        )
+        return await run(request, token, action, body)
 
     @app.get("/gw/v1/metrics", dependencies=[Depends(reader)])
     async def metrics() -> dict[str, Any]:
@@ -916,8 +1392,11 @@ def create_app(gateway: Gateway) -> FastAPI:
         try:
             await hello(client)
             while True:
+                frame = await socket.receive()
+                if frame["type"] == "websocket.disconnect":
+                    break
                 try:
-                    message = json.loads(await socket.receive_text())
+                    message = json.loads(frame.get("text") or "")
                 except ValueError:
                     continue
                 if isinstance(message, dict):
@@ -969,8 +1448,13 @@ def create_app(gateway: Gateway) -> FastAPI:
             client.topics = {topic for topic in message.get("topics") or [] if isinstance(topic, str)}
             client.candles = {}
             for item in message.get("candles") or []:
-                if isinstance(item, dict) and isinstance(item.get("pair"), str):
-                    client.candles[item["pair"]] = max(1, min(1500, int(item.get("limit") or 300)))
+                if not isinstance(item, dict) or not isinstance(item.get("pair"), str):
+                    continue
+                try:
+                    limit = int(item.get("limit") or 300)
+                except (TypeError, ValueError):
+                    continue
+                client.candles[item["pair"]] = max(1, min(1500, limit))
             if "gw.candles" in client.topics:
                 timeframe = gateway.engine_settings(gateway.primary()).exchange.timeframe
                 for pair, limit in client.candles.items():

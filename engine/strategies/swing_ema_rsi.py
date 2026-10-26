@@ -11,17 +11,21 @@ from datetime import datetime
 from pathlib import Path
 
 import talib.abstract as ta
+from freqtrade.enums import RunMode
 from freqtrade.persistence import Order, Trade
 from freqtrade.strategy import IStrategy
 from pandas import DataFrame
 
 from engine.decisions import SHADOW_KEY
 from engine.heartbeat import record_start, write_heartbeat
+from engine.logredact import install as install_log_redaction
 from engine.risk import ClosedTrade, RiskState, assess, stake_for_risk
 from engine.settings import RiskSettings
 from engine.shadow_client import ShadowClient
 
 logger = logging.getLogger(__name__)
+
+TRADING_RUNMODES = (RunMode.DRY_RUN, RunMode.LIVE)
 
 SHADOW_CANDLES = 48
 SHADOW_COLUMNS = ("open", "high", "low", "close", "volume", "ema_fast", "ema_slow", "rsi")
@@ -55,6 +59,10 @@ class SwingEmaRsi(IStrategy):
     }
     order_time_in_force = {"entry": "GTC", "exit": "GTC"}
 
+    def __init__(self, config: dict) -> None:
+        install_log_redaction()
+        super().__init__(config)
+
     def bot_start(self, **kwargs) -> None:
         section = self.config["trading_bot"]
         self.risk_settings = RiskSettings.model_validate(section["risk"])
@@ -63,13 +71,20 @@ class SwingEmaRsi(IStrategy):
         self.fee = float(self.config["fee"])
         self.bot_id = section["bot_id"]
         self.userdir = Path(self.config["user_data_dir"])
-        self.shadow = ShadowClient(section["shadow_url"]) if section.get("shadow_url") else None
+        self.trading = self.config.get("runmode") in TRADING_RUNMODES
+        self.shadow = (
+            ShadowClient(section["shadow_url"], os.environ.get(section["shadow_token_env"], ""))
+            if self.trading and section.get("shadow_url")
+            else None
+        )
         self.shadow_pending: dict[str, str] = {}
-        self.startup_checked = False
+        self.startup_checked = not self.trading
         self._startup_waiting = False
-        self.starts = record_start(self.userdir, os.getpid())
+        self.starts = record_start(self.userdir, os.getpid()) if self.trading else 0
 
     def bot_loop_start(self, current_time: datetime, **kwargs) -> None:
+        if not self.trading:
+            return
         if not self.startup_checked:
             self.startup_check(current_time)
         write_heartbeat(

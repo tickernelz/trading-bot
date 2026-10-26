@@ -19,6 +19,10 @@ from tests.conftest import EXAMPLE
 DATA = Path(__file__).resolve().parent / "data" / "stage2c"
 PASSWORD = "correct horse battery"
 ENV = {"GW_PASSWORD": PASSWORD, "FT_API_USERNAME": "bot", "FT_API_PASSWORD": "pw"}
+BTC_FIRST = "c59379cf6c83405aa91898467d700b11"
+ETH = "a691f6edbc464e1fafe267daf1aa3698"
+SOL = "c678a9b6492f40fab84c09f97aadea02"
+BTC_SECOND = "da2b92e0dfd246d2ade92edc2688c52f"
 
 
 def recorded(name: str) -> dict:
@@ -44,7 +48,7 @@ class RecordedFreqtrade:
         return httpx.Response(200, json=self.answers[path])
 
 
-def restore_userdir(userdir: Path, bot: dict) -> str | None:
+def restore_userdir(userdir: Path, bot: dict, unlinked: set[str]) -> str | None:
     userdir.mkdir(parents=True)
     trades = sqlite3.connect(userdir / DRY_RUN_DB)
     trades.executescript(
@@ -56,7 +60,7 @@ def restore_userdir(userdir: Path, bot: dict) -> str | None:
     trades.executemany(
         "INSERT INTO trade_custom_data (ft_trade_id, cd_key, cd_type, cd_value)"
         " VALUES (:ft_trade_id, :cd_key, :cd_type, :cd_value)",
-        bot["custom_data"],
+        [link for link in bot["custom_data"] if link["cd_value"] not in unlinked],
     )
     trades.commit()
     trades.close()
@@ -77,49 +81,54 @@ def restore_userdir(userdir: Path, bot: dict) -> str | None:
 
 @pytest.fixture
 def replay(tmp_path):
-    run = recorded("run.json")
-    bots = []
-    fakes = {}
-    for name, label, strategy in (("bot-a", "Bot A", "aturan saja"), ("bot-b", "Bot B", "aturan + swarm bayangan")):
-        bot = recorded(f"{name}.json")
-        config = tmp_path / f"{name}.yaml"
-        shutil.copy(EXAMPLE, config)
-        userdir = tmp_path / name
-        decisions = restore_userdir(userdir, bot)
-        bots.append(
-            {
-                "id": bot["id"],
-                "label": label,
-                "strategy": strategy,
-                "api_url": f"http://127.0.0.1:{8180 + len(bots)}",
-                "config": str(config),
-                "userdir": str(userdir),
-                "decisions": decisions,
-            }
-        )
-        fakes[bot["id"]] = RecordedFreqtrade(bot["answers"])
-    gateway = Gateway(GatewaySettings(state_dir=str(tmp_path / "state"), exchange_probe_url=None, bots=bots), ENV)
-    for bot_id, fake in fakes.items():
-        upstream = gateway.upstreams[bot_id]
-        upstream.client = httpx.AsyncClient(
-            base_url=upstream.bot.api_url + "/api/v1", transport=httpx.MockTransport(fake)
-        )
-    recorded_at = datetime.fromisoformat(run["recorded_at"])
-    gateway.clock = lambda: recorded_at
-    client = TestClient(create_app(gateway))
-    token = client.post("/gw/v1/session", json={"password": PASSWORD}).json()["token"]
-    yield client, {"Authorization": f"Bearer {token}"}
-    gateway.ledger.close()
+    clients = []
 
+    def start(unlinked: frozenset[str] = frozenset()) -> tuple[TestClient, dict[str, str]]:
+        base = tmp_path / str(len(clients))
+        bots = []
+        fakes = {}
+        for name, label, strategy in (
+            ("bot-a", "Bot A", "aturan saja"),
+            ("bot-b", "Bot B", "aturan + swarm bayangan"),
+        ):
+            bot = recorded(f"{name}.json")
+            config = base / f"{name}.yaml"
+            config.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(EXAMPLE, config)
+            userdir = base / name
+            bots.append(
+                {
+                    "id": bot["id"],
+                    "label": label,
+                    "strategy": strategy,
+                    "api_url": f"http://127.0.0.1:{8180 + len(bots)}",
+                    "config": str(config),
+                    "userdir": str(userdir),
+                    "decisions": restore_userdir(userdir, bot, set(unlinked)),
+                }
+            )
+            fakes[bot["id"]] = RecordedFreqtrade(bot["answers"])
+        settings = GatewaySettings(state_dir=str(base / "state"), exchange_probe_url=None, bots=bots)
+        gateway = Gateway(settings, ENV)
+        for bot_id, fake in fakes.items():
+            upstream = gateway.upstreams[bot_id]
+            upstream.client = httpx.AsyncClient(
+                base_url=upstream.bot.api_url + "/api/v1", transport=httpx.MockTransport(fake)
+            )
+        recorded_at = datetime.fromisoformat(recorded("run.json")["recorded_at"])
+        gateway.clock = lambda: recorded_at
+        client = TestClient(create_app(gateway))
+        clients.append(gateway)
+        token = client.post("/gw/v1/session", json={"password": PASSWORD}).json()["token"]
+        return client, {"Authorization": f"Bearer {token}"}
 
-BTC_FIRST = "c59379cf6c83405aa91898467d700b11"
-ETH = "a691f6edbc464e1fafe267daf1aa3698"
-SOL = "c678a9b6492f40fab84c09f97aadea02"
-BTC_SECOND = "da2b92e0dfd246d2ade92edc2688c52f"
+    yield start
+    for gateway in clients:
+        gateway.ledger.close()
 
 
 def test_decision_detail_shows_every_voter_the_quorum_and_what_followed(replay):
-    client, headers = replay
+    client, headers = replay()
     decision = client.get(f"/gw/v1/decisions/{BTC_FIRST}", headers=headers).json()
     assert [(voter["voter_id"], voter["answers"]["verdict"]["choice"]) for voter in decision["voters"]] == [
         (f"v{index}", "lewati") for index in range(1, 8)
@@ -130,63 +139,93 @@ def test_decision_detail_shows_every_voter_the_quorum_and_what_followed(replay):
     assert decision["quorum"] == {"required": 5, "answered": 7, "met": True}
     assert decision["would_take"] == {"verdict": "lewati", "action": "tidak masuk", "applied": False}
     outcome = decision["outcome"]
-    assert outcome["trade"]["trade_id"] == 1
-    assert outcome["trade"]["profit_abs"] == -981.93363272
-    assert outcome["trade"]["profit_pct"] == -0.3326
-    assert outcome["trade"]["result"] == "rugi"
-    assert (outcome["effect"], outcome["basis"]) == ("menghindari_rugi", "trade")
-    first, second, fourth = outcome["forward"]["horizons"]
+    assert {key: outcome[key] for key in ("state", "basis", "trade_id", "is_open", "profit_abs", "profit_pct")} == {
+        "state": "settled",
+        "basis": "trade",
+        "trade_id": 1,
+        "is_open": False,
+        "profit_abs": -981.93363272,
+        "profit_pct": -0.3326,
+    }
+    assert outcome["effect"] == "avoided_loss"
+    assert outcome["trade"]["exit_reason"] == "force_exit"
+    first, second, fourth = outcome["forward"]
     assert first == {
         "candles": 1,
         "until": "2026-10-26T01:00:00Z",
+        "state": "settled",
         "close": 1453999000.0,
         "return_pct": -0.0001,
         "net_pct": -0.8201,
         "max_up_pct": 0.1843,
         "max_down_pct": -0.0417,
-        "result": "rugi",
     }
     assert (second["close"], second["return_pct"], second["max_down_pct"]) == (1449038000.0, -0.3413, -0.619)
-    assert fourth == {"candles": 4, "until": "2026-10-26T04:00:00Z", "result": "belum_cukup_data"}
+    assert fourth == {"candles": 4, "until": "2026-10-26T04:00:00Z", "state": "pending"}
+    assert (outcome["horizon_h"], outcome["price_at"], outcome["price_after"]) == (4, 1454000000.0, None)
 
 
-def test_gross_gain_below_the_round_trip_cost_counts_as_a_loss(replay):
-    client, headers = replay
+def test_skipped_entry_without_a_trade_is_judged_by_price_after_costs(replay):
+    client, headers = replay(frozenset({ETH}))
     decision = client.get(f"/gw/v1/decisions/{ETH}?horizons=1", headers=headers).json()
     assert decision["aggregate"]["questions"]["verdict"]["votes"] == {"izinkan": 0, "kecilkan": 1, "lewati": 6}
-    (first,) = decision["outcome"]["forward"]["horizons"]
-    assert (first["return_pct"], first["net_pct"], first["result"]) == (0.261, -0.559, "rugi")
-    free = client.get(f"/gw/v1/decisions/{ETH}?horizons=1&cost_pct=0", headers=headers).json()
-    assert free["outcome"]["forward"]["horizons"][0]["result"] == "untung"
+    outcome = decision["outcome"]
+    assert {key: outcome[key] for key in ("state", "basis", "horizon_h", "price_after", "trade_id")} == {
+        "state": "settled",
+        "basis": "price",
+        "horizon_h": 1,
+        "price_after": 42260000.0,
+        "trade_id": None,
+    }
+    assert (outcome["return_pct"], outcome["return_after_fees_pct"], outcome["effect"]) == (
+        0.261,
+        -0.559,
+        "avoided_loss",
+    )
+    free = client.get(f"/gw/v1/decisions/{ETH}?horizons=1&cost_pct=0", headers=headers).json()["outcome"]
+    assert (free["return_after_fees_pct"], free["effect"]) == (0.261, "missed_gain")
+    later = client.get(f"/gw/v1/decisions/{ETH}", headers=headers).json()["outcome"]
+    assert (later["state"], later["settles_at"], later["effect"]) == ("pending", "2026-10-26T04:00:00Z", "pending")
 
 
 def test_failed_quorum_skips_and_an_open_trade_is_not_judged_yet(replay):
-    client, headers = replay
+    client, headers = replay()
     decision = client.get(f"/gw/v1/decisions/{SOL}", headers=headers).json()
     assert (decision["status"], decision["reason"]) == ("skip", "quorum_not_met")
     assert decision["quorum"] == {"required": 5, "answered": 3, "met": False}
     assert [voter["status"] for voter in decision["voters"]].count("failed") == 4
     assert decision["would_take"]["verdict"] == "lewati"
-    assert decision["outcome"]["trade"]["result"] == "masih_terbuka"
-    assert (decision["outcome"]["effect"], decision["outcome"]["basis"]) == ("belum_cukup_data", None)
+    outcome = decision["outcome"]
+    assert (outcome["state"], outcome["basis"], outcome["is_open"], outcome["effect"]) == (
+        "pending",
+        "trade",
+        True,
+        "pending",
+    )
 
 
-def test_decision_list_carries_outcomes_only_when_asked(replay):
-    client, headers = replay
-    plain = client.get("/gw/v1/decisions?bot=B", headers=headers).json()
-    assert [row["decision_id"] for row in plain] == [BTC_SECOND, ETH, SOL, BTC_FIRST]
-    assert "outcome" not in plain[0]
-    rows = client.get("/gw/v1/decisions?bot=B&outcome=true&horizons=1,2", headers=headers).json()
-    latest = rows[0]
-    assert latest["outcome"]["trade"]["trade_id"] == 4
-    assert [point["result"] for point in latest["outcome"]["forward"]["horizons"]] == ["rugi", "belum_cukup_data"]
-    assert latest["outcome"]["forward"]["horizons"][0]["return_pct"] == -0.2759
+def test_decision_list_filters_and_carries_outcomes(replay):
+    client, headers = replay()
+    rows = client.get("/gw/v1/decisions?bot=B", headers=headers).json()
+    assert [row["decision_id"] for row in rows] == [BTC_SECOND, ETH, SOL, BTC_FIRST]
+    assert all(row["outcome"]["basis"] == "trade" for row in rows)
+    latest = client.get("/gw/v1/decisions?bot=B&limit=1&horizons=1,2", headers=headers).json()[0]
+    assert latest["outcome"]["trade_id"] == 4
+    assert [point["state"] for point in latest["outcome"]["forward"]] == ["settled", "pending"]
+    assert latest["outcome"]["forward"][0]["return_pct"] == -0.2759
+
+    def ids(query: str) -> list[str]:
+        return [row["decision_id"] for row in client.get(f"/gw/v1/decisions?{query}", headers=headers).json()]
+
+    assert ids("status=skip") == [SOL]
+    assert ids("pair=BTC/IDR") == [BTC_SECOND, BTC_FIRST]
+    assert ids("before=2026-10-26T01:00:00Z") == [ETH, SOL, BTC_FIRST]
     assert client.get("/gw/v1/decisions/0123", headers=headers).json()["error"]["code"] == "not_found"
     assert client.get("/gw/v1/decisions?horizons=0", headers=headers).status_code == 400
 
 
 def test_daily_weekly_monthly_follow_the_risk_timezone(replay):
-    client, headers = replay
+    client, headers = replay()
     daily = client.get("/gw/v1/profit?bot=B&window=daily&timescale=2", headers=headers).json()
     assert daily["timezone"] == "Asia/Jakarta"
     assert daily["data"] == [
@@ -220,10 +259,14 @@ def test_daily_weekly_monthly_follow_the_risk_timezone(replay):
 
 
 def test_history_exit_reasons_and_entry_tags_come_from_the_recorded_bot(replay):
-    client, headers = replay
-    trades = client.get("/gw/v1/trades?bot=B&limit=2", headers=headers).json()
-    assert [trade["trade_id"] for trade in trades] == [4, 2]
-    assert [trade["trade_id"] for trade in client.get("/gw/v1/trades?bot=B&offset=2", headers=headers).json()] == [1]
+    client, headers = replay()
+
+    def trade_ids(query: str) -> list[int]:
+        return [trade["trade_id"] for trade in client.get(f"/gw/v1/trades?bot=B&{query}", headers=headers).json()]
+
+    assert trade_ids("limit=2&state=closed") == [4, 2]
+    assert trade_ids("offset=2&state=closed") == [1]
+    assert trade_ids("limit=10") == [4, 3, 2, 1]
     performance = client.get("/gw/v1/performance?bot=B", headers=headers).json()
     assert {row["mix_tag"]: (row["count"], row["profit_pct"]) for row in performance["by_mix_tag"]} == {
         "uji_rekam force_exit": (2, -0.95),
@@ -237,9 +280,9 @@ def test_history_exit_reasons_and_entry_tags_come_from_the_recorded_bot(replay):
     assert stats["exit_reasons"] == {"force_exit": {"wins": 0, "losses": 3, "draws": 0}}
 
 
-def test_run_equity_stacks_both_bots_from_the_first_bot_start(replay):
-    client, headers = replay
-    equity = client.get("/gw/v1/equity?window=run&bots=A,B", headers=headers).json()
+def test_total_equity_stacks_both_bots_from_the_first_bot_start(replay):
+    client, headers = replay()
+    equity = client.get("/gw/v1/equity?window=total&bots=A,B", headers=headers).json()
     assert equity["start"] == "2026-10-26T00:54:49Z"
     curves = {series["bot"]: [point[1] for point in series["points"]] for series in equity["series"]}
     assert curves == {

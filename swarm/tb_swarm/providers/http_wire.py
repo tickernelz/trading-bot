@@ -54,6 +54,9 @@ class HttpDecisionProvider(DecisionProvider):
             cost=float(cost) if isinstance(cost, (int, float)) else None,
         )
 
+    def _raw_answers(self, body: dict[str, Any]) -> Any:
+        return body.get("answers")
+
     def secrets(self) -> tuple[str, ...]:
         return (self._api_key,) if self._api_key else ()
 
@@ -75,7 +78,7 @@ class HttpDecisionProvider(DecisionProvider):
             raise ProviderError("invalid", "response is not JSON") from exc
         if not isinstance(body, dict):
             raise ProviderError("invalid", "response is not an object")
-        answers = parse_answers(request, body.get("answers"))
+        answers = parse_answers(request, self._raw_answers(body))
         served = body.get("model")
         return DecisionResponse(
             model=served if isinstance(served, str) and served else self._model,

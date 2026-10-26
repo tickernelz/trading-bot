@@ -156,9 +156,23 @@ class DecisionStore:
     def pending_count(self) -> int:
         return self._db.execute("SELECT COUNT(*) FROM decisions WHERE status = 'pending'").fetchone()[0]
 
-    def recent(self, limit: int) -> list[dict[str, Any]]:
+    def recent(
+        self, limit: int, *, pair: str | None = None, before: datetime | None = None, status: str | None = None
+    ) -> list[dict[str, Any]]:
+        """Newest settled decisions first, optionally for one pair, one status, or candles before a moment."""
+        where = ["settle_seq IS NOT NULL"]
+        params: list[Any] = []
+        if pair is not None:
+            where.append("pair = ?")
+            params.append(pair)
+        if status is not None:
+            where.append("status = ?")
+            params.append(status)
+        if before is not None:
+            where.append("candle < ?")
+            params.append(before.astimezone(UTC).isoformat())
         rows = self._db.execute(
-            "SELECT * FROM decisions WHERE settle_seq IS NOT NULL ORDER BY settle_seq DESC LIMIT ?", (limit,)
+            f"SELECT * FROM decisions WHERE {' AND '.join(where)} ORDER BY settle_seq DESC LIMIT ?", (*params, limit)
         )
         return [public_decision(row) for row in rows]
 

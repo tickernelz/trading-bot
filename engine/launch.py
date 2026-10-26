@@ -11,8 +11,10 @@ from typing import Any
 from engine.settings import ConfigError, Settings, load_settings
 
 STRATEGY = "SwingEmaRsi"
-STRATEGY_COMMANDS = {"trade", "backtesting", "webserver"}
+STRATEGY_COMMANDS = {"trade", "backtesting"}
 API_COMMANDS = {"trade", "webserver"}
+SHADOW_COMMANDS = {"trade"}
+TELEGRAM_COMMANDS = {"trade"}
 ENGINE_ROOT = Path(__file__).resolve().parent
 DRY_RUN_DB = "tradesv3.dryrun.sqlite"
 TRADABLE_BALANCE_RATIO = 0.99
@@ -22,7 +24,9 @@ class MissingSecret(Exception):
     """Raised when a required environment variable is unset or empty."""
 
 
-def freqtrade_config(settings: Settings, serve_api: bool = True) -> dict[str, Any]:
+def freqtrade_config(
+    settings: Settings, serve_api: bool = True, telegram: bool = False, shadow: bool = False
+) -> dict[str, Any]:
     """Translate validated settings into a Freqtrade configuration without secrets."""
     config: dict[str, Any] = {
         "bot_name": "trading-bot",
@@ -58,10 +62,12 @@ def freqtrade_config(settings: Settings, serve_api: bool = True) -> dict[str, An
             "pair_blacklist": [],
         },
         "pairlists": [{"method": "StaticPairList"}],
+        "strategy_path": str(ENGINE_ROOT / "strategies"),
         "internals": {"process_throttle_secs": 5},
         "trading_bot": {
             "bot_id": settings.bot_id,
-            "shadow_url": settings.shadow.url if settings.swarm.enabled and settings.shadow else None,
+            "shadow_url": settings.shadow.url if shadow and settings.swarm.enabled and settings.shadow else None,
+            "shadow_token_env": settings.shadow.token_env if shadow and settings.shadow else None,
             "initial_capital": settings.capital.initial_idr,
             "compounding": settings.capital.compounding,
             "risk": settings.risk.model_dump(),
@@ -77,18 +83,37 @@ def freqtrade_config(settings: Settings, serve_api: bool = True) -> dict[str, An
             "CORS_origins": [],
         }
         config["apiserver"] = {"allow_custom_messages": True}
+    if telegram:
+        channel = settings.notify.telegram
+        config["telegram"] = {
+            "enabled": True,
+            "token": "",
+            "chat_id": channel.chat_id,
+            "authorized_users": list(channel.authorized_users),
+            "allow_custom_messages": True,
+        }
     return config
 
 
-def secret_env(settings: Settings, environ: dict[str, str]) -> dict[str, str]:
-    """Map the API credentials named in settings onto Freqtrade environment overrides."""
+def telegram_enabled(settings: Settings, command: str) -> bool:
+    return command in TELEGRAM_COMMANDS and settings.notify.telegram.enabled
+
+
+def secret_env(
+    settings: Settings, environ: dict[str, str], telegram: bool = False, shadow: bool = False
+) -> dict[str, str]:
+    """Map the credentials named in settings onto Freqtrade environment overrides."""
     names = {
         "FREQTRADE__API_SERVER__USERNAME": settings.api.username_env,
         "FREQTRADE__API_SERVER__PASSWORD": settings.api.password_env,
         "FREQTRADE__API_SERVER__JWT_SECRET_KEY": settings.api.jwt_secret_env,
-        "FREQTRADE__API_SERVER__WS_TOKEN": settings.api.ws_token_env,
     }
-    missing = [source for source in names.values() if not environ.get(source)]
+    if telegram:
+        names["FREQTRADE__TELEGRAM__TOKEN"] = settings.notify.telegram.token_env
+    required = list(names.values())
+    if shadow and settings.swarm.enabled and settings.shadow is not None:
+        required.append(settings.shadow.token_env)
+    missing = [source for source in required if not environ.get(source)]
     if missing:
         raise MissingSecret(f"set environment variables: {', '.join(missing)}")
     return {target: environ[source] for target, source in names.items()}
@@ -110,13 +135,15 @@ def main(argv: list[str]) -> int:
     try:
         settings = load_settings(config_file)
         serve_api = argv[0] in API_COMMANDS
-        overrides = secret_env(settings, dict(os.environ)) if serve_api else {}
+        telegram = telegram_enabled(settings, argv[0])
+        shadow = argv[0] in SHADOW_COMMANDS
+        overrides = secret_env(settings, dict(os.environ), telegram, shadow) if serve_api else {}
     except (ConfigError, MissingSecret) as exc:
         print(f"trading-bot: refusing to start: {exc}", file=sys.stderr)
         return 2
     rendered = Path(userdir) / "trading-bot.freqtrade.json"
     rendered.parent.mkdir(parents=True, exist_ok=True)
-    config = freqtrade_config(settings, serve_api)
+    config = freqtrade_config(settings, serve_api, telegram, shadow)
     if serve_api:
         config["db_url"] = f"sqlite:///{(Path(userdir) / DRY_RUN_DB).resolve()}"
     rendered.write_text(json.dumps(config, indent=2), encoding="utf-8")

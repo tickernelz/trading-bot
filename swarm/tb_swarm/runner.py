@@ -4,55 +4,22 @@ import random
 import time
 import uuid
 from collections.abc import Mapping
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
-from pydantic import BaseModel
-
-from tb_swarm.aggregate import Aggregate, ChoiceResult, NoulResult, aggregate
 from tb_swarm.config import SwarmConfig, SwarmSettings, VoterSpec
 from tb_swarm.errors import ConfigError, ProviderError
-from tb_swarm.models import Answer, DecisionRequest, DecisionResponse, Usage
+from tb_swarm.models import DecisionRequest, DecisionResponse
+from tb_swarm.outcome import DecisionOutcome, VoterRecord, VoterStatus, settle
 from tb_swarm.providers.base import DecisionProvider
 from tb_swarm.providers.factory import AgentFactory, build_provider
 from tb_swarm.redact import redact
 from tb_swarm.shuffle import OptionOrder, identity_order, plan_order
 from tb_swarm.validate import parse_answers
 
-VoterStatus = Literal["ok", "timeout", "failed", "invalid"]
-OutcomeStatus = Literal["ok", "skip"]
-
 MAX_ERROR_CHARS = 300
-
-
-class VoterRecord(BaseModel):
-    voter_id: str
-    status: VoterStatus
-    latency_s: float
-    error_kind: str | None = None
-    error: str | None = None
-    model: str | None = None
-    usage: Usage = Usage()
-    answers: dict[str, Answer] | None = None
-    presented_options: dict[str, list[str]] = {}
-    flipped_scores: list[str] = []
-
-
-@dataclass(frozen=True)
-class DecisionOutcome:
-    decision_id: str
-    status: OutcomeStatus
-    reason: str | None
-    required: int
-    answered: int
-    aggregate: Aggregate | None
-    voters: list[VoterRecord] = field(default_factory=list)
-
-    @property
-    def proceed(self) -> bool:
-        return self.status == "ok"
 
 
 class VoterLog:
@@ -187,23 +154,7 @@ class SwarmRunner:
         self, request: DecisionRequest, decision_id: str, records: list[VoterRecord], required: int
     ) -> DecisionOutcome:
         weights = {voter.id: voter.weight for voter in self._voters}
-        ballots = [(weights[r.voter_id], r.answers) for r in records if r.status == "ok" and r.answers is not None]
-        if len(ballots) < required:
-            return DecisionOutcome(decision_id, "skip", "quorum_not_met", required, len(ballots), None, records)
-        merged = aggregate(request, ballots)
-        for name, result in merged.questions.items():
-            if isinstance(result, ChoiceResult) and result.tie:
-                return DecisionOutcome(
-                    decision_id, "skip", f"choice_tie:{name}", required, len(ballots), merged, records
-                )
-        limit = self._settings.max_spread
-        if limit is not None:
-            for name, result in merged.questions.items():
-                if isinstance(result, (NoulResult, ChoiceResult)) and result.spread.iqr > limit:
-                    return DecisionOutcome(
-                        decision_id, "skip", f"spread_exceeded:{name}", required, len(ballots), merged, records
-                    )
-        return DecisionOutcome(decision_id, "ok", None, required, len(ballots), merged, records)
+        return settle(request, decision_id, records, weights, required, self._settings.max_spread)
 
     async def aclose(self) -> None:
         await asyncio.gather(*(provider.aclose() for provider in self._providers.values()))

@@ -10,10 +10,13 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+TOKEN_HEADER = "X-Shadow-Token"
+
 
 class ShadowClient:
-    def __init__(self, url: str, timeout_s: float = 3.0) -> None:
+    def __init__(self, url: str, token: str, timeout_s: float = 3.0) -> None:
         self.url = url.rstrip("/") + "/candidates"
+        self._token = token
         self.timeout_s = timeout_s
         self.sent = 0
         self.failed = 0
@@ -26,7 +29,7 @@ class ShadowClient:
         request = urllib.request.Request(
             self.url,
             data=json.dumps(candidate).encode(),
-            headers={"content-type": "application/json"},
+            headers={"content-type": "application/json", TOKEN_HEADER: self._token},
             method="POST",
         )
         try:

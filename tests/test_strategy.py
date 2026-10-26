@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
+from freqtrade.enums import RunMode
 from freqtrade.persistence import Trade, init_db
 from pandas import DataFrame
 
@@ -60,10 +61,11 @@ class ShadowRecorder:
         self.candidates.append(candidate)
 
 
-def _unstarted(userdir, compounding: bool = True) -> SwingEmaRsi:
-    config = freqtrade_config(load_settings(EXAMPLE))
+def _unstarted(userdir, compounding: bool = True, runmode: RunMode = RunMode.DRY_RUN) -> SwingEmaRsi:
+    config = freqtrade_config(load_settings(EXAMPLE), shadow=True)
     config["trading_bot"]["compounding"] = compounding
     config["user_data_dir"] = userdir
+    config["runmode"] = runmode
     instance = SwingEmaRsi(config)
     instance.dp = CandleStub({})
     instance.bot_start()
@@ -296,3 +298,23 @@ def test_shadow_failure_never_blocks_entry(strategy):
     strategy.shadow = ShadowRecorder(fail=True)
     assert _confirm(strategy)
     assert strategy.shadow_pending == {}
+
+
+@pytest.mark.parametrize("runmode", [RunMode.BACKTEST, RunMode.WEBSERVER, RunMode.HYPEROPT])
+def test_non_trading_runmodes_leave_live_files_and_shadow_alone(db, tmp_path, monkeypatch, runmode):
+    monkeypatch.setenv("SHADOW_TOKEN", "s" * 32)
+    (tmp_path / "heartbeat.json").write_text('{"ts": "2026-10-25T00:00:00+00:00", "pid": 1}', encoding="utf-8")
+    (tmp_path / "starts.jsonl").write_text('{"pid": 1}\n', encoding="utf-8")
+    config = freqtrade_config(load_settings(EXAMPLE), shadow=True)
+    config["user_data_dir"] = tmp_path
+    config["runmode"] = runmode
+    instance = SwingEmaRsi(config)
+    instance.dp = CandleStub({"ETH/IDR": 60_000_000.0})
+    instance.bot_start()
+    assert instance.shadow is None
+    for _ in range(3):
+        instance.bot_loop_start(NOW)
+    assert _confirm(instance)
+    assert instance.dp.messages == []
+    assert (tmp_path / "starts.jsonl").read_text(encoding="utf-8") == '{"pid": 1}\n'
+    assert read_heartbeat(tmp_path) == {"ts": "2026-10-25T00:00:00+00:00", "pid": 1}

@@ -1,38 +1,44 @@
 <script lang="ts">
   import { gateway } from "../lib/gateway.svelte";
   import { age } from "../lib/format";
+  import { t } from "../lib/i18n";
 
   const g = gateway;
   const linkText = $derived.by(() => {
     switch (g.link.state) {
       case "open":
-        return "Tersambung";
+        return t("top.open");
       case "connecting":
-        return "Menyambung";
+        return t("top.connecting");
       case "waiting":
       case "offline":
-        return "Terputus";
+        return t("top.down");
       default:
-        return "Belum tersambung";
+        return t("top.idle");
     }
   });
 </script>
 
 <header class="bar">
   {#if g.mode === null}
-    <span class="mode unknown" aria-label="Mode belum diketahui" title="Mode belum diketahui">Mode ?</span>
+    <span class="mode unknown" aria-label={t("top.mode_unknown")} title={t("top.mode_unknown")}>Mode ?</span>
   {:else}
-    <span class="mode" class:live={g.mode === "live"}>{g.mode === "live" ? "Live, dana nyata" : "Dry-run"}</span>
+    <span class="mode" class:live={g.mode === "live"}>{g.mode === "live" ? t("top.live") : "Dry-run"}</span>
   {/if}
   {#if g.sampleData}
-    <span class="sample">contoh data</span>
+    <span class="sample">{t("top.sample")}</span>
+  {/if}
+  {#if g.viewingSaved}
+    <span class="sample">{t("top.read_only")}</span>
   {/if}
   <span class="sp"></span>
-  <span class="link" class:down={g.link.state !== "open"}>
-    <span class="dot" aria-hidden="true"></span>
-    <span>{linkText}</span>
-    <span class="age num" class:warn-text={g.stale}>{g.lastDataAt === null ? "" : age(g.dataAge)}</span>
-  </span>
+  {#if g.token}
+    <span class="link" class:down={g.link.state !== "open"}>
+      <span class="dot" aria-hidden="true"></span>
+      <span>{linkText}</span>
+      <span class="age num" class:warn-text={g.stale}>{g.lastDataAt === null ? "" : age(g.dataAge)}</span>
+    </span>
+  {/if}
 </header>
 
 <style>

@@ -5,6 +5,7 @@
     createSeriesMarkers,
     LineSeries,
     LineStyle,
+    LineType,
     type AutoscaleInfo,
     type IChartApi,
     type IPriceLine,
@@ -17,7 +18,10 @@
   import { onDestroy, onMount } from "svelte";
   import { chartOptions, cssColor, onSchemeChange } from "../lib/chartTheme";
   import { parseTs, signedPercent } from "../lib/format";
-  import type { CandleFrame, Trade } from "../lib/types";
+  import { t } from "../lib/i18n";
+  import { newsByBar, sentimentLine } from "../lib/timeMachine";
+  import type { CandleFrame, Decision, NewsItem, SentimentPoint, Trade } from "../lib/types";
+  import { verdictText } from "../lib/words";
 
   let {
     frame,
@@ -26,7 +30,24 @@
     showSlow,
     showRsi,
     showMarkers,
-  }: { frame: CandleFrame; trades: Trade[]; showFast: boolean; showSlow: boolean; showRsi: boolean; showMarkers: boolean } = $props();
+    news = [],
+    showNews = false,
+    sentiment = [],
+    showSentiment = false,
+    focus = null,
+  }: {
+    frame: CandleFrame;
+    trades: Trade[];
+    showFast: boolean;
+    showSlow: boolean;
+    showRsi: boolean;
+    showMarkers: boolean;
+    news?: NewsItem[];
+    showNews?: boolean;
+    sentiment?: SentimentPoint[];
+    showSentiment?: boolean;
+    focus?: Decision | null;
+  } = $props();
 
   let host: HTMLDivElement;
   let chart: IChartApi | null = null;
@@ -34,6 +55,8 @@
   let fast: ISeriesApi<"Line"> | null = null;
   let slow: ISeriesApi<"Line"> | null = null;
   let rsi: ISeriesApi<"Line"> | null = null;
+  let fng: ISeriesApi<"Line"> | null = null;
+  let centered: string | null = null;
   let markers: ISeriesMarkersPluginApi<Time> | null = null;
   let stops: IPriceLine[] = [];
   let stopFloor: number | null = null;
@@ -60,11 +83,12 @@
     fast.applyOptions({ color: ink });
     slow.applyOptions({ color: ink2 });
     rsi.applyOptions({ color: ink2 });
+    fng?.applyOptions({ color: ink2 });
     draw();
   }
 
   function draw() {
-    if (!chart || !candles || !fast || !slow || !rsi || !markers) return;
+    if (!chart || !candles || !fast || !slow || !rsi || !fng || !markers) return;
     const col = (name: string) => frame.columns.indexOf(name);
     const [iD, iO, iH, iL, iC, iF, iS, iR] = ["date", "open", "high", "low", "close", "ema_fast", "ema_slow", "rsi"].map(col);
     const rows = frame.data;
@@ -78,36 +102,56 @@
     const list: SeriesMarker<Time>[] = [];
     if (showMarkers) {
       const ink = cssColor("--ink");
-      for (const t of trades) {
-        const open = barTime(t.open_timestamp);
-        if (open >= first) list.push({ time: open, position: "belowBar", shape: "arrowUp", color: ink, text: "Masuk #" + t.trade_id });
-        if (!t.is_open && t.close_timestamp) {
-          const close = barTime(t.close_timestamp);
-          if (close >= first) list.push({ time: close, position: "aboveBar", shape: "arrowDown", color: ink, text: "Keluar " + signedPercent(t.profit_pct ?? 0) });
+      for (const trade of trades) {
+        const open = barTime(trade.open_timestamp);
+        if (open >= first) list.push({ time: open, position: "belowBar", shape: "arrowUp", color: ink, text: t("chart.entry_marker", { id: trade.trade_id }) });
+        if (!trade.is_open && trade.close_timestamp) {
+          const close = barTime(trade.close_timestamp);
+          if (close >= first) list.push({ time: close, position: "aboveBar", shape: "arrowDown", color: ink, text: t("chart.exit_marker", { pct: signedPercent(trade.profit_pct ?? 0) }) });
         }
       }
     }
+    const last = rows.length ? toTime(rows[rows.length - 1][iD] as string) : 0;
+    if (showNews) {
+      const ink2 = cssColor("--ink2");
+      for (const [bar, items] of newsByBar(news, first)) {
+        list.push({ time: bar as UTCTimestamp, position: "aboveBar", shape: "square", color: ink2, size: 0.6, text: t("chart.news_marker", { n: items.length }) });
+      }
+    }
+    if (focus) {
+      const bar = barTime(parseTs(focus.candle));
+      if (bar >= first) list.push({ time: bar, position: "aboveBar", shape: "arrowDown", color: cssColor("--ink"), text: t("tm.marker", { verdict: verdictText(focus) }) });
+    }
     markers.setMarkers(list.sort((a, b) => (a.time as number) - (b.time as number)));
+    fng.setData(showSentiment ? sentimentLine(sentiment, first, last).map((p) => ({ time: p.time as UTCTimestamp, value: p.value })) : []);
     for (const s of stops) candles.removePriceLine(s);
-    const open = trades.filter((t) => t.is_open);
-    const stopOf = (t: Trade) => t.stop_loss_abs ?? t.open_rate * (1 + (t.stop_loss_pct ?? -3) / 100);
+    const open = trades.filter((trade) => trade.is_open);
+    const stopOf = (trade: Trade) => trade.stop_loss_abs ?? trade.open_rate * (1 + (trade.stop_loss_pct ?? -3) / 100);
     stopFloor = open.length ? Math.min(...open.map(stopOf)) : null;
     stops = open
-      .map((t) =>
+      .map((trade) =>
         candles!.createPriceLine({
-          price: stopOf(t),
+          price: stopOf(trade),
           color: cssColor("--sig"),
           lineWidth: 2,
           lineStyle: LineStyle.Dashed,
           axisLabelVisible: true,
-          title: "stop loss #" + t.trade_id,
+          title: t("chart.stop_line", { id: trade.trade_id }),
         }),
       );
     chart.panes()[1]?.setHeight(showRsi ? 110 : 0);
+    chart.panes()[2]?.setHeight(showSentiment ? 90 : 0);
+    const bars = Math.max(24, Math.min(96, Math.round(host.clientWidth / 11)));
     if (fitted !== frame.pair && rows.length) {
       fitted = frame.pair;
-      const bars = Math.max(24, Math.min(96, Math.round(host.clientWidth / 11)));
       chart.timeScale().setVisibleLogicalRange({ from: rows.length - bars, to: rows.length + 2 });
+    }
+    const focusId = focus ? focus.decision_id : null;
+    if (focusId !== centered && rows.length) {
+      centered = focusId;
+      const at = focus ? rows.findIndex((r) => toTime(r[iD] as string) >= barTime(parseTs(focus.candle))) : -1;
+      if (at >= 0) chart.timeScale().setVisibleLogicalRange({ from: at - bars / 2, to: at + bars / 2 });
+      else chart.timeScale().setVisibleLogicalRange({ from: rows.length - bars, to: rows.length + 2 });
     }
   }
 
@@ -127,13 +171,27 @@
     rsi = chart.addSeries(LineSeries, { lineWidth: 1, priceLineVisible: false, lastValueVisible: true, title: "RSI" }, 1);
     rsi.createPriceLine({ price: 70, color: cssColor("--rule-strong"), lineWidth: 1, lineStyle: LineStyle.Dotted, axisLabelVisible: false, title: "" });
     rsi.createPriceLine({ price: 30, color: cssColor("--rule-strong"), lineWidth: 1, lineStyle: LineStyle.Dotted, axisLabelVisible: false, title: "" });
+    fng = chart.addSeries(
+      LineSeries,
+      {
+        lineWidth: 2,
+        lineType: LineType.WithSteps,
+        priceLineVisible: false,
+        lastValueVisible: true,
+        title: t("chart.fear_greed_short"),
+        autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 100 } }),
+      },
+      2,
+    );
+    fng.createPriceLine({ price: 25, color: cssColor("--rule-strong"), lineWidth: 1, lineStyle: LineStyle.Dotted, axisLabelVisible: false, title: "" });
+    fng.createPriceLine({ price: 75, color: cssColor("--rule-strong"), lineWidth: 1, lineStyle: LineStyle.Dotted, axisLabelVisible: false, title: "" });
     markers = createSeriesMarkers(candles, []);
     detach = onSchemeChange(theme);
     theme();
   });
 
   $effect(() => {
-    void [frame, trades, showFast, showSlow, showRsi, showMarkers];
+    void [frame, trades, showFast, showSlow, showRsi, showMarkers, news, showNews, sentiment, showSentiment, focus];
     draw();
   });
 
@@ -144,7 +202,7 @@
   });
 </script>
 
-<div class="chart" bind:this={host} role="img" aria-label="Grafik kandel {frame.pair} per jam dengan penanda masuk dan keluar"></div>
+<div class="chart" bind:this={host} role="img" aria-label={t("chart.candle_label", { pair: frame.pair })}></div>
 
 <style>
   .chart {

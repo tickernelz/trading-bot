@@ -2,12 +2,35 @@ import { createApi, type Api } from "./api";
 import { FeedClient, type LinkInfo } from "./feed";
 import { describe, type FeedItem } from "./feedText";
 import { parseTs } from "./format";
+import { decodeView, storeView, VIEW_KEY, type SavedView } from "./savedView";
 import { carriesData, faultOf, greetingMessages, isStale, loadSnapshot, safetyOf, type Fault, type PanelName, type SafetyState } from "./state";
-import type { CandleFrame, Decision, Equity, FeedEvent, Health, LogLine, Overview, Risk, Sysinfo, Trade } from "./types";
+import type { AuditRow, BotInfo, CandleFrame, Decision, Equity, FeedEvent, Health, LogLine, News, Overview, Risk, Scope, SessionInfo, Sentiment, Sysinfo, Trade } from "./types";
+
+const DEFAULT_BOTS: BotInfo[] = [
+  { id: "A", label: "Bot A" },
+  { id: "B", label: "Bot B" },
+];
 
 const FEED_LIMIT = 200;
 const RECOVERY_REFRESH_MS = 10000;
 const TOKEN_KEY = "tb.session";
+const SCOPE_KEY = "tb.scope";
+const OVERLAY_TTL_MS = 15 * 60 * 1000;
+const HISTORY_LIMIT = 200;
+
+export type LazyPanel = "candles" | "news" | "sentiment" | "history";
+
+function savedViewFromStorage(): SavedView | null {
+  try {
+    return decodeView(localStorage.getItem(VIEW_KEY));
+  } catch {
+    return null;
+  }
+}
+
+function clearAppBadge(): void {
+  if ("clearAppBadge" in navigator) void navigator.clearAppBadge().catch(() => undefined);
+}
 const BASE = (import.meta.env.VITE_GATEWAY_BASE as string | undefined) ?? "";
 
 export interface PendingOrder {
@@ -47,8 +70,17 @@ class Gateway {
   logs = $state<LogLine[]>([]);
   coreFault = $state<Fault | null>(null);
   upstreamFault = $state<Fault | null>(null);
-  panelFaults = $state<Partial<Record<PanelName | "candles", Fault>>>({});
+  panelFaults = $state<Partial<Record<PanelName | LazyPanel, Fault>>>({});
   pending = $state<PendingOrder[]>([]);
+  scope = $state<Scope | null>(sessionStorage.getItem(SCOPE_KEY) === "control" ? "control" : sessionStorage.getItem(TOKEN_KEY) ? "read" : null);
+  bots = $state<BotInfo[]>(DEFAULT_BOTS);
+  auditLive = $state<AuditRow[]>([]);
+  stateTick = $state(0);
+  news = $state<Record<string, News>>({});
+  sentiment = $state<Sentiment | null>(null);
+  history = $state<Record<string, Decision[]>>({});
+  savedAt = $state<number | null>(null);
+  viewingSaved = $state(false);
 
   readonly api: Api;
   private client: FeedClient;
@@ -57,6 +89,7 @@ class Gateway {
   private watchedPairs = new Set<string>();
   private refreshing = false;
   private lastRefreshAt = 0;
+  private overlayAt = new Map<string, number>();
 
   constructor() {
     this.api = createApi(BASE, () => this.token, () => this.logout());
@@ -69,11 +102,16 @@ class Gateway {
       },
       greeting: () => this.greeting(),
     });
+    const saved = savedViewFromStorage();
+    this.savedAt = saved?.saved_at ?? null;
+    if (saved && this.token) this.applySaved(saved);
+    clearAppBadge();
     setInterval(() => (this.now = Date.now()), 1000);
     addEventListener("online", () => this.client.retryNow());
     addEventListener("offline", () => this.client.wentOffline());
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "visible") {
+        clearAppBadge();
         this.client.retryNow();
         if (this.link.state === "open") void this.refresh();
       }
@@ -102,11 +140,68 @@ class Gateway {
     return safetyOf(this.health, this.risk);
   }
 
+  get canControl(): boolean {
+    return this.scope === "control";
+  }
+
+  openSaved(): void {
+    const saved = savedViewFromStorage();
+    if (saved) this.applySaved(saved);
+  }
+
+  closeSaved(): void {
+    if (!this.token) this.viewingSaved = false;
+  }
+
+  private applySaved(saved: SavedView): void {
+    this.health = saved.health;
+    this.overview = saved.overview;
+    this.risk = saved.risk;
+    this.openTrades = saved.openTrades;
+    this.closedTrades = saved.closedTrades;
+    this.equityDay = saved.equityDay;
+    this.equityWeek = saved.equityWeek;
+    this.decisions = saved.decisions;
+    this.candles = saved.candles;
+    this.news = saved.news;
+    this.sentiment = saved.sentiment;
+    this.sampleData = Boolean(saved.health.gateway.sample_data);
+    this.lastDataAt = parseTs(saved.overview.as_of);
+    this.savedAt = saved.saved_at;
+    this.viewingSaved = true;
+  }
+
+  private persist(): void {
+    if (!this.health || !this.overview || !this.risk) return;
+    const at = Date.now();
+    const stored = storeView(localStorage, {
+      saved_at: at,
+      health: this.health,
+      overview: this.overview,
+      risk: this.risk,
+      openTrades: this.openTrades,
+      closedTrades: this.closedTrades,
+      equityDay: this.equityDay,
+      equityWeek: this.equityWeek,
+      decisions: this.decisions,
+      candles: this.candles,
+      news: this.news,
+      sentiment: this.sentiment,
+    });
+    if (stored) this.savedAt = at;
+  }
+
   async login(password: string): Promise<void> {
-    const session = await this.api.post<{ token: string; expires_at: string }>("/gw/v1/session", { password });
+    const session = await this.api.post<SessionInfo>("/gw/v1/session", { password });
     this.token = session.token;
+    this.scope = session.scope === "control" ? "control" : "read";
     sessionStorage.setItem(TOKEN_KEY, session.token);
+    sessionStorage.setItem(SCOPE_KEY, this.scope);
     this.start();
+  }
+
+  touchState(): void {
+    this.stateTick++;
   }
 
   reconnect(): void {
@@ -115,7 +210,12 @@ class Gateway {
 
   logout(): void {
     this.token = null;
+    this.scope = null;
     sessionStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(SCOPE_KEY);
+    localStorage.removeItem(VIEW_KEY);
+    this.savedAt = null;
+    this.viewingSaved = false;
     this.client.stop();
     if (this.refreshTimer) clearInterval(this.refreshTimer);
     this.refreshTimer = null;
@@ -147,6 +247,44 @@ class Gateway {
     }
   }
 
+  private fresh(key: string): boolean {
+    const at = this.overlayAt.get(key);
+    return at !== undefined && Date.now() - at < OVERLAY_TTL_MS;
+  }
+
+  async loadNews(pair: string, force = false): Promise<void> {
+    if (!force && this.fresh("news:" + pair)) return;
+    try {
+      const news = await this.api.get<News>("/gw/v1/news?pair=" + encodeURIComponent(pair) + "&limit=50");
+      this.news = { ...this.news, [pair]: news };
+      this.overlayAt.set("news:" + pair, Date.now());
+      this.clearPanelFault("news");
+    } catch (error) {
+      this.panelFaults = { ...this.panelFaults, news: faultOf(error, Date.now()) };
+    }
+  }
+
+  async loadSentiment(force = false): Promise<void> {
+    if (!force && this.fresh("sentiment")) return;
+    try {
+      this.sentiment = await this.api.get<Sentiment>("/gw/v1/sentiment?days=30");
+      this.overlayAt.set("sentiment", Date.now());
+      this.clearPanelFault("sentiment");
+    } catch (error) {
+      this.panelFaults = { ...this.panelFaults, sentiment: faultOf(error, Date.now()) };
+    }
+  }
+
+  async loadHistory(pair: string): Promise<void> {
+    try {
+      const rows = await this.api.get<Decision[]>("/gw/v1/decisions?pair=" + encodeURIComponent(pair) + "&limit=" + HISTORY_LIMIT);
+      this.history = { ...this.history, [pair]: rows };
+      this.clearPanelFault("history");
+    } catch (error) {
+      this.panelFaults = { ...this.panelFaults, history: faultOf(error, Date.now()) };
+    }
+  }
+
   private greeting(): object[] {
     return greetingMessages(this.lastSeq, this.watchedPairs);
   }
@@ -155,7 +293,7 @@ class Gateway {
     return greetingMessages(null, this.watchedPairs)[0];
   }
 
-  private clearPanelFault(name: PanelName | "candles"): void {
+  private clearPanelFault(name: PanelName | LazyPanel): void {
     if (!this.panelFaults[name]) return;
     const rest = { ...this.panelFaults };
     delete rest[name];
@@ -183,6 +321,7 @@ class Gateway {
       this.lastDataAt = Math.max(this.lastDataAt ?? 0, parseTs(snap.core.overview.as_of));
       this.coreFault = null;
       this.upstreamFault = null;
+      this.viewingSaved = false;
     } else {
       this.coreFault = snap.coreFault;
     }
@@ -194,8 +333,10 @@ class Gateway {
     if (p.decisions) this.decisions = p.decisions;
     if (p.sysinfo) this.sysinfo = p.sysinfo;
     if (p.logs) this.logs = p.logs;
-    const candles = this.panelFaults.candles;
-    this.panelFaults = candles ? { ...snap.panelFaults, candles } : snap.panelFaults;
+    const lazy: Partial<Record<LazyPanel, Fault>> = {};
+    for (const name of ["candles", "news", "sentiment", "history"] as const) if (this.panelFaults[name]) lazy[name] = this.panelFaults[name];
+    this.panelFaults = { ...snap.panelFaults, ...lazy };
+    if (snap.core) this.persist();
   }
 
   private apply(event: FeedEvent): void {
@@ -214,6 +355,7 @@ class Gateway {
         break;
       case "gw.hello":
         this.sampleData = Boolean(data.sample_data);
+        if (Array.isArray(data.bots) && data.bots.length > 0) this.bots = data.bots as BotInfo[];
         void this.refresh();
         for (const pair of this.watchedPairs) void this.loadCandles(pair);
         break;
@@ -242,13 +384,18 @@ class Gateway {
         }
         break;
       case "status":
-        if (this.health) this.health = { ...this.health, freqtrade: { ...this.health.freqtrade, state: String(data.status) } };
+        if (this.health && (!event.bot || event.bot === this.bots[0]?.id)) this.health = { ...this.health, freqtrade: { ...this.health.freqtrade, state: String(data.status) } };
+        this.stateTick++;
+        break;
+      case "gw.audit":
+        this.auditLive = [event.data as AuditRow, ...this.auditLive.filter((r) => r.id !== (event.data as AuditRow).id)].slice(0, 50);
         break;
       case "whitelist":
         if (this.overview && Array.isArray(event.data)) this.overview = { ...this.overview, pairs: { ...this.overview.pairs, whitelist: event.data as string[] } };
         break;
       case "gw.decision":
         this.decisions = [event.data as Decision, ...this.decisions].slice(0, 20);
+        this.prependHistory(event.data as Decision);
         break;
       case "gw.candles":
         this.mergeCandles(data);
@@ -269,6 +416,12 @@ class Gateway {
     }
     const item = describe(event, this.dryRun);
     if (item) this.feed = [item, ...this.feed].slice(0, FEED_LIMIT);
+  }
+
+  private prependHistory(decision: Decision): void {
+    const rows = this.history[decision.pair];
+    if (!rows || rows.some((d) => d.decision_id === decision.decision_id)) return;
+    this.history = { ...this.history, [decision.pair]: [decision, ...rows].slice(0, HISTORY_LIMIT) };
   }
 
   private mergeCandles(data: Record<string, unknown>): void {

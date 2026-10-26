@@ -10,6 +10,7 @@ Status: tahap 1 (dua bot dry-run, swarm bayangan, gateway). Belum ada akun atau 
 - engine/: launcher, skema konfigurasi, lapisan risiko, strategi
 - engine/settings.py: skema tunggal config/config.yaml, divalidasi sebelum mesin start
 - engine/risk.py: batas rugi harian, batas drawdown, ukuran posisi berbasis risiko
+- engine/news.py: pengambil judul RSS CoinDesk dan Cointelegraph serta Fear and Greed alternative.me untuk lapisan grafik (cache 15 menit dan 1 jam, diambil hanya saat diminta)
 - engine/strategies/swing_ema_rsi.py: strategi swing 1h (EMA 20/50 + RSI) dengan gerbang risiko
 - engine/launch.py: validasi config, render config Freqtrade (database trade di userdir), exec Freqtrade
 - engine/heartbeat.py: berkas heartbeat dan log start per bot
@@ -45,7 +46,7 @@ Butuh Docker di mesin yang sama; diuji di WSL2 dengan Docker Engine 29.9.2.
     mkdir -p user_data
     cp config/config.example.yaml config/config.yaml
 
-Isi FT_API_USERNAME, FT_API_PASSWORD, FT_API_JWT_SECRET (minimal 32 karakter), FT_API_WS_TOKEN di .env (jangan di-commit). Hanya trade dan webserver yang membuka API dan membutuhkan keempatnya; download-data, backtesting, dan show-config berjalan tanpa API server. Lalu:
+Isi FT_API_USERNAME, FT_API_PASSWORD, FT_API_JWT_SECRET (minimal 32 karakter) di .env (jangan di-commit). Hanya trade dan webserver yang membuka API dan membutuhkan ketiganya; download-data, backtesting, dan show-config berjalan tanpa API server. Config contoh menyalakan swarm bayangan, jadi trade dan webserver juga butuh SHADOW_TOKEN (minimal 32 karakter, sama dengan milik layanan bayangan); untuk bot aturan saja set `swarm.enabled: false` dan hapus bagian `shadow`. `ws_token` Freqtrade sengaja tidak dipakai: gateway menyambung WebSocket dengan JWT 15 menit (docs/gateway-api.md bagian 8). Lalu:
 
     docker compose build bot
     docker compose up -d bot
@@ -69,19 +70,32 @@ Empat proses, satu image (`trading-bot/engine`), semuanya hanya mendengarkan 127
 | --- | --- | --- |
 | bot-a | 8080 | Freqtrade, aturan saja (`swarm.enabled: false`) |
 | bot-b | 8081 | Freqtrade, aturan yang sama; tiap entry yang lolos lapisan risiko dikirim ke layanan bayangan tanpa menunggu jawaban |
-| shadow-b | 8091 | Swarm voter nyata; mencatat jawaban, median, sebaran, kuorum, dan verdict yang AKAN diambil ke `bot-b/swarm_decisions.sqlite`. Tidak pernah memengaruhi order |
+| shadow-b | 8091 | `POST /candidates` hanya dengan header `X-Shadow-Token` yang sama dengan SHADOW_TOKEN. Swarm voter nyata; mencatat jawaban, median, sebaran, kuorum, dan verdict yang AKAN diambil ke `bot-b/swarm_decisions.sqlite`. Tidak pernah memengaruhi order |
 | gateway | 8090 | Sesi, endpoint baca, feed, kesehatan, biaya dan token, audit |
+
+Susunan voter contoh mengikuti tahap 0c (tujuh voter aktif di tujuh provider berbeda, docs/stage0-findings.md). Alasan tidak menaruh banyak voter pada satu key terukur 2026-10-26 02:0x UTC lewat `ShadowService` dengan voter nyata, satu kandidat BTC/IDR yang sama tiap ronde dan jeda 2 s antar ronde (keluaran mentah per keputusan dan per voter terlampir di ZHA-3764):
+
+| Susunan | Ronde | Panggilan voter | Keputusan |
+| --- | --- | --- | --- |
+| 7 voter pada satu key nutaraline | 5 | 18 sah, 17 HTTP 429 "Laju request per key melebihi batas" | kuorum 5 gagal 3 dari 5 |
+| 4 nutaraline + 3 experientiallabs | 8 | 56 dari 56 sah | 7 dari 7 menjawab di 8 dari 8; 5 `ok`, 3 `choice_tie` |
+| 3 nutaraline + 2 tiprouter + 2 experientiallabs | 5 | tiprouter 0 dari 10 (6 HTTP 503, 4 timeout 30 s) | kuorum 5 tercapai karena 5 voter lain |
+
+Latensi jawaban sah pembagian 4+3: nutaraline median 1,6 s maks 2,7 s; experientiallabs median 6,4 s maks 26,9 s. Maks experientiallabs dekat `timeout_s` 30, jadi timeout voter itu perlu dipantau. `choice_tie` adalah seri antar jawaban voter (aturan agregasi), bukan galat provider.
 
 Mode `swarm.mode: veto` ditolak skema sampai gerbang dibangun. Trade yang dibayangi membawa custom data `shadow_decision_id`, sehingga `DecisionStore.outcomes(<tradesv3.dryrun.sqlite>)` bisa menghitung apakah entry yang akan dilewati ternyata rugi.
 
-Setiap bot menulis `heartbeat.json` tiap loop dan menambah satu baris di `starts.jsonl` tiap start. Setelah start, bot menolak semua entry sampai cek start lolos: posisi terbuka dihargai dan batas rugi harian serta drawdown dinilai; hasilnya dikirim sebagai `strategy_msg` `startup_check`.
+Setiap bot menulis `heartbeat.json` tiap loop dan menambah satu baris di `starts.jsonl` tiap start. Setelah start, bot menolak semua entry sampai cek start lolos: posisi terbuka dihargai dan batas rugi harian serta drawdown dinilai; hasilnya dikirim sebagai `strategy_msg` `startup_check`. Semua ini, ditambah pengiriman kandidat ke layanan bayangan, hanya berjalan di runmode `dry_run` dan `live`: Freqtrade juga memanggil `bot_start`, `bot_loop_start`, `confirm_trade_entry`, dan `order_filled` saat backtest, hyperopt, dan webserver, dan di sana strategi tidak menyentuh berkas bot hidup maupun voter. Launcher hanya merender alamat layanan bayangan dan mewajibkan SHADOW_TOKEN untuk perintah `trade`.
 
 Direktori jalan (di luar repo), contoh `~/Projects/trading-bot-runs/stage1`:
 
     config/bot-a.yaml config/bot-b.yaml config/gateway.yaml
-    secrets/ft.env        FT_API_USERNAME, FT_API_PASSWORD, FT_API_JWT_SECRET, FT_API_WS_TOKEN
-    secrets/gateway.env   GW_PASSWORD (minimal 12 karakter)
-    secrets/swarm.env     kunci provider voter, mis. NUTARALINE_API_KEY
+    secrets/ft.env        FT_API_USERNAME, FT_API_PASSWORD, FT_API_JWT_SECRET (bot-a, bot-b)
+    secrets/shadow.env    SHADOW_TOKEN, minimal 32 karakter (bot-b, shadow-b)
+    secrets/swarm.env     kunci provider voter, mis. NUTARALINE_API_KEY, EXPERIENTIALLABS_API_KEY (shadow-b)
+    secrets/gateway.env   GW_PASSWORD (minimal 12 karakter), FT_API_USERNAME, FT_API_PASSWORD (gateway)
+
+Tiap proses hanya menerima berkas rahasia yang dipakainya: gateway tidak memegang JWT secret Freqtrade, bot tidak memegang kunci provider, layanan bayangan tidak memegang kredensial Freqtrade.
     bot-a/ bot-b/ gateway/
 
 `config/bot-*.yaml` berasal dari `config/config.example.yaml` dengan `bot_id`, `api.port`, dan `swarm.enabled` berbeda; `config/gateway.yaml` dari `config/gateway.example.yaml` dengan path di bawah `/opt/trading-bot/run`. Lalu:
@@ -101,6 +115,23 @@ Rekam data uji gateway dari lari yang sedang jalan (butuh `secrets/ft.env` dan `
 
 Unit systemd user transien (`Restart=always`) bertahan saat sesi terminal atau server lain di-restart; restart dihitung dari `starts.jsonl`. Log: `journalctl --user -u trading-bot-stage1-bot-a`.
 
+## Kanal Telegram (nonaktif bawaan)
+
+Kanal kontrol memakai Telegram bawaan Freqtrade (perintah /status, /profit, /balance, /daily, /stopentry, /start, /stop, /forceexit, /reload_config, /help, dan lainnya). Bawaannya mati. Untuk menyalakan, isi di config/config.yaml:
+
+    notify:
+      telegram:
+        enabled: true
+        token_env: TELEGRAM_BOT_TOKEN
+        chat_id: "<id chat>"
+        authorized_users: ["<id user Telegram>"]
+
+lalu isi TELEGRAM_BOT_TOKEN di .env. Token hanya lewat variabel lingkungan (FREQTRADE__TELEGRAM__TOKEN), tidak pernah ditulis ke config Freqtrade yang dirender. Launcher menolak start bila kanal menyala tanpa chat_id, tanpa authorized_users, atau tanpa token. Hanya perintah trade yang memuat kanal ini.
+
+Risiko yang diterima saat menyalakan: perintah Telegram dijalankan Freqtrade langsung, tanpa konfirmasi dua langkah dan tanpa log audit gateway (docs/gateway-api.md bagian 3). /forcelong tetap tertolak selama api.force_entry false. Pesan dari chat atau user lain diabaikan Freqtrade.
+
+Bukti: tests/test_telegram_channel.py menjalankan modul Telegram Freqtrade asli terhadap Bot API tiruan lokal (chat pemilik mendapat jawaban /status, /stopentry, /help; /stopentry dari chat lain tidak mengubah keadaan). Belum terbukti dengan bot Telegram sungguhan karena belum ada token.
+
 ## Tes
 
     docker compose --profile test build tests
@@ -108,12 +139,29 @@ Unit systemd user transien (`Restart=always`) bertahan saat sesi terminal atau s
 
 Tes berjalan di dalam image turunan Freqtrade, jadi versi Freqtrade, ccxt, dan pandas sama dengan produksi. Kontrol negatif: matikan pemeriksaan batas di engine/risk.py (ganti kedua if batas menjadi if False:) lalu jalankan tes; tes batas wajib gagal.
 
+## Analitik
+
+Paket analytics/ menyediakan pratinjau what-if batas risiko dan putar ulang jawaban voter, papan skor voter, uji stres turun 10 persen, ekspor CSV dan ringkasan pajak sebagai informasi, portofolio per pair, serta sinyal strategi dan backtest lewat instans Freqtrade mode webserver. Bentuk endpoint ada di bagian 13 docs/gateway-api.md; ambang dan tarif diatur di bagian analytics config. Rutenya dipasang ke gateway lewat `gateway/analytics_context.py`; `analysis_url` di config gateway menunjuk instans webserver (port 8092 di contoh) yang config-nya memakai `api.port: 8092`.
+
+Sinyal dan backtest butuh instans mode webserver dengan data OHLCV di userdir-nya (bot mode trade menjawab 503 untuk /pair_history dan /backtest):
+
+    docker run --rm --network host --env-file .env -v ./config:/opt/trading-bot/config:ro -v ./user_data:/freqtrade/user_data trading-bot/engine:dev download-data --days 25 --timeframes 1h
+    docker run -d --network host --env-file .env -v ./config:/opt/trading-bot/config:ro -v ./user_data:/freqtrade/user_data trading-bot/engine:dev webserver
+
+Pair tambahan cukup ditulis di exchange.pairs (dan risk.max_open_trades dinaikkan); setiap pair menambah panggilan voter per kandidat entry.
+
 ## Batasan Indodax yang terukur
 
 - Freqtrade 2026.9 mencetak peringatan bahwa indodax tidak didukung resmi dan memakai kelas exchange generik, tetapi OHLCV 1h BTC/IDR, ETH/IDR, SOL/IDR terambil.
 - ccxt 4.5.84 melaporkan biaya taker Indodax 0.2 sebagai rasio (bukan 0,2%), sehingga Freqtrade akan memakai biaya 20% bila tidak ditimpa. Karena itu exchange.fee_pct: 0.2 wajib di config dan dirender menjadi fee: 0.002.
 - ccxt melaporkan fetchMyTrades dan watchOHLCV tidak tersedia (dilaporkan Freqtrade sebagai missing opt).
-- Riwayat OHLCV 1h hanya sekitar 649 candle terakhir (27 hari) walaupun diminta 120 hari; permintaan 1d mengembalikan 1000 candle dalam satu panggilan. Backtest 1h karena itu terbatas pada sekitar 27 hari.
+- Satu permintaan OHLCV dengan rentang panjang hanya mengembalikan candle terbaru (1h: 649 candle, 27 hari), sehingga download-data Freqtrade berhenti di 27 hari. Riwayat 1h sendiri tersedia minimal sejak 2023-10-01: engine/history.py mengambilnya per jendela 500 candle (docs/stage2-backtest.md).
+
+## Backtest tahap 2
+
+    IMAGE=trading-bot/engine:dev scripts/stage2_backtest.sh user_data/stage2
+
+Mengunduh riwayat 1h tiga pair sejak 2023-10-01, lalu menjalankan delapan backtest yang matriksnya dikunci di engine/backtest_suite.py (in-sample dan out-of-sample, fee 0,2% dan pajak 0,21% per sisi, pembanding fee saja dan tanpa biaya, batas risiko apa adanya dan dimatikan). Hasil: report.json dan report.md di direktori keluaran. Temuan: docs/stage2-backtest.md.
 
 ## Memperbarui Freqtrade
 
