@@ -70,13 +70,14 @@ async def decide_paced(voter, request, arguments):
         try:
             response = await voter.decide(request)
         except ProviderError as exc:
-            if exc.kind != "rate_limit" or retries >= arguments.rate_limit_retries:
-                raise
-            retries += 1
-            await asyncio.sleep(arguments.rate_limit_wait * retries * random.uniform(0.8, 1.2))
-        else:
+            if exc.kind == "rate_limit" and retries < arguments.rate_limit_retries:
+                retries += 1
+                await asyncio.sleep(arguments.rate_limit_wait * retries * random.uniform(0.8, 1.2))
+                continue
             await asyncio.sleep(arguments.interval)
-            return response, retries
+            raise
+        await asyncio.sleep(arguments.interval)
+        return response, retries
 
 
 def percentile(values, share):
@@ -153,7 +154,7 @@ async def main():
     parser.add_argument("--extra-body", default=os.environ.get("NUTARALINE_EXTRA_BODY"))
     parser.add_argument("--modes", default="prompt,json_object,json_schema")
     parser.add_argument("--backends", default="direct,deepagents")
-    parser.add_argument("--interval", type=float, default=0.0)
+    parser.add_argument("--interval", type=float, default=3.0)
     parser.add_argument("--rate-limit-retries", type=int, default=4)
     parser.add_argument("--rate-limit-wait", type=float, default=15.0)
     parser.add_argument("--out", type=Path)
