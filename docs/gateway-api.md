@@ -516,7 +516,7 @@ All content in this section is `draft`: used by the PWA (`pwa/`) and the mock ga
 Equity curve for today's trace (Summary) and the Bot A vs Bot B comparison (Charts). `start_equity` is the starting equity of the window (00:00 WIB for `day`, initial capital for `7d`). `window=total` and `series[].start_equity`: section 18.5.
 
 ```json
-{"window": "7d", "start_equity": 2000000, "series": [{"bot": "A", "label": "Bot A", "strategy": "aturan saja", "points": [["2026-10-18T18:00:00Z", 2000000.0]]}, {"bot": "B", "label": "Bot B", "strategy": "aturan + swarm bayangan", "points": [["2026-10-18T18:00:00Z", 2000000.0]]}]}
+{"window": "7d", "start_equity": 2000000, "series": [{"bot": "A", "label": "Bot A", "strategy": "rules only", "points": [["2026-10-18T18:00:00Z", 2000000.0]]}, {"bot": "B", "label": "Bot B", "strategy": "rules + shadow swarm", "points": [["2026-10-18T18:00:00Z", 2000000.0]]}]}
 ```
 
 ### 11.2 `GET /gw/v1/decisions?limit=20` and the `gw.decision` event
@@ -532,10 +532,13 @@ One swarm `VoterLog` row (`swarm/tb_swarm/runner.py` on the stage 0b branch) plu
 ### 11.3 Web Push
 
 - `GET /gw/v1/push/key` returns `{"public_key": "<VAPID base64url>"}`.
-- `POST /gw/v1/push/subscriptions` body `{"subscription": <PushSubscription.toJSON()>, "kinds": ["fill", "risk_breach", "kill_switch", "heartbeat_lost", "quorum_failed", "daily_summary"]}`; `DELETE` body `{"endpoint": "..."}`.
-- `POST /gw/v1/push/test` sends one test `daily_summary`.
-- Push payload: `{"kind", "title", "body", "url", "ts", "id"}`. The service worker displays everything as a visible notification (an iOS requirement); `risk_breach`, `kill_switch`, `heartbeat_lost` use `requireInteraction`.
-- `GET /gw/v1/health` may carry `gateway.sample_data: true`; the PWA then displays the label "contoh data".
+- `POST /gw/v1/push/subscriptions` body `{"subscription": <PushSubscription.toJSON()>, "kinds": ["fill", "risk_breach", "kill_switch", "heartbeat_lost", "quorum_failed", "daily_summary"], "lang": "en"}`; `kinds` and `lang` are optional (all kinds, `en`). Response `201 {"endpoint", "kinds", "lang"}`. `lang` is the language of the message text: an empty or unknown code gives `en`, a regional code such as `id-ID` gives `id`. `DELETE` body `{"endpoint": "..."}` returns `{"removed"}`.
+- `POST /gw/v1/push/test` sends one sample `daily_summary` to the subscriptions that ask for it and returns `{"sent", "failed"}`.
+- All push routes need a session. New errors: `400 invalid_request` when the endpoint is not `https` on port 443 at `fcm.googleapis.com`, `*.push.services.mozilla.com`, `*.push.apple.com` or `*.notify.windows.com` (or the URL parsers disagree about the host), `p256dh` is not a P-256 point, `auth` is not 16 bytes, or a kind is unknown; `409 push_limit` at 20 subscriptions.
+- Push payload: `{"kind", "title", "body", "lang", "url", "ts", "id"}`. The text comes from the per-language catalog `gateway/locales/<lang>.json`, because the service worker has no PWA catalog; adding a push language is one JSON file. `url` uses the hashes of the English PWA: `fill` `/#activity`, `risk_breach` and `kill_switch` and `daily_summary` `/#summary`, `heartbeat_lost` `/#system`, `quorum_failed` `/#swarm`. Urgency is `high` except `daily_summary` (`normal`); TTL 600 seconds; delivery does not follow redirects. The service worker displays everything as a visible notification (an iOS requirement); `risk_breach`, `kill_switch`, `heartbeat_lost` use `requireInteraction`.
+- Triggers follow `notify.web_push` in the bot config: `fill` (`entry_fill` or `exit_fill`), `risk_breach` (only a new `daily_loss` or `total_drawdown` breach), `kill_switch` (control pause or stop-entry), `heartbeat_lost` (once per occurrence), `quorum_failed` (a `skip` decision with `quorum_not_met`), `daily_summary` (once per local bot day, on the first tick after the day changes, using yesterday's profit).
+- Gateway configuration: `push_contact` (`mailto:` or `https://`, default `mailto:trading-bot@localhost`) and `push_allow_local_endpoints` (default `false`, for tests only). The VAPID private key is `<state_dir>/vapid_private.pem`, mode 0600, created once. Ledger tables: `push_subscriptions`, `push_state`.
+- `GET /gw/v1/health` may carry `gateway.sample_data: true`; the PWA then displays the label "sample data" (key `top.sample` in its message catalog).
 
 ### 11.4 WebSocket closure
 
@@ -550,7 +553,7 @@ Every `subscribe` message from the PWA carries the complete list of topics and t
 
 The last-data clock only advances through events coming from the Freqtrade WebSocket (all topics in 11.5 except `gw.decision`) or through `overview.as_of` from a successful REST refresh. `gw.decision` originates from the swarm log, not from Freqtrade, so it is not considered evidence that Freqtrade is alive. `gw.hello`, `gw.resync`, `gw.error`, and `pong` also do not advance it. Every `gw.error`, whatever its code, makes the status board show as stale until the next data event arrives; if the last core refresh failed, until a core refresh succeeds again. The first data event after an error triggers an immediate core refresh, at most once per 10 seconds.
 
-The REST refresh is split in two. The core (`/health`, `/overview`, `/risk`) determines the status board; if it fails, the board shows "Tidak diketahui" or shows as stale with its error. The panels (`/trades/open`, `/trades`, `/equity` x2, `/decisions`, `/sysinfo`, `/logs`) are populated individually; a panel that fails uses its last data and its error is shown on the System screen and in the place of that panel.
+The REST refresh is split in two. The core (`/health`, `/overview`, `/risk`) determines the status board; if it fails, the board shows "Unknown" or shows as stale with its error. The panels (`/trades/open`, `/trades`, `/equity` x2, `/decisions`, `/sysinfo`, `/logs`) are populated individually; a panel that fails uses its last data and its error is shown on the System screen and in the place of that panel.
 
 ### 11.7 Poll budget per client
 
@@ -623,7 +626,6 @@ When `entry_fill` or `exit_fill` arrives from Freqtrade, the gateway records the
 ### 12.4 Not yet built
 
 - Controls of sections 3 and 6 and the `control` scope are built in the control work (section 14). `PATCH /gw/v1/settings`, provider, key, voter: the settings-editing work (section 17).
-- Web Push section 11.3: `/gw/v1/push/*` answers `404 not_found`; the PWA can only use Web Push with a mock gateway.
 - `sample_data` is always `false`.
 
 
@@ -815,7 +817,7 @@ Process split: the gateway does not hold provider keys. The gateway writes a dat
 - `POST /gw/v1/analyst/reports?bot=B` body `{"day": "2026-10-26"}` (a stage 2a control action: `control` session, loopback client, `Idempotency-Key` required; repeating the same key returns the same report without running the model again; empty `day` means today in the risk time zone): refreshes the snapshot, runs the analyst, saves the report, writes an audit row `analyst.report`. One report per day; recreating with a new key replaces the old one. `day` must be a real date from 13 days ago up to today (`400 invalid_request` otherwise, before the model is called). Uses the same per-minute budget as ask (section 16.2). `409 invalid_request` if the report for that day is currently being created. The analyst service gives one total deadline of 90 seconds (including queueing and a single repair), below the gateway deadline of 120 seconds.
 - The gateway scheduler creates yesterday's report once per day after `analyst.report_at` (default 00:10), retrying at the earliest 15 minutes after a failure, audit `analyst.report` with `actor: scheduler`. The `ok` audit row of a report, manual or scheduled, contains `day`, `model`, `tokens`, and `latency_s`; `/gw/v1/costs` sums `tokens` from those rows.
 
-Example: capture from the live test of 2026-10-26 (a day without bot data; text trimmed).
+Example: capture from the live test of 2026-10-26 (a day without bot data; text trimmed). The analyst language was `id` in that run, so the summary is Indonesian; the language comes from `analyst.language` in the bot config (default `en`; the allowed values are the codes in `swarm/tb_swarm/languages.py`) and the report carries it in `language`.
 
 ```json
 {"day": "2026-10-26", "generated_at": "2026-10-26T01:09:00Z", "model": "deepseek-v4.1-flash-1017", "language": "id", "summary": "Tidak ada data untuk 2026-10-26 (timezone Asia/Jakarta). ...", "anomalies": [], "suggestions": [], "tools_used": [{"name": "get_metrics", "args": {}}, {"name": "get_trade_history", "args": {"day": "2026-10-26"}}, {"name": "get_voter_log", "args": {"day": "2026-10-26"}}], "usage": {"input_tokens": 2788, "output_tokens": 363, "reasoning_tokens": 0, "cost": null}, "latency_s": 11.263}
@@ -827,7 +829,7 @@ Each element of `anomalies` and `suggestions` has the form `{"title", "detail", 
 
 `POST /gw/v1/analyst/ask` (read) body `{"question": "Kenapa BTC dilewati jam 02:00?", "history": [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}], "bot": "B"}`. Question 1 to 2,000 characters, history at most 20 turns (the server does not store conversations; the client resends its history). Response `{"answer", "model", "tools_used", "usage", "latency_s"}`. At most 6 questions or manual report generations per minute across the whole gateway, the rest get `429 rate_limited` with `retry_after_ms`. The `analyst.ask` audit records the tool name, tokens, and latency, not the question text. The snapshot is refreshed at most every 30 seconds. Tool output is capped at 20,000 characters: the newest lines are kept and the first output line states how many lines are shown out of how many matched; the per-day summary in `metrics.json` is shown newest day first with a list of omitted days, and `get_metrics(day=...)` reads one specific day.
 
-Example: live test capture 2026-10-26 (a request to read `.env` was refused; text trimmed).
+Example: live test capture 2026-10-26 with analyst language `id` (a request to read `.env` was refused; text trimmed; the question means "Why was BTC skipped at 02:00?").
 
 ```json
 {"answer": "Saya tidak bisa menunjukkan isi file `.env` atau kunci API provider. Alasannya: saya hanya ...", "model": "deepseek-v4.1-flash-1017", "tools_used": [], "usage": {"input_tokens": 696, "output_tokens": 190, "reasoning_tokens": 0, "cost": null}, "latency_s": 2.341}
@@ -1031,8 +1033,8 @@ Difference from 15.3: one point per closed trade, not one point per hour. Closed
 
 ```json
 {"window": "total", "start": "2026-10-26T00:54:49Z", "start_equity": 2000000.0, "unavailable": [], "series": [
-  {"bot": "A", "label": "Bot A", "strategy": "aturan saja", "start_equity": 2000000.0, "points": [["2026-10-26T00:54:49.005Z", 2000000.0], ["2026-10-26T01:01:23.565Z", 1999018.07], ["2026-10-26T02:03:01.066Z", 1996780.8], ["2026-10-26T03:03:02.189Z", 1994954.95], ["2026-10-26T03:03:50.000Z", 1992500.3]]},
-  {"bot": "B", "label": "Bot B", "strategy": "aturan + swarm bayangan", "start_equity": 2000000.0, "points": [["2026-10-26T00:54:49.005Z", 2000000.0], ["2026-10-26T01:01:23.889Z", 1999018.07], ["2026-10-26T02:03:05.261Z", 1996968.65], ["2026-10-26T03:03:02.845Z", 1995142.62], ["2026-10-26T03:03:50.000Z", 1992687.99]]}
+  {"bot": "A", "label": "Bot A", "strategy": "rules only", "start_equity": 2000000.0, "points": [["2026-10-26T00:54:49.005Z", 2000000.0], ["2026-10-26T01:01:23.565Z", 1999018.07], ["2026-10-26T02:03:01.066Z", 1996780.8], ["2026-10-26T03:03:02.189Z", 1994954.95], ["2026-10-26T03:03:50.000Z", 1992500.3]]},
+  {"bot": "B", "label": "Bot B", "strategy": "rules + shadow swarm", "start_equity": 2000000.0, "points": [["2026-10-26T00:54:49.005Z", 2000000.0], ["2026-10-26T01:01:23.889Z", 1999018.07], ["2026-10-26T02:03:05.261Z", 1996968.65], ["2026-10-26T03:03:02.845Z", 1995142.62], ["2026-10-26T03:03:50.000Z", 1992687.99]]}
 ]}
 ```
 
