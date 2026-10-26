@@ -823,7 +823,7 @@ Setiap baris, detail, dan event `gw.decision` membawa bentuk 11.2 ditambah:
 
 Perbedaan dari 15.3 dan alasannya: (1) `basis` mengikuti ada tidaknya trade, bukan verdict: pada `mode: shadow` setiap keputusan membayangi entry yang benar-benar terjadi, termasuk yang verdict-nya `lewati`, jadi hasil trade itulah jawaban "entry yang dilewati ternyata untung atau rugi"; `price` dipakai bila trade tidak ada (entry tidak terisi, atau `mode: veto` nanti). (2) Field harga tetap diisi pada `basis: trade` sebagai pembanding. (3) `effect`, `trade`, `forward`, `round_trip_cost_pct`, `quorum`, `would_take` tambahan. (4) `gw.decision` dikirim saat keputusan selesai, jadi `outcome` di event hampir selalu `pending`; PWA membaca ulang daftar atau detail untuk hasil yang sudah tutup. Bila Freqtrade tidak menjawab saat event dibuat, event dikirim tanpa `outcome`. (5) `before` memotong per `candle`; beberapa keputusan pada candle yang sama dengan baris terakhir satu halaman tidak muncul di halaman berikutnya (urutan halaman per `settle_seq`). Rekaman ini punya tiga keputusan pada candle 23:00.
 
-Biaya (diukur di PC ini, 15 panggilan dingin berjarak 2,2 detik lalu 30 hangat, bot dry-run nyata): `/gw/v1/decisions?bot=B&limit=20` dengan `outcome` p50 dingin 37,5 ms, hangat 5,4 ms; tanpa `outcome` (kode 141bcd0) 2,3 ms dan 3,3 ms. Angka mentah dilampirkan di ZHA-3776.
+Bukti hidup (2026-10-26 04:26 UTC, gateway nyata dari cabang ini melawan dua bot dry-run yang sama, gateway `main` 0468d19 di port sebelah sebagai pembanding; skrip dan angka mentah dilampirkan di ZHA-3776): timeout `gw.decision` 17,0 detik setelah `POST /forceenter` ETH/IDR, isinya `status ok`, 7 dari 7 voter, `verdict lewati`, `quorum.met true`, `would_take.applied false`, `outcome.state pending`, `basis price`, `effect pending`. Entry paksa itu memakai limit dan tidak terisi, lalu ordernya dibatalkan Freqtrade (trade 5 dihapus, `entry_cancel`), jadi `trade` tetap `null` dan penilaian berpindah ke harga; contoh ini yang membuktikan `basis: price` muncul sendiri tanpa rekayasa. Biaya p50 (15 panggilan dingin berjarak 2,2 detik, lalu 30 hangat, ms): `/decisions` sebelum (daftar tanpa `outcome`) 2,58 / 2,64 dan sesudah (dengan `outcome`) 21,6 / 3,35; `/trades` 14,03 / 1,29 lalu 21,18 / 2,58; `/equity` 33,4 / 2,95 lalu 37,22 / 1,98; `/profit` harian 15,7 / 1,88 lalu 17,21 / 2,38; `/performance` 18,1 / 1,69 lalu 23,09 / 1,99 (satu panggilan `/mix_tags` tambahan); `/risk` 19,21 / 2,09 lalu 25,29 / 1,88. Tidak ada endpoint yang lebih dari sekitar 19 ms lebih lambat pada p50 dingin; itu harga kelengkapan (semua halaman trade, `outcome`, `mix_tags`), dan poll PWA 30 detik tetap di bawah 4 ms hangat kecuali `/decisions` dengan `outcome` (3,35 ms).
 
 Contoh (rekaman, `GET /gw/v1/decisions/c59379cf6c83405aa91898467d700b11`, dipangkas ke dua voter):
 
@@ -895,8 +895,9 @@ Menambah `state` dari `/show_config` bot itu (15.3).
 
 ### 16.7 Belum terbukti
 
-- Keputusan pada `mode: veto` (belum ada di mesin): `basis: price` hanya diuji dengan tautan trade yang dihapus dari rekaman.
+- Keputusan pada `mode: veto` (belum ada di mesin): `basis: price` diuji dengan tautan trade dihapus dari rekaman dan diamati `pending` pada uji hidup (entry tidak terisi).
 - Trade live: database `tradesv3.dryrun.sqlite` hanya ada di dry-run; di live `outcome.trade` `null` dan penilaian memakai harga.
 - Pajak 0,21% di `cost_pct` bawaan: sumber sekunder.
 - Jalur strategi asli (entry dari sinyal, bukan `forceenter`): tidak ada sinyal selama rekaman.
+- `basis: price` yang sudah `settled` (horizon harga tutup): baru terlihat `pending` pada uji hidup; `settled`-nya diuji lewat tes dengan tautan trade dihapus.
 - PWA tahap 2 di `main` melawan gateway nyata ini: bentuk mengikuti 15.3, tetapi layar tidak dijalankan di browser pada tugas ini.
