@@ -98,7 +98,7 @@
   <div><dt>{t("sistem.sentiment")}</dt><dd><a class="tap" href="https://alternative.me/crypto/fear-and-greed-index/" rel="noopener noreferrer" target="_blank">Fear &amp; Greed Index, alternative.me</a></dd></div>
   <div><dt>{t("sistem.version")}</dt><dd>{version}</dd></div>
 </dl>
-<p class="note">{t("sistem.read_only_note")}</p>
+<p class="note">{g.canControl ? t("sistem.scope_control") : t("sistem.scope_read")} <a class="tap" href="#kontrol">{t("nav.kontrol")}</a> · <a class="tap" href="#provider">{t("nav.provider")}</a> · <a class="tap" href="#audit">{t("nav.audit")}</a></p>
 <p class="note">{t("sistem.charts_credit")} <a class="tap" href="https://www.tradingview.com/" rel="noopener" target="_blank">tradingview.com</a></p>
 <div class="actions"><button class="btn secondary" type="button" onclick={() => gateway.logout()}>{t("sistem.logout")}</button></div>
 

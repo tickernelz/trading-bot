@@ -6,7 +6,7 @@
   import { t } from "../lib/i18n";
   import type { Equity } from "../lib/types";
 
-  let { equity }: { equity: Equity } = $props();
+  let { equity, label }: { equity: Equity; label?: string } = $props();
 
   let host: HTMLDivElement;
   let chart: IChartApi | null = null;
@@ -52,7 +52,7 @@
   });
 </script>
 
-<div class="chart" bind:this={host} role="img" aria-label={t("chart.equity_label")}></div>
+<div class="chart" bind:this={host} role="img" aria-label={label ?? t("chart.equity_label")}></div>
 
 <style>
   .chart {

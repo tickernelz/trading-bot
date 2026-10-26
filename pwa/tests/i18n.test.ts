@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { DICTS, lang, pickLang, translate } from "../src/lib/i18n";
+import { lang, pickLang, translate } from "../src/lib/i18n";
+import { en } from "../src/lib/locales/en";
+import { id } from "../src/lib/locales/id";
+
+const DICTS = { id, en };
 
 const placeholders = (text: string) => [...text.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort();
 

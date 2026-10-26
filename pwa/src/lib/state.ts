@@ -16,10 +16,12 @@ export const FEED_TOPICS = [
   "gw.risk",
   "gw.risk_denied",
   "gw.decision",
+  "gw.audit",
   "gw.candles",
 ] as const;
 
-const FRESHNESS_EVENTS = new Set<string>(FEED_TOPICS.filter((type) => type !== "gw.decision"));
+const NOT_MARKET = new Set<string>(["gw.decision", "gw.audit"]);
+const FRESHNESS_EVENTS = new Set<string>(FEED_TOPICS.filter((type) => !NOT_MARKET.has(type)));
 
 export function carriesData(type: string): boolean {
   return FRESHNESS_EVENTS.has(type);
