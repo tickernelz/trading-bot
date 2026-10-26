@@ -333,6 +333,16 @@ def _strict_client(tmp_path):
         "https://evilpush.apple.com/x",
         "https://fcm.googleapis.com:8443/x",
         "https://user:pw@fcm.googleapis.com/x",
+        "https://127.0.0.1\\.push.apple.com/x",
+        "https://attacker.example\\.push.services.mozilla.com/x",
+        "https://169.254.169.254\\.notify.windows.com/x",
+        "https://127.0.0.1%5c.push.apple.com/x",
+        "https://127.0.0.1%2f.push.apple.com/x",
+        "https://127.0.0.1%23.push.apple.com/x",
+        "https://127.0.0.1%3f.push.apple.com/x",
+        "https://127.0.0.1;.push.apple.com/x",
+        "https://127.0.0.1 .push.apple.com/x",
+        "https://[::1].push.apple.com/x",
     ],
 )
 def test_endpoints_outside_the_push_services_are_refused(tmp_path, endpoint):
@@ -352,6 +362,7 @@ def test_endpoints_outside_the_push_services_are_refused(tmp_path, endpoint):
         "https://updates.push.services.mozilla.com/wpush/v2/abc",
         "https://web.push.apple.com/abc",
         "https://wns2-par02p.notify.windows.com/w/?token=abc",
+        "https://FCM.GoogleAPIs.com/fcm/send/abc",
     ],
 )
 def test_the_browser_push_services_are_accepted(tmp_path, endpoint):

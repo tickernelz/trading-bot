@@ -7,12 +7,15 @@ import base64
 import json
 import logging
 import os
+import re
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Annotated, Any, Literal
 from urllib.parse import urlsplit
 
 import requests
+from urllib3.exceptions import LocationParseError
+from urllib3.util import parse_url
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from fastapi import Depends, FastAPI
@@ -47,6 +50,7 @@ GONE = (404, 410)
 PUSH_HOSTS = ("fcm.googleapis.com",)
 PUSH_HOST_SUFFIXES = (".push.services.mozilla.com", ".push.apple.com", ".notify.windows.com")
 AUTH_SECRET_BYTES = 16
+HOST_PATTERN = re.compile(r"^[a-z0-9-]+(\.[a-z0-9-]+)+$")
 SIGNED = frozenset({"pnl_pct"})
 Base64Url = Annotated[str, Field(min_length=1, max_length=256, pattern=r"^[A-Za-z0-9_-]+={0,2}$")]
 
@@ -119,14 +123,17 @@ def render(
 
 def push_service_only(endpoint: str) -> None:
     """Accept only https endpoints on the standard port that belong to a known browser push service."""
-    parts = urlsplit(endpoint)
-    host = (parts.hostname or "").lower()
     try:
+        parts = urlsplit(endpoint)
+        host = (parts.hostname or "").lower()
         port = parts.port
-    except ValueError:
-        port = -1
+        sent_to = (parse_url(endpoint).host or "").lower()
+    except (ValueError, LocationParseError):
+        raise ApiError(400, "invalid_request", "push endpoint is not a valid URL") from None
     if parts.scheme != "https" or not host or parts.username or parts.password or port not in (None, 443):
         raise ApiError(400, "invalid_request", "push endpoint must be an https URL without credentials")
+    if host != sent_to or not HOST_PATTERN.fullmatch(host):
+        raise ApiError(400, "invalid_request", "push endpoint host is ambiguous")
     if host not in PUSH_HOSTS and not host.endswith(PUSH_HOST_SUFFIXES):
         raise ApiError(400, "invalid_request", "push endpoint is not a known browser push service")
 
