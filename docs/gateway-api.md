@@ -555,7 +555,7 @@ Satu PWA yang terbuka mengirim 10 GET per refresh: setiap 30 detik selama feed t
 
 ## 12. Tambahan nice-to-have N2 (ZHA-3781)
 
-Semua isi bagian ini `rancangan`: dibangun di PWA dan gateway tiruan; gateway nyata (ZHA-3764) belum ada di main saat ditulis. Pengambil data berita dan Fear and Greed sudah ada dan dites (`engine/news.py`, `tests/test_news.py`); gateway nyata tinggal memanggil `Feeds(settings.data.news_rss, <aset pair whitelist>, settings.data.fear_greed)` di dua rute di bawah.
+Semua isi bagian ini `rancangan`: dibangun di PWA dan gateway tiruan; gateway nyata (ZHA-3764) belum ada di main saat ditulis. Pengambil data berita dan Fear and Greed sudah ada dan dites (`engine/news.py`, `tests/test_news.py`); gateway nyata membuat satu `Feeds(settings.data.news_rss, <aset pair whitelist>, settings.data.fear_greed)` dan memanggilnya di dua rute di bawah lewat `await asyncio.to_thread(feeds.news, asset, limit)` dan `await asyncio.to_thread(feeds.sentiment, days)`. `Feeds` memakai urllib yang memblok (timeout 15 detik per sumber, berurutan, satu kunci), jadi memanggilnya langsung di handler async bisa menahan event loop sampai sekitar 30 detik saat cache dingin atau kedaluwarsa.
 
 Alasan perubahan kontrak: mesin waktu butuh riwayat keputusan per pair yang lebih panjang dari 20 baris terakhir, dan lapisan berita butuh data yang diambil di PC (PWA tidak boleh memanggil pihak ketiga langsung, bagian 1).
 
@@ -565,7 +565,7 @@ Menambah dua parameter opsional ke 11.2. `pair` menyaring satu pair; `before` me
 
 ### 12.2 `GET /gw/v1/news?pair=BTC/IDR&limit=50`
 
-Judul RSS CoinDesk dan Cointelegraph yang menyebut aset dasar pair (kata utuh, tanpa beda huruf besar: simbol dan nama, misalnya BTC atau Bitcoin). Tanpa `pair`, semua judul. Deskripsi RSS tidak dikirim karena berisi HTML pihak ketiga; tautan hanya `http` atau `https`. Gateway mengambil umpan hanya saat ada permintaan dan menyimpannya 15 menit; bila satu sumber gagal, item terakhirnya tetap dipakai dan `ok: false` beserta galatnya dikirim. `enabled: false` bila `data.news_rss` kosong.
+Judul RSS CoinDesk dan Cointelegraph yang menyebut aset dasar pair (kata utuh, tanpa beda huruf besar: simbol dan nama, misalnya BTC atau Bitcoin). Tanpa `pair`, semua judul. `limit` 1 sampai 100, bawaan 50; nilai di luar rentang dipotong ke batasnya. Deskripsi RSS tidak dikirim karena berisi HTML pihak ketiga; tautan hanya `http` atau `https`. Gateway mengambil umpan hanya saat ada permintaan dan menyimpannya 15 menit; bila satu sumber gagal, item terakhirnya tetap dipakai dan `ok: false` beserta galatnya dikirim. `enabled: false` bila `data.news_rss` kosong.
 
 ```json
 {"as_of": "2026-10-26T04:46:40Z", "enabled": true, "sources": [{"id": "coindesk", "name": "CoinDesk", "url": "https://www.coindesk.com/", "feed": "https://www.coindesk.com/arc/outboundfeeds/rss/", "ok": true, "error": null, "fetched_at": "2026-10-26T04:46:40Z"}], "items": [{"id": "n_3f2a9c0d1e4b5a67", "source": "coindesk", "title": "Bitcoin slips below $60K", "url": "https://www.coindesk.com/markets/btc-slips", "published": "2026-10-25T15:00:00Z", "assets": ["BTC"]}]}

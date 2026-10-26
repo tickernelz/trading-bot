@@ -164,6 +164,7 @@ class Feeds:
             entry.error = f"{type(exc).__name__}: {exc}"[:200]
 
     def news(self, asset: str | None = None, limit: int = 50) -> dict:
+        limit = max(1, min(limit, 100))
         with self._lock:
             sources, items = [], []
             for source in self._sources:

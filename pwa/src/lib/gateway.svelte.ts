@@ -130,10 +130,6 @@ class Gateway {
     return safetyOf(this.health, this.risk);
   }
 
-  get readOnly(): boolean {
-    return this.viewingSaved || this.link.state !== "open";
-  }
-
   openSaved(): void {
     const saved = savedViewFromStorage();
     if (saved) this.applySaved(saved);

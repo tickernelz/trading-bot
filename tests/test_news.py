@@ -86,6 +86,11 @@ def test_untrusted_fields_are_not_served(feeds):
     assert "No date" not in served
 
 
+@pytest.mark.parametrize(("limit", "served"), [(0, 1), (-3, 1), (2, 2), (500, 5)])
+def test_limit_is_clamped(feeds, limit, served):
+    assert len(feeds.news(limit=limit)["items"]) == served
+
+
 def test_asset_filter_keeps_only_tagged_items(feeds):
     assert [item["assets"] for item in feeds.news(asset="BTC")["items"]] == [["BTC"]]
 
