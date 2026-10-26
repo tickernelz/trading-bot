@@ -1,0 +1,806 @@
+{
+ "selected": "F1-regime-btc-sma50",
+ "eligible": [
+  "F1-regime-btc-sma50",
+  "F1-regime-btc-sma100",
+  "F3L-don1d20-low10-nofilter-st2atr",
+  "F3L-don1d20-low10-btc100-st2atr",
+  "K-SwingEmaRsi"
+ ],
+ "results": [
+  {
+   "id": "F1-regime-btc-sma200",
+   "family": "F1 hold every pair while BTC/IDR closes above its SMA",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 71,
+    "trades_per_month": 1.549,
+    "win_rate": 0.2535211267605634,
+    "wilson_lower": 0.1668055116318711,
+    "mean": 0.16252138624233575,
+    "ci95": [
+     0.010792292711519635,
+     0.3690444126356862
+    ],
+    "median": -0.025845070291740768,
+    "profit_factor": 4.253025860958842,
+    "payoff_ratio": 12.522798368378812,
+    "largest_loss": -0.9503099129738821,
+    "worst5_mean": -0.3334658709768798,
+    "max_drawdown": 0.004984522272900027,
+    "worst_month_idr": -9969.04454579999,
+    "monthly_profit_idr": 1694.870213711841,
+    "monthly_profit_idr_research_risk": 6404.33380177674,
+    "max_drawdown_research_risk": 0.019938089091599998,
+    "worst_month_idr_research_risk": -39876.17818319996,
+    "monthly_profit_idr_equal_weight": 60412.07622568123,
+    "max_drawdown_equal_weight": 0.18816136276882867,
+    "worst_month_idr_equal_weight": -792808.5646675751,
+    "rolling30_min_win_rate": 0.13333333333333333,
+    "longest_days_without_entry": 373.0,
+    "days_without_entry_at_end": 373.0,
+    "exit_reasons": {
+     "exit_signal": 70,
+     "stoploss": 1
+    }
+   },
+   "fold_win_rates": {
+    "F1": null,
+    "F2": 0.6666666666666666,
+    "F3": 0.26666666666666666,
+    "F4": null,
+    "F5": 0.2,
+    "F6": 0.2,
+    "F7": null,
+    "F8": null
+   },
+   "fold_std": 0.22443344307471286,
+   "regimes": {
+    "range": {
+     "trades": 10,
+     "win_rate": 0.6
+    },
+    "bull": {
+     "trades": 61,
+     "win_rate": 0.19672131147540983
+    }
+   },
+   "sensitivity": {
+    "taker": 0.16252138624233575,
+    "stress_041": 0.16021897350285602,
+    "no_tax": 0.16497286828708152,
+    "slip_005": 0.16135821207268863,
+    "slip_010": 0.16019619753395897
+   }
+  },
+  {
+   "id": "F3L-don1d55-low20-btc100-st2atr",
+   "family": "F3 Donchian high entry, Donchian low exit, 2 ATR stop",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 61,
+    "trades_per_month": 1.331,
+    "win_rate": 0.47540983606557374,
+    "wilson_lower": 0.35530487422845264,
+    "mean": 0.16098474609587457,
+    "ci95": [
+     0.04197250908142849,
+     0.3119862001252345
+    ],
+    "median": -0.031016808782113436,
+    "profit_factor": 5.07111228264817,
+    "payoff_ratio": 5.595710104991084,
+    "largest_loss": -0.12691478120761301,
+    "worst5_mean": -0.1121815896383684,
+    "max_drawdown": 0.0039024125279368826,
+    "worst_month_idr": -4460.852466667725,
+    "monthly_profit_idr": 3011.9277304092584,
+    "monthly_profit_idr_research_risk": 11532.948985808478,
+    "max_drawdown_research_risk": 0.015554966574365725,
+    "worst_month_idr_research_risk": -20137.377362288815,
+    "monthly_profit_idr_equal_weight": 58839.849090796204,
+    "max_drawdown_equal_weight": 0.1217216735277119,
+    "worst_month_idr_equal_weight": -264939.56910071126,
+    "rolling30_min_win_rate": 0.36666666666666664,
+    "longest_days_without_entry": 195.8,
+    "days_without_entry_at_end": 8.4,
+    "exit_reasons": {
+     "end": 2,
+     "exit_signal": 33,
+     "stoploss": 26
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.5,
+    "F2": 0.4666666666666667,
+    "F3": 0.6363636363636364,
+    "F4": 0.42857142857142855,
+    "F5": 0.5555555555555556,
+    "F6": 0.2857142857142857,
+    "F7": 0.375,
+    "F8": 0.5
+   },
+   "fold_std": 0.1078967015112107,
+   "regimes": {
+    "bear": {
+     "trades": 8,
+     "win_rate": 0.625
+    },
+    "range": {
+     "trades": 5,
+     "win_rate": 0.8
+    },
+    "bull": {
+     "trades": 48,
+     "win_rate": 0.4166666666666667
+    }
+   },
+   "sensitivity": {
+    "taker": 0.16098474609587457,
+    "stress_041": 0.15868537672393287,
+    "no_tax": 0.16343298773078974,
+    "slip_005": 0.159823109429234,
+    "slip_010": 0.15866263086069118
+   }
+  },
+  {
+   "id": "F3L-don1d55-low20-nofilter-st2atr",
+   "family": "F3 Donchian high entry, Donchian low exit, 2 ATR stop",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 69,
+    "trades_per_month": 1.506,
+    "win_rate": 0.43478260869565216,
+    "wilson_lower": 0.324328026351315,
+    "mean": 0.13898756547107413,
+    "ci95": [
+     0.03194024688479382,
+     0.2730803239354282
+    ],
+    "median": -0.04165092585954877,
+    "profit_factor": 4.2478881486883,
+    "payoff_ratio": 5.5222545932947895,
+    "largest_loss": -0.12691478120761301,
+    "worst5_mean": -0.11419414726551554,
+    "max_drawdown": 0.0045531430617216095,
+    "worst_month_idr": -4248.665014408061,
+    "monthly_profit_idr": 2912.009215765732,
+    "monthly_profit_idr_research_risk": 11127.266141813585,
+    "max_drawdown_research_risk": 0.018125782355070674,
+    "worst_month_idr_research_risk": -19142.4804202791,
+    "monthly_profit_idr_equal_weight": 56673.32039605411,
+    "max_drawdown_equal_weight": 0.13695769986890738,
+    "worst_month_idr_equal_weight": -261678.8784345986,
+    "rolling30_min_win_rate": 0.3333333333333333,
+    "longest_days_without_entry": 111.7,
+    "days_without_entry_at_end": 8.6,
+    "exit_reasons": {
+     "end": 2,
+     "exit_signal": 34,
+     "stoploss": 33
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.4,
+    "F2": 0.4375,
+    "F3": 0.6363636363636364,
+    "F4": 0.42857142857142855,
+    "F5": 0.5,
+    "F6": 0.2857142857142857,
+    "F7": 0.375,
+    "F8": 0.2
+   },
+   "fold_std": 0.13162614240693774,
+   "regimes": {
+    "bear": {
+     "trades": 14,
+     "win_rate": 0.42857142857142855
+    },
+    "range": {
+     "trades": 6,
+     "win_rate": 0.6666666666666666
+    },
+    "bull": {
+     "trades": 49,
+     "win_rate": 0.40816326530612246
+    }
+   },
+   "sensitivity": {
+    "taker": 0.13898756547107413,
+    "stress_041": 0.13673176225585232,
+    "no_tax": 0.14138942026616438,
+    "slip_005": 0.13784793833699838,
+    "slip_010": 0.13670944735853316
+   }
+  },
+  {
+   "id": "F1-regime-btc-sma100",
+   "family": "F1 hold every pair while BTC/IDR closes above its SMA",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 116,
+    "trades_per_month": 2.531,
+    "win_rate": 0.25862068965517243,
+    "wilson_lower": 0.18758064303055505,
+    "mean": 0.13292517032849868,
+    "ci95": [
+     0.02341057460004368,
+     0.27755367176369244
+    ],
+    "median": -0.02316391481381308,
+    "profit_factor": 4.214324248929899,
+    "payoff_ratio": 12.081062846932378,
+    "largest_loss": -0.9503099129738821,
+    "worst5_mean": -0.3073496116558155,
+    "max_drawdown": 0.008076754945941733,
+    "worst_month_idr": -4579.19238864189,
+    "monthly_profit_idr": 2018.2027314432637,
+    "monthly_profit_idr_research_risk": 7616.766763860916,
+    "max_drawdown_research_risk": 0.032093655702265855,
+    "worst_month_idr_research_risk": -18090.784590804124,
+    "monthly_profit_idr_equal_weight": 73517.18203860047,
+    "max_drawdown_equal_weight": 0.2759995393406778,
+    "worst_month_idr_equal_weight": -1220332.0188837403,
+    "rolling30_min_win_rate": 0.06666666666666667,
+    "longest_days_without_entry": 278.0,
+    "days_without_entry_at_end": 10.0,
+    "exit_reasons": {
+     "end": 5,
+     "exit_signal": 110,
+     "stoploss": 1
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.1,
+    "F2": 0.3333333333333333,
+    "F3": 0.3333333333333333,
+    "F4": null,
+    "F5": 0.24,
+    "F6": 0.5,
+    "F7": 0.08,
+    "F8": 0.4
+   },
+   "fold_std": 0.15404939769832576,
+   "regimes": {
+    "bear": {
+     "trades": 45,
+     "win_rate": 0.3111111111111111
+    },
+    "bull": {
+     "trades": 71,
+     "win_rate": 0.22535211267605634
+    }
+   },
+   "sensitivity": {
+    "taker": 0.13292517032849868,
+    "stress_041": 0.13068137389093548,
+    "no_tax": 0.1353142409692361,
+    "slip_005": 0.13179160899374456,
+    "slip_010": 0.1306591777672792
+   }
+  },
+  {
+   "id": "F3L-don1d100-low50-btc100-st2atr",
+   "family": "F3 Donchian high entry, Donchian low exit, 2 ATR stop",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 43,
+    "trades_per_month": 0.938,
+    "win_rate": 0.23255813953488372,
+    "wilson_lower": 0.13153678479384479,
+    "mean": 0.12223232539746619,
+    "ci95": [
+     -0.025231798722786875,
+     0.32069304863065
+    ],
+    "median": -0.07160763120210223,
+    "profit_factor": 3.088307360388186,
+    "payoff_ratio": 10.191414289281013,
+    "largest_loss": -0.12691478120761301,
+    "worst5_mean": -0.12076035324152978,
+    "max_drawdown": 0.005878423785965148,
+    "worst_month_idr": -4684.525506268445,
+    "monthly_profit_idr": 1839.5837501525848,
+    "monthly_profit_idr_research_risk": 6900.208144877684,
+    "max_drawdown_research_risk": 0.023368963460321357,
+    "worst_month_idr_research_risk": -20723.676847668947,
+    "monthly_profit_idr_equal_weight": 31870.10701764148,
+    "max_drawdown_equal_weight": 0.1754205548956672,
+    "worst_month_idr_equal_weight": -138002.3745810101,
+    "rolling30_min_win_rate": 0.2,
+    "longest_days_without_entry": 204.4,
+    "days_without_entry_at_end": 204.4,
+    "exit_reasons": {
+     "exit_signal": 15,
+     "stoploss": 28
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.0,
+    "F2": 0.2222222222222222,
+    "F3": 0.375,
+    "F4": 0.2,
+    "F5": 0.3,
+    "F6": 0.0,
+    "F7": 0.125,
+    "F8": null
+   },
+   "fold_std": 0.14272866797927924,
+   "regimes": {
+    "bear": {
+     "trades": 1,
+     "win_rate": 0.0
+    },
+    "range": {
+     "trades": 4,
+     "win_rate": 0.5
+    },
+    "bull": {
+     "trades": 38,
+     "win_rate": 0.21052631578947367
+    }
+   },
+   "sensitivity": {
+    "taker": 0.12223232539746619,
+    "stress_041": 0.12000970649924284,
+    "no_tax": 0.12459884736282793,
+    "slip_005": 0.12110946291192982,
+    "slip_010": 0.11998771986842374
+   }
+  },
+  {
+   "id": "F3L-don1d100-low50-nofilter-st2atr",
+   "family": "F3 Donchian high entry, Donchian low exit, 2 ATR stop",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 44,
+    "trades_per_month": 0.96,
+    "win_rate": 0.22727272727272727,
+    "wilson_lower": 0.12841947594917152,
+    "mean": 0.11715414940964554,
+    "ci95": [
+     -0.027871986031820374,
+     0.3147333044425563
+    ],
+    "median": -0.07175242138034488,
+    "profit_factor": 2.9689220136682004,
+    "payoff_ratio": 10.094334846471883,
+    "largest_loss": -0.12691478120761301,
+    "worst5_mean": -0.12076035324152978,
+    "max_drawdown": 0.006876112459579642,
+    "worst_month_idr": -4679.824171793179,
+    "monthly_profit_idr": 1795.7273636159953,
+    "monthly_profit_idr_research_risk": 6723.62632111323,
+    "max_drawdown_research_risk": 0.027299570836475384,
+    "worst_month_idr_research_risk": -20640.271104833762,
+    "monthly_profit_idr_equal_weight": 30957.167708538513,
+    "max_drawdown_equal_weight": 0.1922308884249493,
+    "worst_month_idr_equal_weight": -135188.98169532378,
+    "rolling30_min_win_rate": 0.2,
+    "longest_days_without_entry": 204.4,
+    "days_without_entry_at_end": 204.4,
+    "exit_reasons": {
+     "exit_signal": 15,
+     "stoploss": 29
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.0,
+    "F2": 0.2222222222222222,
+    "F3": 0.375,
+    "F4": 0.2,
+    "F5": 0.3,
+    "F6": 0.0,
+    "F7": 0.125,
+    "F8": null
+   },
+   "fold_std": 0.14272866797927924,
+   "regimes": {
+    "bear": {
+     "trades": 2,
+     "win_rate": 0.0
+    },
+    "range": {
+     "trades": 4,
+     "win_rate": 0.5
+    },
+    "bull": {
+     "trades": 38,
+     "win_rate": 0.21052631578947367
+    }
+   },
+   "sensitivity": {
+    "taker": 0.11715414940964554,
+    "stress_041": 0.114941588009913,
+    "no_tax": 0.11950996270555697,
+    "slip_005": 0.1160363679516136,
+    "slip_010": 0.11491970087006219
+   }
+  },
+  {
+   "id": "F3L-don1d20-low10-btc100-st2atr",
+   "family": "F3 Donchian high entry, Donchian low exit, 2 ATR stop",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 109,
+    "trades_per_month": 2.378,
+    "win_rate": 0.4036697247706422,
+    "wilson_lower": 0.3163643534878716,
+    "mean": 0.0845140418558699,
+    "ci95": [
+     0.02393643576983062,
+     0.1609147899658033
+    ],
+    "median": -0.028866466085658238,
+    "profit_factor": 3.142322994570581,
+    "payoff_ratio": 4.642068060161085,
+    "largest_loss": -0.14440461450408248,
+    "worst5_mean": -0.13116648734324463,
+    "max_drawdown": 0.006973133259341346,
+    "worst_month_idr": -6529.462553125497,
+    "monthly_profit_idr": 1330.8568522654164,
+    "monthly_profit_idr_research_risk": 5168.434038503644,
+    "max_drawdown_research_risk": 0.02766621556065907,
+    "worst_month_idr_research_risk": -27665.480443264572,
+    "monthly_profit_idr_equal_weight": 56436.255494971556,
+    "max_drawdown_equal_weight": 0.18916740327441017,
+    "worst_month_idr_equal_weight": -309041.07742310764,
+    "rolling30_min_win_rate": 0.3,
+    "longest_days_without_entry": 191.7,
+    "days_without_entry_at_end": 8.4,
+    "exit_reasons": {
+     "end": 5,
+     "exit_signal": 69,
+     "stoploss": 35
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.14285714285714285,
+    "F2": 0.4090909090909091,
+    "F3": 0.4375,
+    "F4": 0.5384615384615384,
+    "F5": 0.3333333333333333,
+    "F6": 0.3076923076923077,
+    "F7": 0.5333333333333333,
+    "F8": 0.4
+   },
+   "fold_std": 0.12891411556490479,
+   "regimes": {
+    "bear": {
+     "trades": 21,
+     "win_rate": 0.3333333333333333
+    },
+    "range": {
+     "trades": 7,
+     "win_rate": 0.7142857142857143
+    },
+    "bull": {
+     "trades": 81,
+     "win_rate": 0.3950617283950617
+    }
+   },
+   "sensitivity": {
+    "taker": 0.0845140418558699,
+    "stress_041": 0.08236612528791344,
+    "no_tax": 0.08680102490181461,
+    "slip_005": 0.0834289188335883,
+    "slip_010": 0.08234487762883547
+   }
+  },
+  {
+   "id": "F3L-don1d20-low10-nofilter-st2atr",
+   "family": "F3 Donchian high entry, Donchian low exit, 2 ATR stop",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 137,
+    "trades_per_month": 2.989,
+    "win_rate": 0.39416058394160586,
+    "wilson_lower": 0.31629116502617627,
+    "mean": 0.07440205979502951,
+    "ci95": [
+     0.020053285749014788,
+     0.14345607707468405
+    ],
+    "median": -0.028866466085658238,
+    "profit_factor": 2.797517720987428,
+    "payoff_ratio": 4.29988834892512,
+    "largest_loss": -0.14440461450408248,
+    "worst5_mean": -0.13651718318622488,
+    "max_drawdown": 0.007086924613222689,
+    "worst_month_idr": -7616.263410618023,
+    "monthly_profit_idr": 2599.1247074381718,
+    "monthly_profit_idr_research_risk": 10005.786828277242,
+    "max_drawdown_research_risk": 0.028081625940686306,
+    "worst_month_idr_research_risk": -30102.66797457543,
+    "monthly_profit_idr_equal_weight": 61336.98101829488,
+    "max_drawdown_equal_weight": 0.17006932506096584,
+    "worst_month_idr_equal_weight": -424263.6453896604,
+    "rolling30_min_win_rate": 0.26666666666666666,
+    "longest_days_without_entry": 66.4,
+    "days_without_entry_at_end": 9.2,
+    "exit_reasons": {
+     "end": 5,
+     "exit_signal": 94,
+     "stoploss": 38
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.18181818181818182,
+    "F2": 0.43478260869565216,
+    "F3": 0.47058823529411764,
+    "F4": 0.5384615384615384,
+    "F5": 0.47058823529411764,
+    "F6": 0.35714285714285715,
+    "F7": 0.47058823529411764,
+    "F8": 0.2857142857142857
+   },
+   "fold_std": 0.11821231893937395,
+   "regimes": {
+    "bear": {
+     "trades": 43,
+     "win_rate": 0.27906976744186046
+    },
+    "range": {
+     "trades": 16,
+     "win_rate": 0.4375
+    },
+    "bull": {
+     "trades": 78,
+     "win_rate": 0.44871794871794873
+    }
+   },
+   "sensitivity": {
+    "taker": 0.07440205979502951,
+    "stress_041": 0.07227417034794482,
+    "no_tax": 0.07666771906770668,
+    "slip_005": 0.07332705443292718,
+    "slip_010": 0.07225312080151373
+   }
+  },
+  {
+   "id": "F1-regime-btc-sma50",
+   "family": "F1 hold every pair while BTC/IDR closes above its SMA",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 195,
+    "trades_per_month": 4.255,
+    "win_rate": 0.28717948717948716,
+    "wilson_lower": 0.2282696699579269,
+    "mean": 0.07313844153133621,
+    "ci95": [
+     0.02304620846305812,
+     0.1362374550532445
+    ],
+    "median": -0.020070223643846807,
+    "profit_factor": 3.149203464985404,
+    "payoff_ratio": 7.816772886303056,
+    "largest_loss": -0.24600470771598704,
+    "worst5_mean": -0.18746161800969868,
+    "max_drawdown": 0.005286782129258261,
+    "worst_month_idr": -4358.376089072008,
+    "monthly_profit_idr": 1883.6474412444736,
+    "monthly_profit_idr_research_risk": 7334.54091863317,
+    "max_drawdown_research_risk": 0.021005572284010898,
+    "worst_month_idr_research_risk": -19747.78675429679,
+    "monthly_profit_idr_equal_weight": 79841.08769151765,
+    "max_drawdown_equal_weight": 0.34433615566403597,
+    "worst_month_idr_equal_weight": -1847285.6964785743,
+    "rolling30_min_win_rate": 0.0,
+    "longest_days_without_entry": 109.0,
+    "days_without_entry_at_end": 20.0,
+    "exit_reasons": {
+     "end": 5,
+     "exit_signal": 190
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.16666666666666666,
+    "F2": 0.6,
+    "F3": 0.3,
+    "F4": 0.32,
+    "F5": 0.3,
+    "F6": 0.24,
+    "F7": 0.2,
+    "F8": 0.2
+   },
+   "fold_std": 0.1368552705574947,
+   "regimes": {
+    "bear": {
+     "trades": 60,
+     "win_rate": 0.25
+    },
+    "bull": {
+     "trades": 115,
+     "win_rate": 0.26956521739130435
+    },
+    "range": {
+     "trades": 20,
+     "win_rate": 0.5
+    }
+   },
+   "sensitivity": {
+    "taker": 0.07313844153133621,
+    "stress_041": 0.07101305472276004,
+    "no_tax": 0.07540143613261763,
+    "slip_005": 0.0720647004970493,
+    "slip_010": 0.07099202993297482
+   }
+  },
+  {
+   "id": "R5-random-F1-exits",
+   "family": "R random entry control",
+   "deployable": false,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 60,
+    "trades_per_month": 1.309,
+    "win_rate": 0.2,
+    "wilson_lower": 0.11828505322897492,
+    "mean": 0.02152143832138765,
+    "ci95": [
+     -0.04787763355777925,
+     0.0979485977305306
+    ],
+    "median": -0.006768809222448102,
+    "profit_factor": 1.4348006444987809,
+    "payoff_ratio": 5.7392025779951235,
+    "largest_loss": -0.9503099129738821,
+    "worst5_mean": -0.3767367687933406,
+    "max_drawdown": 0.007573048429904916,
+    "worst_month_idr": -10323.628784540198,
+    "monthly_profit_idr": 46.516660387574404,
+    "monthly_profit_idr_research_risk": 138.53146995668197,
+    "max_drawdown_research_risk": 0.030124698521213245,
+    "worst_month_idr_research_risk": -41236.78768668546,
+    "monthly_profit_idr_equal_weight": 2603.9660974164212,
+    "max_drawdown_equal_weight": 0.27453012682749445,
+    "worst_month_idr_equal_weight": -399650.4760317803,
+    "rolling30_min_win_rate": 0.16666666666666666,
+    "longest_days_without_entry": 167.4,
+    "days_without_entry_at_end": 22.3,
+    "exit_reasons": {
+     "exit_signal": 59,
+     "stoploss": 1
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.0,
+    "F2": 0.3333333333333333,
+    "F3": 0.2857142857142857,
+    "F4": 0.6666666666666666,
+    "F5": 0.0,
+    "F6": 0.5714285714285714,
+    "F7": 0.09090909090909091,
+    "F8": 0.0
+   },
+   "fold_std": 0.26662439729567444,
+   "regimes": {
+    "bear": {
+     "trades": 18,
+     "win_rate": 0.0
+    },
+    "range": {
+     "trades": 10,
+     "win_rate": 0.0
+    },
+    "bull": {
+     "trades": 32,
+     "win_rate": 0.375
+    }
+   },
+   "sensitivity": {
+    "taker": 0.02152143832138765,
+    "stress_041": 0.019498280725255054,
+    "no_tax": 0.023675584897961517,
+    "slip_005": 0.020499343274485535,
+    "slip_010": 0.01947826720913204
+   }
+  },
+  {
+   "id": "K-SwingEmaRsi",
+   "family": "K benchmark",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 1411,
+    "trades_per_month": 30.787,
+    "win_rate": 0.3798724309000709,
+    "wilson_lower": 0.35490620970707804,
+    "mean": -0.006454443827193322,
+    "ci95": [
+     -0.007664968293017986,
+     -0.005244479437691326
+    ],
+    "median": -0.013289101671429604,
+    "profit_factor": 0.5464044783370994,
+    "payoff_ratio": 0.891984922658511,
+    "largest_loss": -0.036313463735896945,
+    "worst5_mean": -0.03607254210183104,
+    "max_drawdown": 0.6877953796554946,
+    "worst_month_idr": -113379.45589181325,
+    "monthly_profit_idr": -49924.82986630198,
+    "monthly_profit_idr_research_risk": -144600.44553705642,
+    "max_drawdown_research_risk": 0.9699686259518173,
+    "worst_month_idr_research_risk": -213867.3821879068,
+    "monthly_profit_idr_equal_weight": -78352.98338586294,
+    "max_drawdown_equal_weight": 0.8413521244369483,
+    "worst_month_idr_equal_weight": -126385.28912218097,
+    "rolling30_min_win_rate": 0.06666666666666667,
+    "longest_days_without_entry": 9.1,
+    "days_without_entry_at_end": 1.1,
+    "exit_reasons": {
+     "exit_signal": 712,
+     "roi": 455,
+     "stoploss": 244
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.4101123595505618,
+    "F2": 0.33879781420765026,
+    "F3": 0.39634146341463417,
+    "F4": 0.34782608695652173,
+    "F5": 0.4530386740331492,
+    "F6": 0.36548223350253806,
+    "F7": 0.36507936507936506,
+    "F8": 0.36607142857142855
+   },
+   "fold_std": 0.03754554833504795,
+   "regimes": {
+    "bear": {
+     "trades": 363,
+     "win_rate": 0.39944903581267216
+    },
+    "range": {
+     "trades": 167,
+     "win_rate": 0.4491017964071856
+    },
+    "bull": {
+     "trades": 881,
+     "win_rate": 0.358683314415437
+    }
+   },
+   "sensitivity": {
+    "taker": -0.006454443827193322,
+    "stress_041": -0.008406160548631516,
+    "no_tax": -0.0043709309583670215,
+    "slip_005": -0.007420743358810834,
+    "slip_010": -0.008422604194930485
+   }
+  }
+ ],
+ "selected_null": {
+  "shuffles": 1000,
+  "entry_rate_per_bar": {
+   "BTC/IDR": 0.0014038231780167264,
+   "ETH/IDR": 0.0014934289127837516,
+   "SOL/IDR": 0.0022700119474313024,
+   "XRP/IDR": 0.0015531660692951015,
+   "DOGE/IDR": 0.0014336917562724014
+  },
+  "mean_p95": 0.0560532668079953,
+  "mean_p50": 0.04120741360406885,
+  "win_rate_p95": 0.25,
+  "win_rate_p50": 0.20867367926191455,
+  "trades_median": 190.0
+ }
+}

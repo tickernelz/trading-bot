@@ -1,5 +1,54 @@
 # Default strategy search
 
+**Final result after five rounds (ZHA-3876): tier T4 (provisional until forward data); no configuration reached the win-rate target, and the default is unchanged.** The default stays `RuleStrategy` with rule `J-rsi14-1h-tp3-sl10`, which often wins but loses money net of costs. 186 configurations were tried over five rounds (budget 1,500). The win-rate target (60% net, stable across folds, windows and regimes) was met only by small-target, wide-stop rules with a negative expectancy (rounds 1 and 2); every family with a positive expectancy wins 20% to 53% of trades. Measured by Zhafron's later criterion, profit per month on Rp 2,000,000, the best result is round 5's `F1-regime-btc-sma50` (hold every pair while BTC/IDR closes above its 50-day SMA, one equal share each): Rp 79,841 a month on the five selection pairs at 34.4% drawdown, and Rp 46,970 a month on six pairs nobody used for selection at 33.9% drawdown - against Rp 52,864 and Rp 34,090 for equal-weight buy-and-hold of the same pairs at 61.4% and 53.0% drawdown. That is more than buy-and-hold at roughly half its drawdown, but it is not shown to be profitable: it misses the win-rate target, so by the locked tiers it is T4, and the cross-asset pairs move with the selection pairs over the same years, so it is not forward evidence. Section "Round 5" below; families tried and the next directions at the end of that section.
+
+## Round 5: portfolio versions of the ZHA-3913 shortlist (the last round)
+
+Locked in `4293a43` before the first round 5 run (plan.md, "Round 5"). Twelve configurations: Laras's F1 (hold every pair while the daily BTC/IDR close is above its SMA 50, 100 or 200) and F3 with a Donchian channel exit (enter above the n-day high, exit below the m-day low, stop 2 x ATR(14) daily), scored with an equal-weight account (99% / N of equity per pair) next to the risk-sized one. Ranking: tier, then equal-weight profit per month, then drawdown.
+
+Five selection pairs, 2022-07-01 to 2026-04-26, taker costs, compounded on Rp 2,000,000:
+
+| Config | Trades | Win rate | Mean net (95% CI) | Profit/month equal weight | Max DD | Worst month | Largest loss |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| F1-regime-btc-sma50 (selected) | 195 | 28.7% | +7.31% (+2.30% .. +13.62%) | Rp 79,841 | 34.4% | Rp -1,847,286 | -24.6% |
+| F1-regime-btc-sma100 | 116 | 25.9% | +13.29% (+2.34% .. +27.76%) | Rp 73,517 | 27.6% | Rp -1,220,332 | -95.0% (bad tick, see below) |
+| F3L-don1d20-low10-nofilter-st2atr | 137 | 39.4% | +7.44% (+2.01% .. +14.35%) | Rp 61,337 | 17.0% | Rp -424,264 | -14.4% |
+| F3L-don1d55-low20-btc100-st2atr | 61 | 47.5% | +16.10% (+4.20% .. +31.20%) | Rp 58,840 | 12.2% | Rp -264,940 | -12.7% |
+| Equal-weight buy-and-hold of the same five pairs | - | - | - | Rp 52,864 | 61.4% | - | - |
+
+The random-entry null for the selected configuration (its own exits and entry rate, 1,000 series): p95 +5.61%, beaten (+7.31%). The random-entry control with F1's exits made Rp 2,604 a month. Controls for all nine rule configurations: shifting signals one daily candle earlier raises every mean (selected +7.31% to +13.75%), truncation 0 of 200 failures and 0 live-window mismatches each.
+
+Cross-asset on BNB, NEAR, HBAR, ADA, LTC and TRX (the first three eligible configurations by the ranking key, research mode):
+
+| Config | Trades | Win rate | Mean net (95% CI) | Profit/month equal weight | Max DD | Worst month | Pairs with a positive mean |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| F1-regime-btc-sma100 | 138 | 31.2% | +8.40% (+1.17% .. +17.70%) | Rp 48,360 | 22.3% | Rp -559,684 | 6 of 6 |
+| F1-regime-btc-sma50 | 234 | 29.9% | +5.09% (+0.73% .. +10.97%) | Rp 46,970 | 33.9% | Rp -1,251,398 | 6 of 6 |
+| F3L-don1d20-low10-nofilter-st2atr | 157 | 29.9% | +4.55% (-0.31% .. +10.89%) | Rp 29,759 | 26.3% | Rp -446,991 | 5 of 6 |
+| Equal-weight buy-and-hold of the six pairs | - | - | - | Rp 34,090 | 53.0% | - | - |
+
+All three beat the random-entry null on the unseen pairs; their Bonferroni lower bounds over 186 configurations are negative (-4.5% to -7.1%), so after correcting for every configuration tried none is significant. Generated: [strategy-research/round5/results.md](strategy-research/round5/results.md), [strategy-research/cross/cross-asset-r5.md](strategy-research/cross/cross-asset-r5.md).
+
+Data quality: the SOL/IDR 1h candle of 2023-05-13 08:00 UTC has a low of Rp 500 against Rp 312,000 to 314,000 before and after (one bad print in the Indodax history). Any open SOL position with a stop below that price filled there: F1 with SMA100 or SMA200 (a 95% hard stop) and the random control each record one -95.0% trade. The data was not edited, so those rows stay in the results; without that trade the F1 SMA100 profit per month would be higher. A live bot on bot-side stops could take such a fill if the exchange prints it.
+
+## Five rounds: families tried and why they fell short
+
+| Round | Families | Best result | Why it fell short |
+| --- | --- | --- | --- |
+| 1 (ZHA-3872) | Donchian, momentum, EMA trend, volume breakout, RSI2 and Bollinger reversion, small target with wide stop, Fear and Greed | `J-rsi14-1h-tp3-sl10`, 77% net win rate, -0.60% per trade | high win rates came only from small targets and wide stops, which lose money after costs |
+| 2 | faster trend filters, ATR exits, two more pairs | `S-don1d20-sma50-tp5-lock3`, 66.8%, +0.08% (CI includes 0) | no forward data to judge it; on eight other pairs it lost -0.65% per trade |
+| 3 | trend rules that let winners run (Donchian with ATR trail, momentum, EMA) | `M-tsmom-90-sma100`, 25.5%, +9.12% | win rates of 23% to 53%; profit per month far below buy-and-hold at 0.5% risk sizing |
+| 4 | Donchian and momentum behind the BTC regime gate | `F3-tsmom-55-btcabove-sma100-sl20`, 24.1%, +5.95% | same as round 3 |
+| 5 | portfolio versions: F1 regime hold, F3 Donchian channels, equal-weight sizing | `F1-regime-btc-sma50`, Rp 79,841 a month, 34.4% DD | beats buy-and-hold per month at about half its drawdown, but wins 29% of trades (target 60%) and is not significant after 186 configurations |
+
+The locked target asks for a high win rate; the evidence of five rounds is that on Indodax spot after 0.62% round-trip costs, a high win rate and a positive expectancy do not come together in these families. What does carry to unseen pairs is a low-win-rate trend or regime hold with a positive mean.
+
+## Three next directions, with their data needs
+
+1. Forward test of `F1-regime-btc-sma50` and `F3L-don1d55-low20-btc100-st2atr` in dry run, unchanged: about 4 trades a month on five pairs for F1, so 100 forward trades take about two years; a monthly check of the equity curve against buy-and-hold is possible sooner. Needs: a dry-run bot per configuration, no new historical data.
+2. Re-state the target around Zhafron's monthly-profit criterion (median monthly return above zero with a CI, beating buy-and-hold on Sharpe and drawdown, as in Laras's protocol) instead of a per-trade win rate, and judge rounds 3 to 5 against it. Needs: a decision by Wira; the round 5 equity curves already exist.
+3. Maker entries and stop-fill realism: Laras's F3 used maker entries (0.42% round trip instead of 0.62%), and the bad SOL print shows stop fills need a sanity check (reject a fill more than a set multiple of ATR away from the previous close). Needs: an Indodax order-book or trade history to model limit fills, which the public candle endpoint does not give.
+
 **Rounds 3 and 4 result (ZHA-3876): tier T4 (provisional); the default is unchanged.** Thirty-two trend configurations, six of them behind a BTC/IDR daily regime gate, won 23% to 53% of trades, so none reaches the 60% target. Zhafron's measure (profit per month on Rp 2,000,000) puts the best eligible one at Rp 7,144 a month, against Rp 52,864 for equal-weight buy-and-hold of the same pairs, at 2.5% drawdown against 61.4%. Ranked by tier first, the default stays. Sections "Round 4" and "Round 3" below.
 
 **Round 2 result (ZHA-3876): not enough data; the default is unchanged.** The default stays round 1's `RuleStrategy` with rule `J-rsi14-1h-tp3-sl10` (often wins but loses money net of costs; section "Round 1"). Round 2's best configuration, `S-don1d20-sma50-tp5-lock3` (1d Donchian 20 breakout while the daily close is above its SMA50, take-profit 5%, profit lock at 3%, Donchian-mid exit, 8% stop) on BTC/IDR, ETH/IDR, SOL/IDR, XRP/IDR and DOGE/IDR, meets the locked win-rate target on the walk-forward (2022-07-01 to 2026-04-26): 382 trades, net win rate 66.8% (Wilson 95% lower bound 61.9%), net expectancy +0.076% per trade (95% CI -0.436% to +0.598%), walk-forward tier T2. The task accepts only the holdout or forward data for the final evaluation; the round 1 holdout is used and the forward data after 2026-10-26 holds 0 trades, so no target is reported as met and the configuration is not the default. A once-only check on untouched older data (2018-09-01 to 2021-01-01) is supporting evidence only: 189 trades on 4 pairs, net win rate 69.8% (Wilson 63.0%), net expectancy +0.739% per trade (95% CI -0.028% to +1.484%). At 0.41% per side or with +0.10% slippage per side the walk-forward mean is negative. Nothing here is shown to be profitable. Live mode stays locked (`LIVE_ENGINE_PROVEN = False`).
