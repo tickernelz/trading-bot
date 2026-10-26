@@ -110,6 +110,7 @@ async def test_four_adapters_answer_the_same_question_end_to_end(stub):
             ],
             "swarm": {
                 "min_voters_answered": 4,
+                "shuffle_options": False,
                 "voters": [
                     voter("llm", provider="llm", model="deepseek-test"),
                     voter("s1", adapter="systemone", provider="s1", model="jev-latest"),

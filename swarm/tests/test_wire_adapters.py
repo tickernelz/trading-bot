@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from tb_swarm.errors import ProviderError
@@ -107,25 +109,67 @@ async def test_openai_decisions_noul_criteria_move_into_instructions(stub):
     await provider.aclose()
 
 
-@pytest.mark.parametrize(
-    "malformed",
-    [
-        '{"model": "m", "answers": {"aligned": {"type": "noul", "noul": 0.5}}}',
-        '{"model": "m", "answers": [{"type": "predicate", "probability": 0.5}]}',
-        '{"model": "m", "answers": [{"type": "predicate", "name": "aligned", "probability": 0.5}, '
-        '{"type": "predicate", "name": "aligned", "probability": 0.5}]}',
-        '{"model": "m", "answers": [{"type": "predicate", "name": "aligned", "probability": 1.5}]}',
-        '{"model": "m", "answers": [{"type": "predicate", "name": "aligned", "probability": 0.5}]}',
-        '{"model": "m", "answers": [{"type": "choice", "name": "action", "choice": "bogus", "probabilities": []}]}',
-        '{"model": "m", "answers": [{"type": "choice", "name": "action", "choice": "allow", "probabilities": "x"}]}',
-    ],
-)
-async def test_openai_decisions_malformed_is_invalid(stub, malformed):
+def valid_openai_answers():
+    return [
+        {"type": "predicate", "name": "aligned", "probability": 0.5},
+        {
+            "type": "choice",
+            "name": "action",
+            "choice": "allow",
+            "probabilities": [
+                {"value": "allow", "probability": 0.6},
+                {"value": "shrink", "probability": 0.3},
+                {"value": "skip", "probability": 0.1},
+            ],
+            "confidence": 0.3,
+        },
+        {
+            "type": "score",
+            "name": "risk",
+            "score": 1.0,
+            "probabilities": [
+                {"value": 0, "label": "low", "probability": 0.1},
+                {"value": 1, "label": "medium", "probability": 0.8},
+                {"value": 2, "label": "high", "probability": 0.1},
+            ],
+            "confidence": 0.8,
+        },
+    ]
+
+
+def break_answers(mutate):
+    answers = valid_openai_answers()
+    mutate(answers)
+    return json.dumps({"model": "m", "answers": answers})
+
+
+MALFORMED_OPENAI = [
+    (json.dumps({"model": "m", "answers": {"aligned": {"type": "noul", "noul": 0.5}}}), "answers is not a list"),
+    (break_answers(lambda a: a[0].pop("name")), "answer without a name"),
+    (break_answers(lambda a: a.append(dict(a[0]))), "duplicate answer 'aligned'"),
+    (break_answers(lambda a: a[0].update(probability=1.5)), "noul must be in [0, 1]"),
+    (break_answers(lambda a: a.pop(0)), "answer names mismatch"),
+    (break_answers(lambda a: a[1].update(choice="bogus")), "choice 'bogus' is not an option"),
+    (break_answers(lambda a: a[1].update(probabilities="x")), "probabilities is not a list"),
+]
+
+
+@pytest.mark.parametrize(("malformed", "fragment"), MALFORMED_OPENAI)
+async def test_openai_decisions_malformed_is_invalid(stub, malformed, fragment):
     stub.state.behaviors["gpt-6-luna-decisions"] = Behavior(malformed=malformed)
     provider = openai_decisions(stub)
     with pytest.raises(ProviderError) as caught:
         await provider.decide(request())
     assert caught.value.kind == "invalid"
+    assert fragment in str(caught.value)
+    await provider.aclose()
+
+
+async def test_openai_decisions_accepts_the_valid_baseline(stub):
+    stub.state.behaviors["gpt-6-luna-decisions"] = Behavior(malformed=break_answers(lambda a: None))
+    provider = openai_decisions(stub)
+    response = await provider.decide(request())
+    assert response.answers["action"].choice == "allow"
     await provider.aclose()
 
 

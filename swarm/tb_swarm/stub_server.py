@@ -324,7 +324,7 @@ class StubServer(ThreadingHTTPServer):
     def __init__(self, state: StubState | None = None) -> None:
         super().__init__(("127.0.0.1", 0), _Handler)
         self.state = state or StubState()
-        self._thread = threading.Thread(target=self.serve_forever, daemon=True)
+        self._thread = threading.Thread(target=self.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True)
 
     @property
     def base_url(self) -> str:

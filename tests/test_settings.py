@@ -74,7 +74,11 @@ def _mutations():
     def wrong_type(raw):
         raw["capital"]["initial_idr"] = "two million"
 
+    def analyst_on_decision_provider(raw):
+        raw["llm"]["analyst_model"] = "experientiallabs-systemone:jev-latest"
+
     return [
+        analyst_on_decision_provider,
         unknown_key,
         live_mode,
         daily_above_total,

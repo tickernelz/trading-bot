@@ -81,7 +81,7 @@ class OpenAiDecisionsProvider(HttpDecisionProvider):
     def _raw_answers(self, body: dict[str, Any]) -> Any:
         items = body.get("answers")
         if not isinstance(items, list):
-            return items
+            raise ProviderError("invalid", "answers is not a list")
         converted: dict[str, Any] = {}
         for item in items:
             if not isinstance(item, dict) or not isinstance(item.get("name"), str):

@@ -14,6 +14,7 @@ from tb_swarm.errors import ProviderError
 from tb_swarm.models import DecisionRequest
 from tb_swarm.providers.openai_decisions import OpenAiDecisionsProvider
 from tb_swarm.providers.systemone import SystemOneProvider
+from tb_swarm.redact import redact
 from tb_swarm.validate import parse_answers
 
 MODELS = ("jev-latest", "clef", "clef-flash", "gpt-6-luna-decisions")
@@ -34,7 +35,7 @@ async def probe(provider, url, model, request, key):
         "url": url,
         "status": response.status_code,
         "latency_s": latency,
-        "body": response.text[:1500],
+        "body": redact(response.text, (key,))[:1500],
     }
     if response.status_code == 200:
         try:
