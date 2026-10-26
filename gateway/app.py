@@ -23,15 +23,17 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from engine.decisions import DecisionStore
+from engine.decisions import DecisionStore, linked_trades
 from engine.heartbeat import read_heartbeat
-from engine.launch import TRADABLE_BALANCE_RATIO
+from engine.launch import DRY_RUN_DB, TRADABLE_BALANCE_RATIO
 from engine.risk import day_start
 from engine.settings import ConfigError, Settings, load_settings
 from gateway import VERSION
 from gateway.events import FILL_SIDES, translate
 from gateway.feed import Client, Hub, now_iso
+from gateway.history import periods
 from gateway.ledger import Ledger, LoginThrottle
+from gateway.outcomes import Candle, by_open_time, explain
 from gateway.settings import BotRef, GatewaySettings
 from gateway.upstream import ApiError, Upstream
 from gateway.views import (
@@ -53,6 +55,10 @@ CACHE_TTL_S = 2.0
 CANDLE_SECONDS = 3600
 HEARTBEAT_EVENT_S = 60
 SECRET_KEYS = ("api_key",)
+TRADE_PAGE = 500
+CANDLE_TTL_S = 60.0
+ROUND_TRIP_COST_PCT = 0.82
+MAX_HORIZON = 48
 
 
 class Login(BaseModel):
@@ -106,6 +112,7 @@ class Gateway:
         self.cpu_recent: float | None = None
         self.http = httpx.AsyncClient(timeout=5.0)
         self.tasks: list[asyncio.Task] = []
+        self.clock = lambda: datetime.now(UTC)
 
     def primary(self) -> BotRef:
         return self.settings.bots[0]
@@ -143,14 +150,27 @@ class Gateway:
         self.cache[key] = (time.monotonic(), value)
         return value
 
+    async def closed_trades(self, bot: BotRef) -> list[dict[str, Any]]:
+        """Every closed trade, paged by id so later pages never skip the earliest trades."""
+        trades: dict[int, dict[str, Any]] = {}
+        offset = 0
+        while True:
+            page = await self.ft(bot, "/trades", limit=TRADE_PAGE, offset=offset, order_by_id=True)
+            rows = page.get("trades", [])
+            for trade in rows:
+                trades[trade["trade_id"]] = trade
+            offset += len(rows)
+            if len(rows) < TRADE_PAGE or offset >= page.get("total_trades", offset):
+                return list(trades.values())
+
     async def closed_and_open(self, bot: BotRef) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-        history, status = await asyncio.gather(self.ft(bot, "/trades", limit=500), self.ft(bot, "/status"))
-        return history.get("trades", []), status
+        history, status = await asyncio.gather(self.closed_trades(bot), self.ft(bot, "/status"))
+        return history, status
 
     async def risk(self, bot: BotRef) -> dict[str, Any]:
         settings = self.engine_settings(bot)
         trades, opened = await self.closed_and_open(bot)
-        now = datetime.now(UTC)
+        now = self.clock()
         open_pnl = sum(trade.get("profit_abs") or 0.0 for trade in opened)
         return risk_view(settings, compute_risk(settings, trades, open_pnl, now), now)
 
@@ -269,15 +289,34 @@ class Gateway:
             "load": self.load(),
         }
 
+    async def run_start(self, bots: list[BotRef], now: datetime) -> datetime:
+        """Earliest Freqtrade bot_start among the bots: the first start of the dry-run database, kept across restarts."""
+        answers = await asyncio.gather(*(self.ft(bot, "/health") for bot in bots), return_exceptions=True)
+        for answer in answers:
+            if isinstance(answer, BaseException) and not isinstance(answer, ApiError):
+                raise answer
+        starts = [
+            datetime.fromisoformat(health["bot_start"]).astimezone(UTC)
+            for health in answers
+            if isinstance(health, dict) and health.get("bot_start")
+        ]
+        return min(starts) if starts else now
+
     async def equity(self, window: str, bot_ids: list[str]) -> dict[str, Any]:
-        now = datetime.now(UTC)
+        now = self.clock()
+        bots = [self.bot(bot_id) for bot_id in bot_ids]
+        common = await self.run_start(bots, now) if window == "run" else None
         series = []
         unavailable = []
         start_equity = None
-        for bot_id in bot_ids:
-            bot = self.bot(bot_id)
+        for bot in bots:
             settings = self.engine_settings(bot)
-            start = day_start(now, settings.risk.daily_reset_timezone) if window == "day" else now - timedelta(days=7)
+            if window == "day":
+                start = day_start(now, settings.risk.daily_reset_timezone)
+            elif window == "7d":
+                start = now - timedelta(days=7)
+            else:
+                start = common or now
             try:
                 trades, opened = await self.closed_and_open(bot)
             except ApiError:
@@ -286,13 +325,70 @@ class Gateway:
             open_pnl = sum(trade.get("profit_abs") or 0.0 for trade in opened)
             points = equity_points(settings.capital.initial_idr, trades, open_pnl, start, now)
             start_equity = points[0][1] if start_equity is None else start_equity
-            series.append({"bot": bot.id, "label": bot.label, "strategy": bot.strategy, "points": points})
-        return {"window": window, "start_equity": start_equity, "series": series, "unavailable": unavailable}
+            series.append(
+                {
+                    "bot": bot.id,
+                    "label": bot.label,
+                    "strategy": bot.strategy,
+                    "start_equity": points[0][1],
+                    "points": points,
+                }
+            )
+        return {
+            "window": window,
+            "start": common.isoformat(timespec="seconds").replace("+00:00", "Z") if common else None,
+            "start_equity": start_equity,
+            "series": series,
+            "unavailable": unavailable,
+        }
+
+    async def profit_periods(self, bot: BotRef, window: str, timescale: int) -> dict[str, Any]:
+        settings = self.engine_settings(bot)
+        trades, config = await asyncio.gather(self.closed_trades(bot), self.ft(bot, "/show_config"))
+        return {
+            "window": window,
+            "timezone": settings.risk.daily_reset_timezone,
+            "stake_currency": config.get("stake_currency"),
+            "data": periods(
+                trades,
+                window,
+                timescale,
+                settings.risk.daily_reset_timezone,
+                settings.capital.initial_idr,
+                self.clock(),
+            ),
+        }
+
+    async def explained(
+        self, bot: BotRef, decisions: list[dict[str, Any]], horizons: list[int], cost_pct: float
+    ) -> list[dict[str, Any]]:
+        if not decisions:
+            return []
+        timeframe = self.engine_settings(bot).exchange.timeframe
+        links = linked_trades(Path(bot.userdir) / DRY_RUN_DB)
+        closed, opened = await self.closed_and_open(bot)
+        by_id = {trade["trade_id"]: trade for trade in [*closed, *opened]}
+        candles: dict[str, dict[int, Candle]] = {}
+        for pair in sorted({decision["pair"] for decision in decisions}):
+            try:
+                frame = await self.ft(
+                    bot, "/pair_candles", ttl=CANDLE_TTL_S, pair=pair, timeframe=timeframe, limit=1500
+                )
+            except ApiError:
+                frame = {}
+            candles[pair] = by_open_time(frame)
+        now = self.clock()
+        result = []
+        for decision in decisions:
+            link = links.get(decision["decision_id"])
+            trade = by_id.get(link["id"]) if link is not None else None
+            result.append(explain(decision, trade, candles[decision["pair"]], now, horizons, cost_pct, CANDLE_SECONDS))
+        return result
 
     def costs(self, window: str) -> dict[str, Any]:
         bot = self.primary()
         settings = self.engine_settings(bot)
-        now = datetime.now(UTC)
+        now = self.clock()
         since = None
         if window == "day":
             since = day_start(now, settings.risk.daily_reset_timezone).astimezone(UTC)
@@ -643,12 +739,15 @@ def create_app(gateway: Gateway) -> FastAPI:
 
     @app.get("/gw/v1/trades", dependencies=[Depends(reader)])
     async def trades(
-        bot: str | None = None, limit: int = Query(100, ge=1, le=500), pair: str | None = None
+        bot: str | None = None,
+        limit: int = Query(100, ge=1, le=500),
+        offset: int = Query(0, ge=0),
+        pair: str | None = None,
     ) -> list[dict[str, Any]]:
-        history = await gateway.ft(gateway.bot(bot), "/trades", limit=500)
-        rows = [trade for trade in history.get("trades", []) if pair is None or trade.get("pair") == pair]
-        rows.sort(key=lambda trade: trade.get("trade_id", 0), reverse=True)
-        return rows[:limit]
+        history = await gateway.closed_trades(gateway.bot(bot))
+        rows = [trade for trade in history if pair is None or trade.get("pair") == pair]
+        rows.sort(key=lambda trade: (trade.get("close_timestamp") or 0, trade.get("trade_id", 0)), reverse=True)
+        return rows[offset : offset + limit]
 
     @app.get("/gw/v1/trades/{trade_id}", dependencies=[Depends(reader)])
     async def trade(trade_id: int, bot: str | None = None) -> dict[str, Any]:
@@ -676,7 +775,7 @@ def create_app(gateway: Gateway) -> FastAPI:
         ref = gateway.bot(bot)
         if window == "total":
             return {"window": "total", **await gateway.ft(ref, "/profit")}
-        return {"window": window, **await gateway.ft(ref, f"/{window}", timescale=timescale)}
+        return await gateway.profit_periods(ref, window, timescale)
 
     @app.get("/gw/v1/stats", dependencies=[Depends(reader)])
     async def stats(bot: str | None = None) -> dict[str, Any]:
@@ -685,15 +784,17 @@ def create_app(gateway: Gateway) -> FastAPI:
     @app.get("/gw/v1/performance", dependencies=[Depends(reader)])
     async def performance(bot: str | None = None, pair: str | None = None) -> dict[str, Any]:
         ref = gateway.bot(bot)
-        per_pair, by_tag, by_exit = await asyncio.gather(
+        per_pair, by_tag, by_exit, by_mix = await asyncio.gather(
             gateway.ft(ref, "/performance"),
             gateway.ft(ref, "/entries", pair=pair),
             gateway.ft(ref, "/exits", pair=pair),
+            gateway.ft(ref, "/mix_tags", pair=pair),
         )
         return {
             "per_pair": [row for row in per_pair if pair is None or row.get("pair") == pair],
             "by_enter_tag": by_tag,
             "by_exit_reason": by_exit,
+            "by_mix_tag": [{**row, "profit_pct": round(row["profit_ratio"] * 100, 2)} for row in by_mix],
         }
 
     @app.get("/gw/v1/candles", dependencies=[Depends(reader)])
@@ -733,20 +834,50 @@ def create_app(gateway: Gateway) -> FastAPI:
         return redacted_settings(gateway.engine_settings(gateway.bot(bot)))
 
     @app.get("/gw/v1/equity", dependencies=[Depends(reader)])
-    async def equity(window: str = Query("day", pattern="^(day|7d)$"), bots: str | None = None) -> dict[str, Any]:
+    async def equity(window: str = Query("day", pattern="^(day|7d|run)$"), bots: str | None = None) -> dict[str, Any]:
         ids = [item for item in (bots or gateway.primary().id).split(",") if item]
         return await gateway.equity(window, ids)
 
+    def horizon_list(horizons: str) -> list[int]:
+        values = sorted({int(item) for item in horizons.split(",")})
+        if values[0] < 1 or values[-1] > MAX_HORIZON:
+            raise ApiError(400, "invalid_request", f"horizons must be between 1 and {MAX_HORIZON} candles")
+        return values
+
+    horizons_query = Query("1,2,4", pattern=r"^\d{1,2}(,\d{1,2}){0,3}$")
+    cost_query = Query(ROUND_TRIP_COST_PCT, ge=0, le=10)
+
     @app.get("/gw/v1/decisions", dependencies=[Depends(reader)])
-    async def decisions(bot: str | None = None, limit: int = Query(20, ge=1, le=500)) -> list[dict[str, Any]]:
+    async def decisions(
+        bot: str | None = None,
+        limit: int = Query(20, ge=1, le=500),
+        outcome: bool = False,
+        horizons: str = horizons_query,
+        cost_pct: float = cost_query,
+    ) -> list[dict[str, Any]]:
+        steps = horizon_list(horizons)
         refs = [gateway.bot(bot)] if bot else gateway.settings.bots
         rows = []
         for ref in refs:
             store = gateway.store(ref)
-            if store is not None:
-                rows += store.recent(limit)
+            if store is None:
+                continue
+            recent = store.recent(limit)
+            rows += await gateway.explained(ref, recent, steps, cost_pct) if outcome else recent
         rows.sort(key=lambda row: row["ts"], reverse=True)
         return rows[:limit]
+
+    @app.get("/gw/v1/decisions/{decision_id}", dependencies=[Depends(reader)])
+    async def decision(
+        decision_id: str, bot: str | None = None, horizons: str = horizons_query, cost_pct: float = cost_query
+    ) -> dict[str, Any]:
+        steps = horizon_list(horizons)
+        for ref in [gateway.bot(bot)] if bot else gateway.settings.bots:
+            store = gateway.store(ref)
+            found = store.get(decision_id) if store is not None else None
+            if found is not None:
+                return (await gateway.explained(ref, [found], steps, cost_pct))[0]
+        raise ApiError(404, "not_found", f"unknown decision {decision_id}")
 
     @app.get("/gw/v1/costs", dependencies=[Depends(reader)])
     async def costs(window: str = Query("day", pattern="^(day|7d|total)$")) -> dict[str, Any]:

@@ -248,21 +248,15 @@ class DecisionStore:
             result.append(entry)
         return result
 
+    def get(self, decision_id: str) -> dict[str, Any] | None:
+        row = self._db.execute(
+            "SELECT * FROM decisions WHERE decision_id = ? AND settle_seq IS NOT NULL", (decision_id,)
+        ).fetchone()
+        return public_decision(row) if row else None
+
     def outcomes(self, trades_db: str | Path) -> list[Outcome]:
         """Join each settled decision to the trade it shadowed, through the trade's custom data."""
-        trades = sqlite3.connect(f"file:{Path(trades_db)}?mode=ro", uri=True)
-        trades.row_factory = sqlite3.Row
-        try:
-            linked = {
-                row["cd_value"]: row
-                for row in trades.execute(
-                    "SELECT d.cd_value, t.id, t.is_open, t.close_profit_abs, t.close_profit FROM trade_custom_data d"
-                    " JOIN trades t ON t.id = d.ft_trade_id WHERE d.cd_key = ?",
-                    (SHADOW_KEY,),
-                )
-            }
-        finally:
-            trades.close()
+        linked = linked_trades(trades_db)
         result = []
         for row in self._db.execute(
             "SELECT decision_id, pair, verdict, status FROM decisions WHERE settle_seq IS NOT NULL ORDER BY settle_seq"
@@ -283,15 +277,39 @@ class DecisionStore:
         return result
 
 
+def linked_trades(trades_db: str | Path) -> dict[str, sqlite3.Row]:
+    """Trades keyed by the shadow decision id stored in their custom data; empty when the database is absent."""
+    path = Path(trades_db)
+    if not path.exists():
+        return {}
+    trades = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    trades.row_factory = sqlite3.Row
+    try:
+        return {
+            row["cd_value"]: row
+            for row in trades.execute(
+                "SELECT d.cd_value, t.id, t.is_open, t.close_profit_abs, t.close_profit FROM trade_custom_data d"
+                " JOIN trades t ON t.id = d.ft_trade_id WHERE d.cd_key = ?",
+                (SHADOW_KEY,),
+            )
+        }
+    finally:
+        trades.close()
+
+
 def public_decision(row: sqlite3.Row) -> dict[str, Any]:
     voters: Iterable[dict[str, Any]] = json.loads(row["voters"] or "[]")
+    state = json.loads(row["request"]).get("state") or {}
     return {
         "decision_id": row["decision_id"],
         "ts": row["settled_at"] or row["ts"],
+        "requested_at": row["ts"],
         "bot": row["bot"],
         "pair": row["pair"],
         "timeframe": row["timeframe"],
         "candle": row["candle"],
+        "rate": row["rate"],
+        "entry_tag": state.get("entry_tag"),
         "mode": row["mode"],
         "status": row["status"],
         "reason": row["reason"],
