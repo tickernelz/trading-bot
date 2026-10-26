@@ -83,7 +83,8 @@ Direktori jalan (di luar repo), contoh `~/Projects/trading-bot-runs/stage1`:
     secrets/ft.env        FT_API_USERNAME, FT_API_PASSWORD, FT_API_JWT_SECRET (bot-a, bot-b)
     secrets/shadow.env    SHADOW_TOKEN, minimal 32 karakter (bot-b, shadow-b)
     secrets/swarm.env     kunci provider voter, mis. NUTARALINE_API_KEY, EXPERIENTIALLABS_API_KEY (shadow-b)
-    secrets/gateway.env   GW_PASSWORD (minimal 12 karakter), FT_API_USERNAME, FT_API_PASSWORD (gateway)
+    secrets/gateway.env   GW_PASSWORD (minimal 12 karakter), FT_API_USERNAME, FT_API_PASSWORD, ANALYST_TOKEN (gateway)
+    secrets/analyst.env   key provider analis, ANALYST_TOKEN minimal 32 karakter (analyst-b)
 
 Tiap proses hanya menerima berkas rahasia yang dipakainya: gateway tidak memegang JWT secret Freqtrade, bot tidak memegang kunci provider, layanan bayangan tidak memegang kredensial Freqtrade.
     bot-a/ bot-b/ gateway/
@@ -133,3 +134,17 @@ API key boleh lewat variabel lingkungan (salin .env.example ke .env) atau langsu
 - Commit memakai Conventional Commits berbahasa Inggris, subject di bawah 72 karakter, tanpa trailer Co-Authored-By.
 - Tidak ada komentar di kode kita. Isi vendor/freqtrade adalah kode pihak ketiga dan tidak diubah.
 - Belum ada remote dan belum ada berkas LICENSE (Freqtrade berlisensi GPL-3.0).
+
+
+## Tahap 3a: agen analis dan kontrol mode live
+
+Satu proses baru, `analyst-b` (port 8092, loopback), dan dua kelompok endpoint gateway; kontrak di `docs/gateway-api.md` bagian 12, angka dan batas bukti di `docs/stage3a-findings.md`.
+
+| Komponen | Isi |
+| --- | --- |
+| analyst-b | `python -m engine.analyst_service`. Memegang key model analis (`secrets/analyst.env`: key provider dan `ANALYST_TOKEN` minimal 32 karakter). Menjalankan agen deepagents dengan tiga tool baca (metrik, riwayat trade, log voter) atas snapshot yang ditulis gateway; tanpa tool order, tanpa tool ubah konfigurasi, tanpa akses ke config atau `.env` |
+| gateway | Menulis snapshot, meneruskan ke analyst-b (`ANALYST_TOKEN` ditambahkan ke `secrets/gateway.env`, key provider tidak), mencatat laporan harian setelah `analyst.report_at`, melayani `/gw/v1/analyst/*` dan `/gw/v1/mode` |
+
+Laporan harian berisi ringkasan, anomali, dan saran; tiap temuan membawa daftar bukti dan penanda `grounded`, yang dihitung kode: true hanya bila setiap bukti muncul apa adanya di keluaran tool. Tanya analis (`POST /gw/v1/analyst/ask`) memakai tool yang sama.
+
+Kontrol mode live: `POST /gw/v1/control/mode` dua langkah, hanya dari mesin bot sendiri, gagal tertutup. Live ditolak bila mesin tidak mencatat key exchange (`INDODAX_API_KEY`, `INDODAX_API_SECRET` di lingkungan bot, tidak pernah di gateway) dan selama `engine.modectl.LIVE_ENGINE_PROVEN` false. Nilai itu false di build ini karena jalur order live Indodax belum dibuktikan, jadi live tidak bisa menyala dari kode ini. Mesin menolak start bila `mode.json` di userdir bot mencatat live.

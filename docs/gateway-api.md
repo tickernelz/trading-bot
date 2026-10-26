@@ -70,7 +70,7 @@ Contoh: rancangan, gateway belum ada; nilai mengikuti tangkapan Freqtrade bila a
 }
 ```
 
-Kode yang dipakai: `unauthorized`, `forbidden_local_only`, `confirmation_required`, `confirmation_expired`, `invalid_request`, `upstream_error`, `upstream_unavailable`, `risk_limit_breached`, `not_found`, `rate_limited`.
+Kode yang dipakai: `unauthorized`, `live_blocked`, `forbidden_local_only`, `confirmation_required`, `confirmation_expired`, `invalid_request`, `upstream_error`, `upstream_unavailable`, `risk_limit_breached`, `not_found`, `rate_limited`.
 
 ## 5. Endpoint baca
 
@@ -593,3 +593,50 @@ Saat `entry_fill` atau `exit_fill` tiba dari Freqtrade, gateway mencatat waktu t
 - Kontrol bagian 3 dan 6, `PATCH /gw/v1/settings`, lingkup `control` dan `owner` (tahap 2).
 - Web Push bagian 11.3: `/gw/v1/push/*` menjawab `404 not_found`; PWA hanya bisa memakai Web Push dengan gateway tiruan.
 - `sample_data` selalu `false`.
+
+
+## 12. Tahap 3a: agen analis dan kontrol mode live
+
+Endpoint di bagian ini dibangun di `gateway/analyst.py` dan `gateway/modeapi.py` dan diuji lewat gateway nyata dengan klien uji (`tests/test_gateway_analyst.py`, `tests/test_gateway_mode.py`). Bentuk laporan dan jawaban ditangkap dari uji hidup 2026-10-26 pada model `deepseek-v4.1-flash-1017` di nutaraline; PWA belum memanggilnya (tahap 2d).
+
+Pembagian proses: gateway tidak memegang key provider. Gateway menulis snapshot data ke `<userdir bot>/<analyst.data_dir>` (`metrics.json`, `trades.jsonl`, `voter_decisions.jsonl`), lalu meneruskan permintaan ke layanan analis (`python -m engine.analyst_service`, loopback, header `X-Analyst-Token`) yang memegang key model dan hanya punya tiga tool baca. Token layanan (`ANALYST_TOKEN`) ada di lingkungan gateway dan layanan, key model hanya di layanan.
+
+### 12.1 Laporan harian
+
+- `GET /gw/v1/analyst/reports?bot=B` (baca): `{"bot": "B", "report_at": "00:10", "days": ["2026-10-26"]}`, terbaru dulu.
+- `GET /gw/v1/analyst/reports/{day}?bot=B` (baca): satu laporan; `404 not_found` bila belum ada, `400 invalid_request` bila `day` bukan tanggal.
+- `POST /gw/v1/analyst/reports` body `{"day": "2026-10-26", "bot": "B"}` (kontrol; `day` kosong berarti hari ini menurut zona waktu risiko): menyegarkan snapshot, menjalankan analis, menyimpan laporan, menulis baris audit `analyst.report`. Satu laporan per hari; membuat ulang menggantikan yang lama. `409 invalid_request` bila laporan hari itu sedang dibuat.
+- Pencatat waktu gateway membuat laporan kemarin sekali per hari setelah `analyst.report_at` (default 00:10), mencoba lagi paling cepat 15 menit setelah gagal, audit `analyst.report` dengan `actor: scheduler`.
+
+Contoh: tangkapan uji hidup 2026-10-26 (hari tanpa data bot; teks dipangkas).
+
+```json
+{"day": "2026-10-26", "generated_at": "2026-10-26T01:09:00Z", "model": "deepseek-v4.1-flash-1017", "language": "id", "summary": "Tidak ada data untuk 2026-10-26 (timezone Asia/Jakarta). ...", "anomalies": [], "suggestions": [], "tools_used": [{"name": "get_metrics", "args": {}}, {"name": "get_trade_history", "args": {"day": "2026-10-26"}}, {"name": "get_voter_log", "args": {"day": "2026-10-26"}}], "usage": {"input_tokens": 2788, "output_tokens": 363, "reasoning_tokens": 0, "cost": null}, "latency_s": 11.263}
+```
+
+Tiap elemen `anomalies` dan `suggestions` berbentuk `{"title", "detail", "evidence": ["dec_18_btc", "22"], "grounded": true}`. `grounded` dihitung oleh kode layanan analis (`tb_swarm.analyst`), bukan oleh model: true hanya bila `evidence` tidak kosong dan setiap entri muncul apa adanya di keluaran tool yang dipanggil analis saat membuat laporan itu. PWA menampilkan yang false sebagai "belum terverifikasi". Saran adalah nasihat; tidak ada jalur yang menerapkannya.
+
+### 12.2 Tanya agen analis
+
+`POST /gw/v1/analyst/ask` (baca) body `{"question": "Kenapa BTC dilewati jam 02:00?", "history": [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}], "bot": "B"}`. Pertanyaan 1 sampai 2.000 karakter, riwayat paling banyak 20 giliran (server tidak menyimpan percakapan; klien mengirim ulang riwayatnya). Respons `{"answer", "model", "tools_used", "usage", "latency_s"}`. Paling banyak 6 pertanyaan per menit untuk seluruh gateway, sisanya `429 rate_limited` dengan `retry_after_ms`. Audit `analyst.ask` mencatat nama tool, token, dan latensi, bukan teks pertanyaan. Snapshot disegarkan paling sering tiap 30 detik.
+
+Contoh: tangkapan uji hidup 2026-10-26 (permintaan membaca `.env` ditolak; teks dipangkas).
+
+```json
+{"answer": "Saya tidak bisa menunjukkan isi file `.env` atau kunci API provider. Alasannya: saya hanya ...", "model": "deepseek-v4.1-flash-1017", "tools_used": [], "usage": {"input_tokens": 696, "output_tokens": 190, "reasoning_tokens": 0, "cost": null}, "latency_s": 2.341}
+```
+
+Galat dari bagian ini: `404 not_found` (bot tanpa bagian `analyst` di config-nya), `503 upstream_unavailable` (layanan analis tidak terjangkau), `503 upstream_error` (`ANALYST_TOKEN` tidak ada di lingkungan gateway), `502 upstream_error` (provider gagal; pesan hanya memuat jenis galat, tidak pernah key atau isi respons provider), `504 upstream_unavailable` (layanan tidak menjawab dalam 120 detik).
+
+### 12.3 Mode live
+
+- `GET /gw/v1/mode?bot=B` (baca): `{"bot": "B", "mode": "dry_run", "live_allowed": false, "exchange_key_configured": false, "blockers": [{"code": "exchange_key_missing", "message": "..."}, {"code": "live_engine_unproven", "message": "..."}]}`. `state_problem` muncul bila `mode.json` tidak terbaca (dibaca sebagai dry_run).
+- `POST /gw/v1/control/mode` body `{"mode": "live", "confirm": null, "bot": "B"}` dengan header `Idempotency-Key` (wajib, paling banyak 128 karakter). Hanya dari `127.0.0.1`/`::1` tanpa header penerusan (`X-Forwarded-For`, `Forwarded`, `X-Real-IP`, `CF-Connecting-IP`, `True-Client-IP`); selain itu `403 forbidden_local_only`, supaya permintaan lewat tunnel tidak pernah dianggap lokal.
+  1. Tanpa `confirm`: bila live diizinkan, `409 confirmation_required` dengan objek `confirmation` seperti bagian 3 (berlaku 60 detik, satu aksi `mode.live`, satu sasaran `live`); mode tidak berubah. Bila tidak diizinkan, `422 live_blocked` dengan `blockers` (semua syarat yang belum terpenuhi, alasan pertama di `message`).
+  2. Ulangi dengan `confirm: "cf_..."`: syarat diperiksa lagi, lalu `200` dengan status mode. `confirmation_expired` (409) bila lewat 60 detik; id tak dikenal, sudah dipakai, atau milik pelaku lain memberi `409 invalid_request`. `confirm` hanya sah bersama `mode: live` (`400` selain itu).
+  3. Kembali ke `dry_run` hanya satu langkah (menurunkan risiko, bagian 3).
+  4. Hasil langkah 2 dan penolakannya disimpan per `Idempotency-Key` 10 menit; mengulang kunci yang sama mengembalikan respons yang sama tanpa mengubah apa pun. Langkah 1 tidak disimpan.
+- Syarat live (semua harus terpenuhi, diperiksa di langkah 1 dan 2): (a) mesin mencatat bahwa ia start dengan `INDODAX_API_KEY` dan `INDODAX_API_SECRET` terisi (`capabilities.json` di userdir, hanya boolean; gateway tidak memegang key exchange); (b) `engine.modectl.LIVE_ENGINE_PROVEN` bernilai true. (b) bernilai false di build ini: jalur order live Indodax belum pernah dibuktikan, jadi live tidak bisa diaktifkan lewat endpoint ini walau key ada. Mengubah nilainya adalah keputusan tahap live kecil, bersama pembuktian jalur order.
+- Audit `mode.change` tiap percobaan dengan hasil `ok`, `refused`, `denied`, `confirmation_required`, kode penolakan, dan kode blocker (tanpa nilai key). Mesin menolak start bila `mode.json` mencatat live sementara `LIVE_ENGINE_PROVEN` false.
+
+Perubahan kontrak: kode galat baru `live_blocked` (422); bagian 3 meminta langkah kedua memakai `Idempotency-Key` yang sama dengan langkah pertama, sedangkan di sini langkah pertama tidak menyimpan hasil sehingga kunci boleh sama atau beda; lingkup `control` untuk `POST /gw/v1/analyst/reports` dan lingkup `owner` untuk mode baru berlaku penuh setelah tahap 2a; sampai itu masuk, gateway memakai sesi baca untuk keduanya dan pemeriksaan lokal (di atas) untuk mode. Alasan: key exchange tidak boleh ada di proses gateway yang menghadap PWA.
