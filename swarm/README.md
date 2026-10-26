@@ -47,7 +47,15 @@ Kunci API diambil dari variabel lingkungan (`api_key_env`) atau `api_key` di kon
 
 ## Agen analis
 
-`build_analyst(model, data_dir)` membuat agen deepagents dengan tiga tool baca (`get_metrics`, `get_trade_history`, `get_voter_log`). `ToolAllowlist` menyaring daftar tool ke model dan menolak panggilan tool lain, termasuk `task`, `write_file`, `edit_file`, `delete`, dan `execute`.
+`build_analyst(model, data_dir)` membuat agen deepagents dengan tiga tool baca (`get_metrics`, `get_trade_history`, `get_voter_log`). `ToolAllowlist` menyaring daftar tool ke model dan menolak panggilan tool lain, termasuk `task`, `write_file`, `edit_file`, `delete`, dan `execute`. `get_trade_history` dan `get_voter_log` menerima filter `day` (YYYY-MM-DD menurut zona waktu risiko) dan `pair`, menambahkan `ts_local` ke tiap baris, dan menutup keluaran yang terpotong dengan baris "showing the newest N of M".
+
+Tahap 3a menambah tiga modul di atasnya:
+
+- `tb_swarm/analyst.py`: `AnalystRunner.daily_report(day)` menghasilkan `DailyReport` (ringkasan, anomali, saran; tiap temuan membawa `evidence` dan `grounded`, yang dihitung kode dari keluaran tool) dan `AnalystRunner.ask(question, history)` menjawab pertanyaan; `ReportStore` menyimpan satu berkas JSON per hari; `build_runner(raw_config, env, data_dir)` memilih model dari `llm.analyst_model` di `config.yaml`.
+- `tb_swarm/snapshot.py`: `write_snapshot` menulis tiga berkas yang dibaca tool, tiap berkas atomik, dengan ringkasan harian swarm (`swarm_by_day`) di `metrics.json` supaya hari yang ramai tidak perlu dibaca baris demi baris.
+- `bench/live_analyst.py`: uji hidup terhadap provider nyata dengan data sintetis atau kosong; butuh key provider di lingkungan dan `--base-url`.
+
+Di aplikasi, analis berjalan sebagai proses sendiri (`engine/analyst_service.py`); lihat README di akar repo bagian Tahap 3a.
 
 ## Menjalankan tes dan alat ukur
 
