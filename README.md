@@ -44,7 +44,7 @@ Butuh Docker di mesin yang sama; diuji di WSL2 dengan Docker Engine 29.9.2.
     mkdir -p user_data
     cp config/config.example.yaml config/config.yaml
 
-Isi FT_API_USERNAME, FT_API_PASSWORD, FT_API_JWT_SECRET (minimal 32 karakter), FT_API_WS_TOKEN di .env (jangan di-commit). Hanya trade dan webserver yang membuka API dan membutuhkan keempatnya; download-data, backtesting, dan show-config berjalan tanpa API server. Lalu:
+Isi FT_API_USERNAME, FT_API_PASSWORD, FT_API_JWT_SECRET (minimal 32 karakter) di .env (jangan di-commit). Hanya trade dan webserver yang membuka API dan membutuhkan ketiganya; download-data, backtesting, dan show-config berjalan tanpa API server. Config contoh menyalakan swarm bayangan, jadi trade dan webserver juga butuh SHADOW_TOKEN (minimal 32 karakter, sama dengan milik layanan bayangan); untuk bot aturan saja set `swarm.enabled: false` dan hapus bagian `shadow`. `ws_token` Freqtrade sengaja tidak dipakai: gateway menyambung WebSocket dengan JWT 15 menit (docs/gateway-api.md bagian 8). Lalu:
 
     docker compose build bot
     docker compose up -d bot
@@ -68,8 +68,10 @@ Empat proses, satu image (`trading-bot/engine`), semuanya hanya mendengarkan 127
 | --- | --- | --- |
 | bot-a | 8080 | Freqtrade, aturan saja (`swarm.enabled: false`) |
 | bot-b | 8081 | Freqtrade, aturan yang sama; tiap entry yang lolos lapisan risiko dikirim ke layanan bayangan tanpa menunggu jawaban |
-| shadow-b | 8091 | Swarm voter nyata; mencatat jawaban, median, sebaran, kuorum, dan verdict yang AKAN diambil ke `bot-b/swarm_decisions.sqlite`. Tidak pernah memengaruhi order |
+| shadow-b | 8091 | `POST /candidates` hanya dengan header `X-Shadow-Token` yang sama dengan SHADOW_TOKEN. Swarm voter nyata; mencatat jawaban, median, sebaran, kuorum, dan verdict yang AKAN diambil ke `bot-b/swarm_decisions.sqlite`. Tidak pernah memengaruhi order |
 | gateway | 8090 | Sesi, endpoint baca, feed, kesehatan, biaya dan token, audit |
+
+Tujuh voter contoh memakai model uji yang sama (`deepseek-v4.1-flash-1017`) tetapi dibagi ke dua key: empat di nutaraline, tiga di experientiallabs. Terukur 2026-10-26 dengan layanan bayangan dan voter nyata: tujuh voter paralel pada satu key nutaraline memberi HTTP 429 pada 18 dari 35 panggilan dan kuorum gagal pada 4 dari 5 keputusan; pembagian 4+3 memberi 56 dari 56 jawaban sah dan kuorum tercapai 8 dari 8 (latensi median nutaraline 1,6 s, experientiallabs 7,8 s, maks 20,4 s di bawah `timeout_s` 30). tiprouter dengan model yang sama hanya menjawab 1 dari 10 (503 dan timeout), jadi tidak dipakai.
 
 Mode `swarm.mode: veto` ditolak skema sampai gerbang dibangun. Trade yang dibayangi membawa custom data `shadow_decision_id`, sehingga `DecisionStore.outcomes(<tradesv3.dryrun.sqlite>)` bisa menghitung apakah entry yang akan dilewati ternyata rugi.
 
@@ -78,9 +80,12 @@ Setiap bot menulis `heartbeat.json` tiap loop dan menambah satu baris di `starts
 Direktori jalan (di luar repo), contoh `~/Projects/trading-bot-runs/stage1`:
 
     config/bot-a.yaml config/bot-b.yaml config/gateway.yaml
-    secrets/ft.env        FT_API_USERNAME, FT_API_PASSWORD, FT_API_JWT_SECRET, FT_API_WS_TOKEN
-    secrets/gateway.env   GW_PASSWORD (minimal 12 karakter)
-    secrets/swarm.env     kunci provider voter, mis. NUTARALINE_API_KEY
+    secrets/ft.env        FT_API_USERNAME, FT_API_PASSWORD, FT_API_JWT_SECRET (bot-a, bot-b)
+    secrets/shadow.env    SHADOW_TOKEN, minimal 32 karakter (bot-b, shadow-b)
+    secrets/swarm.env     kunci provider voter, mis. NUTARALINE_API_KEY, EXPERIENTIALLABS_API_KEY (shadow-b)
+    secrets/gateway.env   GW_PASSWORD (minimal 12 karakter), FT_API_USERNAME, FT_API_PASSWORD (gateway)
+
+Tiap proses hanya menerima berkas rahasia yang dipakainya: gateway tidak memegang JWT secret Freqtrade, bot tidak memegang kunci provider, layanan bayangan tidak memegang kredensial Freqtrade.
     bot-a/ bot-b/ gateway/
 
 `config/bot-*.yaml` berasal dari `config/config.example.yaml` dengan `bot_id`, `api.port`, dan `swarm.enabled` berbeda; `config/gateway.yaml` dari `config/gateway.example.yaml` dengan path di bawah `/opt/trading-bot/run`. Lalu:
