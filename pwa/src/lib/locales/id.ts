@@ -171,7 +171,7 @@ export const id: Messages = {
   "notif.test_sent": "Notifikasi uji dikirim. Bila tidak muncul dalam satu menit, periksa izin notifikasi sistem.",
   "notif.no_subscription": "Gateway belum punya langganan yang bisa dikirimi.",
   "notif.test_failed": "Gagal mengirim uji: {reason}",
-  "notif.ios_home": "Di iPhone dan iPad, notifikasi hanya jalan dari aplikasi di Layar Utama (iOS 16.4 atau lebih baru). Ketuk Bagikan di Safari, pilih Tambah ke Layar Utama, lalu buka Bot Trading dari ikonnya dan kembali ke layar ini.",
+  "notif.ios_home": "Di iPhone dan iPad, notifikasi hanya jalan dari aplikasi di Layar Utama (iOS 16.4 atau lebih baru). Ketuk Bagikan di Safari, pilih Tambah ke Layar Utama, lalu buka Trading Bot dari ikonnya dan kembali ke layar ini.",
   "notif.unsupported": "Browser ini tidak mendukung Web Push. Pakai Chrome atau Edge di Android dan desktop, atau Safari dari Layar Utama di iOS.",
   "notif.send_test": "Kirim notifikasi uji",
   "notif.turn_off": "Matikan di perangkat ini",

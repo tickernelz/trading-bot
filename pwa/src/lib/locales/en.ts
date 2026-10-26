@@ -169,7 +169,7 @@ export const en = {
   "notif.test_sent": "Test notification sent. If it does not show within a minute, check the system notification permission.",
   "notif.no_subscription": "The gateway has no subscription to send to yet.",
   "notif.test_failed": "Could not send the test: {reason}",
-  "notif.ios_home": "On iPhone and iPad, notifications only work from the Home Screen app (iOS 16.4 or later). Tap Share in Safari, choose Add to Home Screen, then open Bot Trading from its icon and come back to this screen.",
+  "notif.ios_home": "On iPhone and iPad, notifications only work from the Home Screen app (iOS 16.4 or later). Tap Share in Safari, choose Add to Home Screen, then open Trading Bot from its icon and come back to this screen.",
   "notif.unsupported": "This browser does not support Web Push. Use Chrome or Edge on Android and desktop, or Safari from the Home Screen on iOS.",
   "notif.send_test": "Send test notification",
   "notif.turn_off": "Turn off on this device",

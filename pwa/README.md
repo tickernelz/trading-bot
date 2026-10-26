@@ -54,7 +54,7 @@ No other file changes. `tests/i18n.test.ts` proves this: it adds a third languag
 
 ## Measured
 
-Initial load, the entry script plus preloaded modules (`vite build`, `gzip -9`, 2026-10-26): 56,078 bytes on `main` 3ad1315 with Indonesian bundled and English lazy, 56,085 bytes with English bundled and Indonesian lazy (+7 bytes); the entry chunk went from 14,329 to 14,276 bytes. The Indonesian catalogue is a separate 12,078-byte chunk loaded only when Indonesian is chosen. The chart module (about 57 kB gzip) loads only on the Chart screen.
+Initial load, the entry script plus preloaded modules (`vite build`, `gzip -9`, 2026-10-26): 56,078 bytes on `main` 3ad1315 with Indonesian bundled and English lazy, 56,038 bytes with English bundled and Indonesian lazy (-40 bytes); the entry chunk went from 14,329 to 14,249 bytes. The Indonesian catalogue is a separate 12,077-byte chunk loaded only when Indonesian is chosen. The chart module (about 57 kB gzip) loads only on the Chart screen.
 
 Earlier measurements (Chromium headless, mock gateway on localhost, 2026-10-26):
 
