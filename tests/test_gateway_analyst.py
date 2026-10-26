@@ -90,6 +90,7 @@ class Rig:
         upstream.client = httpx.AsyncClient(
             base_url=upstream.bot.api_url + "/api/v1", transport=httpx.MockTransport(self.fake)
         )
+        self.sent = 0
         self.model = ScriptedModel(script=[], offered=[])
         data_dir = self.userdir / "analyst_data"
         runner = AnalystRunner(build_analyst(self.model, data_dir), model_id="test-model", secrets=(KEY,), timeout_s=20)
@@ -113,8 +114,10 @@ class Rig:
     def get(self, path):
         return self.client.get(path, headers=self.headers)
 
-    def post(self, path, body):
-        return self.client.post(path, json=body, headers=self.headers)
+    def post(self, path, body, key=None):
+        self.sent += 1
+        headers = {**self.headers, "Idempotency-Key": key or f"rig-key-{self.sent:06d}"}
+        return self.client.post(path, json=body, headers=headers)
 
     def data_file(self, name):
         return (self.userdir / "analyst_data" / name).read_text()
@@ -137,7 +140,7 @@ def test_report_is_built_from_a_fresh_snapshot_and_stored(rig):
     assert rig.get("/gw/v1/analyst/reports").json() == {"bot": "B", "report_at": "23:59", "days": [TODAY]}
     assert rig.get(f"/gw/v1/analyst/reports/{TODAY}").json()["summary"] == GOOD["summary"]
     [row] = [item for item in rig.gateway.ledger.audit_rows(10) if item["action"] == "analyst.report"]
-    assert row["result"] == "ok" and row["detail"]["day"] == TODAY and row["actor"] == "owner"
+    assert row["result"] == "ok" and row["detail"]["params"] == {"day": TODAY} and row["actor"] == "owner"
 
 
 def test_snapshot_carries_trades_decisions_and_risk_but_no_secrets(rig):
@@ -219,6 +222,47 @@ def test_manual_report_days_are_limited_to_the_last_two_weeks_and_never_reach_th
     rig.model.script = [answer(GOOD)]
     oldest = (today - timedelta(days=13)).isoformat()
     assert rig.post("/gw/v1/analyst/reports", {"day": oldest}).status_code == 200
+
+
+def relayed_token(rig):
+    return rig.client.post(
+        "/gw/v1/session", json={"password": PASSWORD}, headers={"CF-Connecting-IP": "203.0.113.9"}
+    ).json()["token"]
+
+
+def test_a_read_session_cannot_start_a_report_even_from_loopback(rig):
+    headers = {"Authorization": f"Bearer {relayed_token(rig)}", "Idempotency-Key": "read-scope-9"}
+    response = rig.client.post("/gw/v1/analyst/reports", json={"day": TODAY}, headers=headers)
+    assert response.status_code == 403 and response.json()["error"]["code"] == "forbidden_local_only"
+    assert rig.service_calls == [] and rig.model.offered == []
+
+
+@pytest.mark.parametrize("header", ["CF-Ray", "X-Forwarded-Host", "X-Forwarded-For"])
+def test_a_relayed_report_request_is_refused_before_the_model(rig, header):
+    headers = {**rig.headers, "Idempotency-Key": "relayed-key-1", header: "value"}
+    response = rig.client.post("/gw/v1/analyst/reports", json={"day": TODAY}, headers=headers)
+    assert response.status_code == 403 and response.json()["error"]["code"] == "forbidden_local_only"
+    assert rig.service_calls == []
+
+
+def test_a_report_request_needs_a_well_formed_idempotency_key(rig):
+    for headers in ({}, {"Idempotency-Key": "short"}, {"Idempotency-Key": "bad key with spaces"}):
+        response = rig.client.post("/gw/v1/analyst/reports", json={"day": TODAY}, headers={**rig.headers, **headers})
+        assert response.status_code == 400 and response.json()["error"]["code"] == "invalid_request"
+    assert rig.service_calls == []
+    assert all(row["idempotency_key"] is None for row in rig.gateway.ledger.audit_rows(20))
+
+
+def test_replaying_a_report_request_costs_one_model_run_and_another_day_is_refused(rig):
+    rig.model.script = [answer(GOOD)]
+    first = rig.post("/gw/v1/analyst/reports", {"day": TODAY}, key="report-key-1")
+    again = rig.post("/gw/v1/analyst/reports", {"day": TODAY}, key="report-key-1")
+    assert first.status_code == again.status_code == 200 and first.json() == again.json()
+    assert len([call for call in rig.service_calls if call == ("POST", "/reports")]) == 1
+    other = rig.post(
+        "/gw/v1/analyst/reports", {"day": str(datetime.now(TZ).date() - timedelta(days=1))}, key="report-key-1"
+    )
+    assert other.status_code == 409 and other.json()["error"]["code"] == "invalid_request"
 
 
 def test_manual_reports_share_the_per_minute_budget_with_questions(rig):

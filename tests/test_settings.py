@@ -123,6 +123,7 @@ def _mutations():
 
     def analyst_token_env_lowercase(raw):
         raw["analyst"]["token_env"] = "analyst_token"
+
     def analyst_on_decision_provider(raw):
         raw["llm"]["analyst_model"] = "experientiallabs-systemone:jev-latest"
 

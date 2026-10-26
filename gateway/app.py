@@ -1,4 +1,4 @@
-"""Gateway between the PWA and the Freqtrade bots: auth, read API, live feed, health, cost and audit."""
+"""Gateway between the PWA and the Freqtrade bots: auth, read API, control, live feed, health, cost and audit."""
 
 from __future__ import annotations
 
@@ -9,18 +9,21 @@ import logging
 import os
 import secrets
 import time
+from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager, suppress
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any, Literal
 
 import httpx
 import psutil
 import yaml
-from fastapi import Depends, FastAPI, Query, Request, WebSocket, WebSocketDisconnect
+from fastapi import Body, Depends, FastAPI, Query, Request, WebSocket, WebSocketDisconnect
+from fastapi import Path as PathParam
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from engine.decisions import DecisionStore
@@ -31,9 +34,10 @@ from engine.risk import day_start
 from engine.settings import ConfigError, Settings, load_settings
 from gateway import VERSION
 from gateway.analyst import AnalystLink, install_analyst
+from gateway.control import IDEMPOTENCY_KEY, Confirmations, digest, idempotency_key, is_local, sanitize
 from gateway.events import FILL_SIDES, translate
 from gateway.feed import Client, Hub, now_iso
-from gateway.ledger import Ledger, LoginThrottle
+from gateway.ledger import Ledger, LoginThrottle, iso
 from gateway.modeapi import ModeDesk, install_mode
 from gateway.settings import BotRef, GatewaySettings
 from gateway.upstream import ApiError, Upstream
@@ -59,8 +63,64 @@ HEARTBEAT_EVENT_S = 60
 SECRET_KEYS = ("api_key",)
 
 
+Pair = Annotated[str, Field(pattern=r"^[A-Z0-9]+/[A-Z0-9]+$")]
+ERROR_TEXT_LIMIT = 300
+
+
 class Login(BaseModel):
     password: str
+
+
+class Confirm(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    confirm: str | None = None
+
+
+class ForceEnter(Confirm):
+    pair: Pair
+    side: Literal["long"] = "long"
+    stake_amount: Annotated[float, Field(gt=0)] | None = None
+    entry_tag: Annotated[str, Field(max_length=64)] | None = None
+
+
+class LockPair(Confirm):
+    pair: Pair
+    until: AwareDatetime
+    side: Literal["long", "short", "*"] = "*"
+    reason: Annotated[str, Field(max_length=200)] | None = None
+
+
+class LockDelete(Confirm):
+    pair: Pair | None = None
+    lockid: Annotated[int, Field(ge=1)] | None = None
+
+    @model_validator(mode="after")
+    def _one_target(self) -> LockDelete:
+        if (self.pair is None) == (self.lockid is None):
+            raise ValueError("give exactly one of pair or lockid")
+        return self
+
+
+class BlacklistAdd(Confirm):
+    pairs: Annotated[list[Pair], Field(min_length=1, max_length=50)]
+
+
+@dataclass(frozen=True)
+class Action:
+    name: str
+    bot: BotRef
+    params: dict[str, Any]
+    targets: list[str]
+    summary: str
+    method: str = ""
+    path: str = ""
+    risky: bool = False
+    query: dict[str, Any] | None = None
+    body: Any = None
+    expect_key: str | None = None
+    entries_stopped: bool | None = None
+    precheck: Callable[[], Awaitable[None]] | None = None
+    run: Callable[[], Awaitable[Any]] | None = None
 
 
 def balance_summary(balance: dict[str, Any]) -> dict[str, Any]:
@@ -72,11 +132,19 @@ def balance_summary(balance: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def error_response(status: int, code: str, message: str, retry_after_ms: int | None = None) -> JSONResponse:
+def error_body(
+    code: str, message: str, retry_after_ms: int | None = None, extra: dict[str, Any] | None = None
+) -> dict[str, Any]:
     body: dict[str, Any] = {"code": code, "message": message}
     if retry_after_ms is not None:
         body["retry_after_ms"] = retry_after_ms
-    return JSONResponse({"error": body}, status_code=status)
+    return {"error": {**body, **(extra or {})}}
+
+
+def error_response(
+    status: int, code: str, message: str, retry_after_ms: int | None = None, extra: dict[str, Any] | None = None
+) -> JSONResponse:
+    return JSONResponse(error_body(code, message, retry_after_ms, extra), status_code=status)
 
 
 class Gateway:
@@ -111,6 +179,8 @@ class Gateway:
         self.cpu_recent: float | None = None
         self.http = httpx.AsyncClient(timeout=5.0)
         self.tasks: list[asyncio.Task] = []
+        self.confirmations = Confirmations()
+        self.inflight: set[str] = set()
         self.analyst = AnalystLink(self)
         self.modes = ModeDesk(self)
 
@@ -366,7 +436,9 @@ class Gateway:
             self.spawn(self.record_fill(bot_id, int(data["trade_id"]), FILL_SIDES[kind], received_ms))
 
     async def on_state(self, bot_id: str, connected: bool) -> None:
-        if not connected:
+        if connected:
+            self.spawn(self.reapply_entry_stop(self.bot(bot_id)))
+        else:
             self.hub.emit(
                 "gw.error",
                 {"code": "upstream_unavailable", "message": "Freqtrade websocket closed", "retry_ms": 2000},
@@ -386,6 +458,129 @@ class Gateway:
             logger.info("bot %s trade %d %s fill reached gateway after %d ms", bot_id, trade_id, side, latency)
         self.cache.clear()
         await self.publish_risk(bot)
+
+    def audit_control(
+        self,
+        action: Action,
+        result: str,
+        *,
+        actor: str = "owner",
+        ip: str | None = None,
+        key: str | None = None,
+        **detail: Any,
+    ) -> dict[str, Any]:
+        row = self.ledger.audit(
+            actor=actor,
+            ip=ip,
+            action=action.name,
+            targets=[action.bot.id, *action.targets],
+            idempotency_key=key,
+            result=result,
+            detail={"params": sanitize(action.params), **detail},
+        )
+        self.hub.emit("gw.audit", row, bot=action.bot.id)
+        return row
+
+    async def execute(self, request: Request, token: str, action: Action, confirm: str | None) -> Any:
+        """Run one control action: local-only, idempotent per key, two-step for risky actions, always audited."""
+        ip = request.client.host if request.client else None
+        raw_key = request.headers.get("idempotency-key")
+        scope = self.ledger.session_scope(token)
+        if not is_local(request) or scope != "control":
+            stored_key = raw_key if raw_key is not None and IDEMPOTENCY_KEY.match(raw_key) else None
+            self.audit_control(action, "forbidden", actor=f"{scope}_session", ip=ip, key=stored_key)
+            raise ApiError(403, "forbidden_local_only", "control actions are accepted only on the bot machine itself")
+        try:
+            key = idempotency_key(raw_key)
+        except ApiError as exc:
+            self.audit_control(action, "rejected", ip=ip, error=exc.code)
+            raise
+        request_hash = digest({"action": action.name, "bot": action.bot.id, "params": action.params})
+        stored = self.ledger.stored_result(key)
+        if stored is not None:
+            if stored[0] != request_hash:
+                self.audit_control(action, "rejected", ip=ip, key=key, error="idempotency_key_reused")
+                raise ApiError(409, "invalid_request", "Idempotency-Key was already used for another request")
+            self.audit_control(action, "replayed", ip=ip, key=key, status=stored[1])
+            return JSONResponse(stored[2], status_code=stored[1])
+        if key in self.inflight:
+            raise ApiError(409, "invalid_request", "a request with this Idempotency-Key is still running")
+        self.inflight.add(key)
+        try:
+            return await self._execute(action, request_hash, token, key, ip, confirm)
+        finally:
+            self.inflight.discard(key)
+
+    async def _execute(
+        self, action: Action, request_hash: str, token: str, key: str, ip: str | None, confirm: str | None
+    ) -> Any:
+        try:
+            if action.precheck is not None:
+                await action.precheck()
+            if action.risky:
+                binding = digest({"request": request_hash, "session": digest(token)})
+                if confirm is None:
+                    pending = self.confirmations.issue(action.name, action.targets, action.summary, binding)
+                    self.audit_control(action, "confirmation_required", ip=ip, key=key)
+                    raise ApiError(
+                        409,
+                        "confirmation_required",
+                        f"{action.name} needs confirmation",
+                        extra={"confirmation": pending.public()},
+                    )
+                self.confirmations.redeem(confirm, binding)
+        except ApiError as exc:
+            if exc.code != "confirmation_required":
+                self.audit_control(action, "rejected", ip=ip, key=key, error=exc.code, message=exc.message)
+            raise
+        try:
+            if action.run is not None:
+                result = await action.run()
+            else:
+                result = await self.upstreams[action.bot.id].send(
+                    action.method, action.path, params=action.query, body=action.body
+                )
+            if action.expect_key is not None and not (isinstance(result, dict) and action.expect_key in result):
+                status = result.get("status") if isinstance(result, dict) else None
+                raise ApiError(502, "upstream_error", str(status or "Freqtrade did not carry out the action"))
+        except ApiError as exc:
+            self.cache.clear()
+            self.ledger.store_result(
+                key, request_hash, exc.status, error_body(exc.code, exc.message, exc.retry_after_ms)
+            )
+            self.audit_control(action, "failed", ip=ip, key=key, error=exc.code, message=exc.message[:ERROR_TEXT_LIMIT])
+            raise
+        self.cache.clear()
+        self.ledger.store_result(key, request_hash, 200, result)
+        if action.entries_stopped is not None:
+            self.ledger.set_entries_stopped(action.bot.id, action.entries_stopped)
+        self.audit_control(action, "ok", ip=ip, key=key)
+        return result
+
+    async def reapply_entry_stop(self, bot: BotRef) -> None:
+        """Freqtrade restarts in the running state, so a stop-entry that was in force is sent again."""
+        if not self.ledger.entries_stopped(bot.id):
+            return
+        action = Action(
+            name="control.stop_entry",
+            bot=bot,
+            params={"reason": "reapplied after the Freqtrade feed reconnected"},
+            targets=[],
+            summary=f"Stop new entries on {bot.label}",
+            method="POST",
+            path="/stopentry",
+        )
+        upstream = self.upstreams[bot.id]
+        try:
+            config = await upstream.get("/show_config")
+            if config.get("state") != "running":
+                return
+            await upstream.send("POST", "/stopentry")
+        except ApiError as exc:
+            self.audit_control(action, "failed", actor="gateway", error=exc.code, message=exc.message)
+            return
+        self.cache.clear()
+        self.audit_control(action, "ok", actor="gateway")
 
     async def publish_risk(self, bot: BotRef) -> None:
         risk = await self.risk(bot)
@@ -611,7 +806,7 @@ def create_app(gateway: Gateway) -> FastAPI:
 
     @app.exception_handler(ApiError)
     async def api_error(_: Request, exc: ApiError) -> JSONResponse:
-        return error_response(exc.status, exc.code, exc.message, exc.retry_after_ms)
+        return error_response(exc.status, exc.code, exc.message, exc.retry_after_ms, exc.extra)
 
     @app.exception_handler(RequestValidationError)
     async def invalid(_: Request, exc: RequestValidationError) -> JSONResponse:
@@ -644,9 +839,12 @@ def create_app(gateway: Gateway) -> FastAPI:
             gateway.throttle.fail()
             gateway.ledger.audit(actor="anonymous", ip=ip, action="session.create", targets=[], result="denied")
             raise ApiError(401, "unauthorized", "wrong password")
-        token, expires = gateway.ledger.create_session("read", gateway.settings.session_days, ip)
-        gateway.ledger.audit(actor="owner", ip=ip, action="session.create", targets=[], result="ok")
-        return {"token": token, "expires_at": expires}
+        scope = "control" if is_local(request) else "read"
+        token, expires = gateway.ledger.create_session(scope, gateway.settings.session_days, ip)
+        gateway.ledger.audit(
+            actor="owner", ip=ip, action="session.create", targets=[], result="ok", detail={"scope": scope}
+        )
+        return {"token": token, "expires_at": expires, "scope": scope}
 
     @app.delete("/gw/v1/session")
     async def logout(request: Request, token: str = Depends(reader)) -> dict[str, bool]:
@@ -786,8 +984,248 @@ def create_app(gateway: Gateway) -> FastAPI:
         return gateway.costs(window)
 
     @app.get("/gw/v1/audit", dependencies=[Depends(reader)])
-    async def audit(limit: int = Query(50, ge=1, le=500)) -> list[dict[str, Any]]:
-        return gateway.ledger.audit_rows(limit)
+    async def audit(
+        limit: int = Query(50, ge=1, le=500),
+        before_id: int | None = Query(None, ge=1),
+        action: str | None = Query(None, min_length=1, max_length=64),
+        result: str | None = Query(None, min_length=1, max_length=32),
+        actor: str | None = Query(None, min_length=1, max_length=32),
+        target: str | None = Query(None, min_length=1, max_length=64),
+        since: AwareDatetime | None = None,
+        until: AwareDatetime | None = None,
+    ) -> list[dict[str, Any]]:
+        return gateway.ledger.audit_rows(
+            limit,
+            before_id=before_id,
+            action=action,
+            result=result,
+            actor=actor,
+            target=target,
+            since=iso(since) if since else None,
+            until=iso(until) if until else None,
+        )
+
+    async def run(request: Request, token: str, action: Action, body: Confirm | None) -> Any:
+        return await gateway.execute(request, token, action, body.confirm if body else None)
+
+    def bot_state_route(route: str, name: str, path: str, summary: str, **options: Any) -> None:
+        async def endpoint(
+            request: Request, bot: str | None = None, body: Confirm | None = Body(None), token: str = Depends(reader)
+        ) -> Any:
+            ref = gateway.bot(bot)
+            action = Action(
+                name=name,
+                bot=ref,
+                params={},
+                targets=[],
+                summary=summary.format(bot=ref.label),
+                method="POST",
+                path=path,
+                **options,
+            )
+            return await run(request, token, action, body)
+
+        app.post(f"/gw/v1/control/{route}", name=name)(endpoint)
+
+    bot_state_route("pause", "control.pause", "/pause", "Pause new entries on {bot}", entries_stopped=True)
+    bot_state_route("stop-entry", "control.stop_entry", "/stopentry", "Stop new entries on {bot}", entries_stopped=True)
+    bot_state_route("resume", "control.resume", "/start", "Resume {bot}", entries_stopped=False)
+    bot_state_route(
+        "stop",
+        "control.stop",
+        "/stop",
+        "Stop {bot}; open trades are no longer managed",
+        risky=True,
+        entries_stopped=True,
+    )
+    bot_state_route("reload-config", "control.reload_config", "/reload_config", "Reload the Freqtrade config of {bot}")
+
+    @app.post("/gw/v1/trades")
+    async def force_enter(
+        request: Request,
+        body: ForceEnter,
+        bot: str | None = None,
+        token: str = Depends(reader),
+    ) -> Any:
+        ref = gateway.bot(bot)
+
+        async def precheck() -> None:
+            if not gateway.engine_settings(ref).api.force_entry:
+                raise ApiError(409, "invalid_request", "forced entries are disabled (api.force_entry is false)")
+            whitelist = (await gateway.ft(ref, "/whitelist")).get("whitelist", [])
+            if body.pair not in whitelist:
+                raise ApiError(422, "invalid_request", f"{body.pair} is not on the whitelist")
+            risk = await gateway.risk(ref)
+            if not risk["entries_allowed"]:
+                raise ApiError(409, "risk_limit_breached", f"entries are blocked by {', '.join(risk['breaches'])}")
+
+        params = body.model_dump(exclude={"confirm"})
+        action = Action(
+            name="trade.enter",
+            bot=ref,
+            params=params,
+            targets=[body.pair],
+            summary=f"Enter {body.side} {body.pair} at market on {ref.label}",
+            method="POST",
+            path="/forceenter",
+            risky=True,
+            body={"pair": body.pair, "side": body.side, "stakeamount": body.stake_amount, "entry_tag": body.entry_tag},
+            expect_key="trade_id",
+            precheck=precheck,
+        )
+        return await run(request, token, action, body)
+
+    @app.post("/gw/v1/trades/exit-all")
+    async def force_exit_all(
+        request: Request,
+        bot: str | None = None,
+        body: Confirm | None = Body(None),
+        token: str = Depends(reader),
+    ) -> Any:
+        ref = gateway.bot(bot)
+        action = Action(
+            name="trade.exit_all",
+            bot=ref,
+            params={},
+            targets=["all"],
+            summary=f"Exit every open trade on {ref.label} at market",
+            method="POST",
+            path="/forceexit",
+            risky=True,
+            body={"tradeid": "all"},
+        )
+        return await run(request, token, action, body)
+
+    @app.post("/gw/v1/trades/{trade_id}/exit")
+    async def force_exit(
+        request: Request,
+        trade_id: Annotated[int, PathParam(ge=1)],
+        bot: str | None = None,
+        body: Confirm | None = Body(None),
+        token: str = Depends(reader),
+    ) -> Any:
+        ref = gateway.bot(bot)
+        action = Action(
+            name="trade.exit",
+            bot=ref,
+            params={"trade_id": trade_id},
+            targets=[str(trade_id)],
+            summary=f"Exit trade {trade_id} on {ref.label} at market",
+            method="POST",
+            path="/forceexit",
+            risky=True,
+            body={"tradeid": str(trade_id)},
+        )
+        return await run(request, token, action, body)
+
+    @app.post("/gw/v1/locks")
+    async def lock_pair(
+        request: Request,
+        body: LockPair,
+        bot: str | None = None,
+        token: str = Depends(reader),
+    ) -> Any:
+        ref = gateway.bot(bot)
+        if body.until <= datetime.now(UTC):
+            raise ApiError(400, "invalid_request", "until must lie in the future")
+        lock = {"pair": body.pair, "until": iso(body.until), "side": body.side, "reason": body.reason}
+        action = Action(
+            name="pair.lock",
+            bot=ref,
+            params=lock,
+            targets=[body.pair],
+            summary=f"Lock {body.pair} on {ref.label} until {lock['until']}",
+            method="POST",
+            path="/locks",
+            body=[lock],
+        )
+        return await run(request, token, action, body)
+
+    @app.delete("/gw/v1/locks/{lock_id}")
+    async def unlock(
+        request: Request,
+        lock_id: Annotated[int, PathParam(ge=1)],
+        bot: str | None = None,
+        body: Confirm | None = Body(None),
+        token: str = Depends(reader),
+    ) -> Any:
+        ref = gateway.bot(bot)
+        action = Action(
+            name="pair.unlock",
+            bot=ref,
+            params={"lockid": lock_id},
+            targets=[f"lock:{lock_id}"],
+            summary=f"Remove lock {lock_id} on {ref.label}",
+            method="DELETE",
+            path=f"/locks/{lock_id}",
+            risky=True,
+        )
+        return await run(request, token, action, body)
+
+    @app.post("/gw/v1/locks/delete")
+    async def unlock_by(
+        request: Request,
+        body: LockDelete,
+        bot: str | None = None,
+        token: str = Depends(reader),
+    ) -> Any:
+        ref = gateway.bot(bot)
+        params = body.model_dump(exclude={"confirm"}, exclude_none=True)
+        target = body.pair or f"lock:{body.lockid}"
+        action = Action(
+            name="pair.unlock",
+            bot=ref,
+            params=params,
+            targets=[target],
+            summary=f"Remove locks of {target} on {ref.label}",
+            method="POST",
+            path="/locks/delete",
+            risky=True,
+            body=params,
+        )
+        return await run(request, token, action, body)
+
+    @app.post("/gw/v1/blacklist")
+    async def blacklist_add(
+        request: Request,
+        body: BlacklistAdd,
+        bot: str | None = None,
+        token: str = Depends(reader),
+    ) -> Any:
+        ref = gateway.bot(bot)
+        action = Action(
+            name="pair.blacklist",
+            bot=ref,
+            params={"pairs": body.pairs},
+            targets=list(body.pairs),
+            summary=f"Blacklist {', '.join(body.pairs)} on {ref.label}",
+            method="POST",
+            path="/blacklist",
+            body={"blacklist": body.pairs},
+        )
+        return await run(request, token, action, body)
+
+    @app.delete("/gw/v1/blacklist")
+    async def blacklist_remove(
+        request: Request,
+        pairs: Annotated[list[Pair], Query(min_length=1, max_length=50)],
+        bot: str | None = None,
+        body: Confirm | None = Body(None),
+        token: str = Depends(reader),
+    ) -> Any:
+        ref = gateway.bot(bot)
+        action = Action(
+            name="pair.unblacklist",
+            bot=ref,
+            params={"pairs": pairs},
+            targets=list(pairs),
+            summary=f"Remove {', '.join(pairs)} from the blacklist of {ref.label}",
+            method="DELETE",
+            path="/blacklist",
+            risky=True,
+            query={"pairs_to_delete": pairs},
+        )
+        return await run(request, token, action, body)
 
     @app.get("/gw/v1/metrics", dependencies=[Depends(reader)])
     async def metrics() -> dict[str, Any]:
@@ -921,6 +1359,6 @@ def create_app(gateway: Gateway) -> FastAPI:
                 },
             )
 
-    install_analyst(app, gateway, reader, reader)
+    install_analyst(app, gateway, reader)
     install_mode(app, gateway, reader)
     return app

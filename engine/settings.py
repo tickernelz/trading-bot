@@ -233,7 +233,6 @@ class Settings(Strict):
     shadow: Shadow | None = None
     analyst: Analyst | None = None
 
-
     analytics: Analytics = Analytics()
 
     @model_validator(mode="after")
