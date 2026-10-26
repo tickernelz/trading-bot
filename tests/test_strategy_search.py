@@ -176,15 +176,36 @@ def daily_walk(days: int, seed: int = 1) -> pd.DataFrame:
         spec(entry="ema_trend", timeframe="4h", lookback=14, fast=5, slow=10, exit="ema_cross", trail_atr=2.0),
         spec(entry="tsmom", timeframe="1d", lookback=5, exit="tsmom_flip", trend_filter="above_sma200_1d"),
         spec(timeframe="1d", lookback=5, exit="donchian_mid", exit_lookback=5, trend_filter="above_sma50_1d"),
+        spec(timeframe="1d", lookback=5, exit="donchian_mid", exit_lookback=5, trend_filter="btc_above_sma100_1d"),
     ],
 )
 def test_signals_never_change_when_later_candles_are_added(rule):
     frame = daily_walk(260)
-    full = rule_frame(frame, rule, {tf: resample(frame, tf) for tf in rule.informative_timeframes})
+    btc = daily_walk(260, seed=9)
+
+    def informative(part: pd.DataFrame, btc_part: pd.DataFrame) -> dict:
+        out = {tf: resample(part, tf) for tf in rule.informative_timeframes}
+        return out | ({"btc": resample(btc_part, "1d")} if rule.trend_on_btc else {})
+
+    full = rule_frame(frame, rule, informative(frame, btc))
     for cut in (24 * 230 + 5, 24 * 240 + 23, 24 * 250 + 11):
         part = frame.iloc[:cut].reset_index(drop=True)
-        cut_frame = rule_frame(part, rule, {tf: resample(part, tf) for tf in rule.informative_timeframes})
+        cut_frame = rule_frame(part, rule, informative(part, btc.iloc[:cut].reset_index(drop=True)))
         pd.testing.assert_frame_equal(cut_frame.tail(48), full.iloc[:cut].tail(48))
+
+
+def test_btc_regime_gate_reads_btc_not_the_traded_pair():
+    pair = daily_walk(260, seed=4)
+    rising, falling = pair.copy(), pair.copy()
+    rising["close"] = rising["open"] = np.linspace(100, 300, len(pair))
+    falling["close"] = falling["open"] = np.linspace(300, 100, len(pair))
+    for frame in (rising, falling):
+        frame["high"], frame["low"] = frame["close"] * 1.002, frame["close"] * 0.998
+    rule = spec(entry="tsmom", lookback=5, exit="none", trend_filter="btc_above_sma100_1d")
+    gated = {"1d": resample(pair, "1d")}
+    up = rule_frame(pair, rule, gated | {"btc": resample(rising, "1d")})["enter"]
+    down = rule_frame(pair, rule, gated | {"btc": resample(falling, "1d")})["enter"]
+    assert up.iloc[24 * 110 :].sum() > 0 and down.iloc[24 * 110 :].sum() == 0
 
 
 def test_daily_feature_is_known_only_from_the_last_hour_of_its_day():
@@ -318,11 +339,13 @@ LIMITS = metrics.Limits(0.01, 0.10, "Asia/Jakarta")
 
 
 def test_daily_loss_limit_refuses_entries_until_the_next_jakarta_day():
-    stops = [day_row(-0.11, 1, 2), day_row(-0.11, 3, 4), day_row(0.02, 6, 7), day_row(0.02, 30, 31)]
+    stops = [day_row(-0.11, 1, 2), day_row(-0.11, 3, 4), day_row(0.02, 6, 7), day_row(0.02, 18, 19)]
     research = metrics.portfolio(stops, -0.10, 0.0031)
-    limited = metrics.portfolio(stops, -0.10, 0.0031, LIMITS)
+    jakarta = metrics.portfolio(stops, -0.10, 0.0031, LIMITS)
+    utc = metrics.portfolio(stops, -0.10, 0.0031, metrics.Limits(0.01, 0.10, "UTC"))
     assert research["taken"] == [0, 1, 2, 3] and research["refused_limits"] == 0
-    assert limited["taken"] == [0, 1, 3] and limited["refused_limits"] == 1
+    assert jakarta["taken"] == [0, 1, 3] and jakarta["refused_limits"] == 1
+    assert utc["taken"] == [0, 1] and utc["refused_limits"] == 2
 
 
 def test_open_losses_count_toward_the_limits_at_the_signal_candle():
@@ -362,7 +385,7 @@ def test_cross_asset_ranking_puts_tier_before_monthly_profit_before_drawdown():
 
 
 def test_rounds_stay_within_the_search_budget_and_ids_are_unique():
-    rounds = [plan.round1_candidates(), plan.round2_candidates(), plan.candidates()]
+    rounds = [plan.round1_candidates(), plan.round2_candidates(), plan.round3_candidates(), plan.candidates()]
     ids = [[candidate.id for candidate in matrix] for matrix in rounds]
     benchmarks = {"K-SwingEmaRsi", "K-buy-and-hold"}
     assert all(len(matrix) == len(set(matrix)) for matrix in ids)

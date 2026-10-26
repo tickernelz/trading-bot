@@ -431,6 +431,9 @@ def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(prog="python -m engine.search_report", description=__doc__)
     parser.add_argument("--out", required=True, type=Path, help="directory with the run outputs")
     parser.add_argument("--docs", required=True, type=Path)
+    parser.add_argument("--walk-forward", default="walk-forward", help="output stem of the walk-forward run")
+    parser.add_argument("--controls", default="controls", help="output stem of the controls run")
+    parser.add_argument("--cross", action="append", default=[], help="output stem of a cross-asset run; repeatable")
     args = parser.parse_args(argv)
 
     def load(name: str) -> dict | None:
@@ -438,16 +441,18 @@ def main(argv: list[str]) -> int:
         return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
 
     args.docs.mkdir(parents=True, exist_ok=True)
-    walk_forward = load("walk-forward.json")
+    walk_forward = load(f"{args.walk_forward}.json")
     if walk_forward:
         presample = load("presample.json")
         final, label = (presample, "Pre-sample") if presample else (load("holdout.json"), "Holdout")
-        text, compact = render(walk_forward, load("controls.json"), final, load("validate.json"), label)
+        text, compact = render(walk_forward, load(f"{args.controls}.json"), final, load("validate.json"), label)
         (args.docs / "results.md").write_text(text, encoding="utf-8")
         (args.docs / "walk-forward-summary.json").write_text(json.dumps(compact, indent=1), encoding="utf-8")
-    cross = load("cross-asset.json")
-    if cross:
-        (args.docs / "cross-asset.md").write_text(render_cross(cross), encoding="utf-8")
+    for stem in args.cross:
+        cross = load(f"{stem}.json")
+        if cross is None:
+            parser.error(f"no {stem}.json in --out")
+        (args.docs / f"{stem}.md").write_text(render_cross(cross), encoding="utf-8")
     return 0
 
 

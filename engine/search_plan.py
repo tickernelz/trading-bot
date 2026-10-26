@@ -10,7 +10,7 @@ import pandas as pd
 from engine.rules import RuleSpec
 from engine.simulate import Costs
 
-ROUND = 3
+ROUND = 4
 SEED = 3872
 BOOTSTRAP_SAMPLES = 10_000
 NULL_SHUFFLES = 1_000
@@ -549,7 +549,7 @@ def round2_candidates() -> list[Candidate]:
     return out
 
 
-def candidates() -> list[Candidate]:
+def round3_candidates() -> list[Candidate]:
     """The locked round 3 matrix, run on PAIRS: trend entries that let winners run, ranked by monthly profit."""
     out: list[Candidate] = []
     for n in (30, 60, 90):
@@ -610,38 +610,6 @@ def candidates() -> list[Candidate]:
                 stoploss=-0.20,
             )
         )
-    for n, exit_lookback, trend, stop in (
-        (55, 20, "btc_above_sma100_1d", -0.20),
-        (55, 55, "btc_above_sma100_1d", -0.20),
-        (20, 20, "btc_above_sma100_1d", -0.20),
-        (55, 20, "btc_above_sma200_1d", -0.20),
-        (90, 20, "btc_above_sma100_1d", -0.20),
-    ):
-        out.append(
-            _rule(
-                f"F3-don1d{n}-exit{exit_lookback}-{trend.replace('_1d', '')}-sl20",
-                "F3 shortlist: Donchian with the BTC regime gate",
-                entry="donchian",
-                timeframe="1d",
-                lookback=n,
-                exit="donchian_mid",
-                exit_lookback=exit_lookback,
-                trend_filter=trend,
-                stoploss=stop,
-            )
-        )
-    out.append(
-        _rule(
-            "F3-tsmom-55-btcabove-sma100-sl20",
-            "F3 shortlist: time-series momentum with the BTC regime gate",
-            entry="tsmom",
-            timeframe="1d",
-            lookback=55,
-            exit="tsmom_flip",
-            trend_filter="btc_above_sma100_1d",
-            stoploss=-0.20,
-        )
-    )
     out += [
         Candidate(
             "R3-random-L-exits",
@@ -657,11 +625,50 @@ def candidates() -> list[Candidate]:
     return out
 
 
+def candidates() -> list[Candidate]:
+    """The locked round 4 matrix, run on PAIRS: trend entries behind the BTC/IDR regime gate (ZHA-3913)."""
+    out: list[Candidate] = []
+    for n, exit_lookback, trend, stop in (
+        (55, 20, "btc_above_sma100_1d", -0.20),
+        (55, 55, "btc_above_sma100_1d", -0.20),
+        (20, 20, "btc_above_sma100_1d", -0.20),
+        (55, 20, "btc_above_sma200_1d", -0.20),
+        (90, 20, "btc_above_sma100_1d", -0.20),
+    ):
+        out.append(
+            _rule(
+                f"F3-don1d{n}-exit{exit_lookback}-{trend.replace('_1d', '')}-sl20",
+                "F3 variants: Donchian with the BTC regime gate",
+                entry="donchian",
+                timeframe="1d",
+                lookback=n,
+                exit="donchian_mid",
+                exit_lookback=exit_lookback,
+                trend_filter=trend,
+                stoploss=stop,
+            )
+        )
+    out.append(
+        _rule(
+            "F3-tsmom-55-btcabove-sma100-sl20",
+            "F3 variants: time-series momentum with the BTC regime gate",
+            entry="tsmom",
+            timeframe="1d",
+            lookback=55,
+            exit="tsmom_flip",
+            trend_filter="btc_above_sma100_1d",
+            stoploss=-0.20,
+        )
+    )
+    return out
+
+
 def all_candidates() -> dict[str, Candidate]:
     """Every configuration of every round by id; a later round wins for the shared benchmarks."""
-    return {c.id: c for c in (*round1_candidates(), *round2_candidates(), *candidates())}
+    rounds = (round1_candidates(), round2_candidates(), round3_candidates(), candidates())
+    return {c.id: c for matrix in rounds for c in matrix}
 
 
 def cumulative_trials() -> int:
     """Configurations tried over every round so far, the count the multiple-testing correction uses."""
-    return len(round1_candidates()) + len(round2_candidates()) + len(candidates())
+    return len(round1_candidates()) + len(round2_candidates()) + len(round3_candidates()) + len(candidates())

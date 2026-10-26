@@ -352,7 +352,8 @@ def walk_forward(args, ledger_entry: dict) -> dict:
             kept_signals[selected["id"]], plan.COSTS[plan.PRIMARY_COST], regimes, start, end
         )
         selected["wf_tier"] = tier_on(kept_rows[selected["id"]], selected["wf_checks"], out["selected_null"])
-    with gzip.open(args.out / "walk_forward_trades.json.gz", "wt", encoding="utf-8") as handle:
+    stem = args.label or "walk-forward"
+    with gzip.open(args.out / f"{stem}-trades.json.gz", "wt", encoding="utf-8") as handle:
         json.dump(trade_dump, handle)
     ledger_entry["selected"] = out["selected"]
     return out
@@ -450,9 +451,8 @@ def controls(args, ledger_entry: dict) -> dict:
                 dates = item.candles["date"].tail(COMPARE_ROWS)
                 if not frame_equal(item, honest[pair], dates):
                     truncation_failures += 1
-                live = build_signals(
-                    candidate, {pair: cut_candles[pair]}, fear_greed, by_id, window=plan.LIVE_WINDOW_CANDLES
-                )[pair]
+                alone = {pair: cut_candles[pair], plan.REGIME_PAIR: cut_candles[plan.REGIME_PAIR]}
+                live = build_signals(candidate, alone, fear_greed, by_id, window=plan.LIVE_WINDOW_CANDLES)[pair]
                 compared += 1
                 if not frame_equal(_entries_only(live), _entries_only(item), dates):
                     live_mismatch += 1
@@ -670,9 +670,7 @@ def cross_asset(args, ledger_entry: dict) -> dict:
                     all_wf_rows, stoploss, primary, limits, account_marker(wf_trades, wf_candles, primary)
                 ),
             }
-        chosen = accounts["research" if args.research_mode else "loss_limits"]
-        rows = all_rows if args.research_mode else chosen["cross"]["rows"]
-        wf_rows = all_wf_rows if args.research_mode else chosen["walk_forward"]["rows"]
+        rows, wf_rows = all_rows, all_wf_rows
         costs = {}
         for name, cost in plan.COSTS.items():
             kept = {(row.pair, row.entry_time) for row in rows}
@@ -723,7 +721,7 @@ def cross_asset(args, ledger_entry: dict) -> dict:
         "round": plan.ROUND,
         "period": [start.isoformat(), end.isoformat()],
         "pairs": list(plan.CROSS_PAIRS),
-        "research_mode": args.research_mode,
+        "research_mode": True,
         "cumulative_trials": plan.cumulative_trials(),
         "results": results,
         "ranked": [entry["id"] for entry in ranked],
@@ -792,8 +790,8 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--ledger", type=Path, default=DEFAULT_LEDGER)
     parser.add_argument("--wf-datadir", type=Path, help="walk-forward candles, for presample")
     parser.add_argument("--cross-datadir", type=Path, help="candles of the cross-asset pairs, for cross-asset")
-    parser.add_argument("--research-mode", action="store_true", help="cross-asset tier without the loss limits")
     parser.add_argument("--candidate", action="append")
+    parser.add_argument("--label", help="file name stem of this run's output, so a later run never overwrites it")
     parser.add_argument("--replay", action="store_true")
     args = parser.parse_args(argv)
     if args.command == "presample" and not args.wf_datadir:
@@ -811,6 +809,8 @@ def main(argv: list[str]) -> int:
     if args.replay:
         kind = f"{kind}_replay"
     args.out.mkdir(parents=True, exist_ok=True)
+    if args.label and (args.out / f"{args.label}.json").exists():
+        parser.error(f"output {args.label}.json already exists in --out")
     entry = {
         "run_id": uuid.uuid4().hex,
         "round": plan.ROUND,
@@ -819,7 +819,7 @@ def main(argv: list[str]) -> int:
         "git_dirty": os.environ.get("TRADING_BOT_GIT_DIRTY", "unknown"),
         "started_at": datetime.now(UTC).isoformat(),
         "candidate": args.candidate,
-        "research_mode": args.research_mode if args.command == "cross-asset" else True,
+        "research_mode": True,
         "period": [period[0].isoformat(), period[1].isoformat()],
     }
     try:
@@ -828,7 +828,9 @@ def main(argv: list[str]) -> int:
             single_run_guard(args, *GUARDS[args.command])
         append_ledger(args.ledger, {**entry, "kind": f"{kind}_started", "status": "started"})
         result = run(args, entry)
-        (args.out / f"{args.command}.json").write_text(json.dumps(result, indent=1, default=str), encoding="utf-8")
+        target = args.out / f"{args.label or args.command}.json"
+        target.write_text(json.dumps(result, indent=1, default=str), encoding="utf-8")
+        entry["output"] = target.name
         entry["status"] = "ok"
         return_code = 0
     except HoldoutUsed as exc:

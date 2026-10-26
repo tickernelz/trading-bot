@@ -116,6 +116,32 @@ def test_informative_pairs_cover_every_whitelisted_pair_and_rule_timeframe():
     ]
 
 
+class BtcProvider(Provider):
+    def __init__(self, frame: pd.DataFrame, btc: pd.DataFrame):
+        super().__init__(frame)
+        self.btc = btc
+
+    def current_whitelist(self):
+        return ["ETH/IDR"]
+
+    def get_pair_dataframe(self, pair, timeframe):
+        return resample(self.btc if pair == "BTC/IDR" else self.frame, timeframe)
+
+
+def test_btc_gated_rule_reads_btc_daily_candles_and_subscribes_to_them():
+    rule = RuleSpec(
+        entry="tsmom", timeframe="1d", lookback=5, exit="none", trend_filter="btc_above_sma100_1d", stoploss=-0.2
+    )
+    frame, btc = walk(24 * 260), walk(24 * 260, seed=11)
+    instance = strategy(rule)
+    instance.dp = BtcProvider(frame, btc)
+    assert sorted(instance.informative_pairs()) == [("BTC/IDR", "1d"), ("ETH/IDR", "1d")]
+    out = instance.populate_entry_trend(instance.populate_indicators(frame.copy(), {"pair": "ETH/IDR"}), {})
+    expected = rule_frame(frame, rule, {"1d": resample(frame, "1d"), "btc": resample(btc, "1d")})["enter"]
+    assert expected.sum() > 0
+    assert (out["enter_long"] == 1).fillna(False).tolist() == expected.tolist()
+
+
 def open_trade(open_date: datetime, open_rate: float = 100.0):
     return SimpleNamespace(open_date_utc=open_date, open_rate=open_rate)
 
