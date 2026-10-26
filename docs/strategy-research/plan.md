@@ -127,3 +127,31 @@ Points 2, 3 and 5 loosened the task's rule, which accepts only the holdout or fo
 - The final evaluation of round 2, and of every later round, uses forward data only: Indodax candles after 2026-10-26 or a dry run started after the configuration was locked, with no parameter tuned on them. Below 100 forward trades on at least 2 pairs the round's result is "not enough data", no target is reported as met, and the default does not change.
 - The pre-sample run stays a once-only, locked out-of-sample check and is reported as supporting evidence next to the walk-forward, never as the final tier.
 - At 2026-10-26 the forward data holds 0 trades, so round 2's result is "not enough data" and the default stays `J-rsi14-1h-tp3-sl10`.
+
+# Round 3 and later: research mode and cross-asset validation (ZHA-3876, direction of 2026-10-26 12:28 UTC)
+
+Zhafron's direction replaces the decision to pause rounds 3 to 5 until forward data exists. Everything above stays in force unless this section says otherwise. Locked in the commit that adds this section, before any cross-asset run.
+
+## Research mode
+
+- The simulator has never modelled the risk layer's loss limits: every number in rounds 1 and 2 is a per-pair trade list with no daily-loss or drawdown stop, and drawdowns come from an account model that only applied the 0.5% risk per trade and the 3-slot cap. Ledger lines of every command except \`cross-asset\` record \`research_mode: true\` for that reason.
+- \`cross-asset\` runs an account model in two modes on the same trades and reports both: research mode (no loss limits) and loss limits (\`risk.max_daily_loss_pct\` 1% from the Asia/Jakarta day-start equity and \`risk.max_total_drawdown_pct\` 10% from the realised peak, open trades marked at the signal candle's close, entries refused on a breach, as the bot does). The tier uses the mode named by \`--research-mode\`; the ledger records it. Bot, dry-run and live configuration do not change.
+
+## Cross-asset validation
+
+- Selection and every parameter choice stay on the five walk-forward pairs (BTC, ETH, SOL, XRP, DOGE against IDR).
+- Cross-asset pairs: from 20 established coins checked on 2026-10-26 (BNB, NEAR, HBAR, LSK, ADA, LTC, TRX, LINK, DOT, BCH, XLM, ETC, ATOM, POL, UNI, AVAX, SHIB, VET, EOS, XAUT; not a scan of all 420 IDR pairs, which Indodax rate-limited), the IDR pairs with 1h candles on 2021-12-01, 24 h volume at least 0.05 bn IDR, a bid-ask spread at most 100 bps (ticker snapshot about 11:40 UTC) and no gold token: BNB, NEAR, HBAR, ADA, LTC, TRX, LINK, DOT, BCH. A pair whose candles have a gap longer than 24 hours inside the period is dropped before the first run and the drop is written here.
+- Dropped before the first run: BCH/IDR. Its 46,584 candles from 2021-01-01 to 2026-04-26 all have zero volume, so no entry can fire (rules require volume above zero). The other eight have no gaps; zero-volume candles: BNB 204, NEAR 7,475 (listed 2021-10-07), HBAR 1,560 (listed 2021-02-10), ADA 211, LTC 255, TRX 208, LINK 4,350, DOT 1,016. Cross-asset pairs: BNB, NEAR, HBAR, ADA, LTC, TRX, LINK, DOT. Period: the walk-forward period 2022-07-01 to 2026-04-26 (warm-up from 2021-01-01 or the listing).
+- The cost model is the same taker cost; a sensitivity adds half the snapshot spread per side for each pair (\`CROSS_SPREAD_BPS\`).
+- Only configurations named before the run are evaluated: in each round the walk-forward selection, plus in this first run the round 1 and 2 near misses \`Q-F-don1d20-tp5-lock3\`, \`Q-G-rsi2-1d-10-sl25\`, \`S-don1d20-sma50-tp5-lock3\` and the current default \`Q-J-rsi14-1h-tp3-sl10\` as a comparator. Nothing is tuned on cross-asset results; every run is in the ledger.
+- Tier: (a) on the cross-asset trades, (b) on the walk-forward folds, (c) and (d) on both; expectancy, bootstrap CI, null p95 (1,000 random-entry series on the cross-asset pairs) and the Bonferroni bound over the cumulative trial count on the cross-asset trades. T1 needs both lower bounds above zero and the null beaten. Every tier from this protocol is written "provisional until forward data": the cross-asset pairs move with BTC and the selection pairs over the same years, so they are correlated with the selection data and are not forward evidence. Monthly forward monitoring stays the final gate before any decision about live trading.
+- Ranking (Zhafron): tier, then higher net win rate, then lower drawdown. Reported next to the win rate: largest loss, mean of the 5 worst trades, max drawdown, and the worst calendar-month realised loss in rupiah on Rp 2,000,000 capital with the 0.5% risk sizing.
+- The default changes to the best-ranked configuration when its provisional tier is higher than the current default's.
+
+## Budget
+
+The total over all rounds is raised from 600 to 1,500 configurations (Zhafron). The multiple-testing correction keeps using the cumulative count.
+
+## Round 3 matrix
+
+Locked in a later commit, from the shortlist of ZHA-3902 (Agent Laras), before the first round 3 walk-forward run.

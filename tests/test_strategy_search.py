@@ -306,6 +306,52 @@ def test_an_entry_refused_for_lack_of_slots_frees_no_slot_it_never_held():
     assert metrics.max_drawdown([*open_three, refused, fifth], -0.10, 0.0031) == pytest.approx(loss)
 
 
+def day_row(profit: float, entry: int, exit_: int, pair: str = "BTC/IDR") -> metrics.Row:
+    start = pd.Timestamp("2025-01-01 01:00", tz="UTC")
+    hours = pd.Timedelta(hours=1)
+    return metrics.Row(
+        pair, start + (entry - 1) * hours, start + entry * hours, start + exit_ * hours, profit, "x", "bull", "F1"
+    )
+
+
+LIMITS = metrics.Limits(0.01, 0.10, "Asia/Jakarta")
+
+
+def test_daily_loss_limit_refuses_entries_until_the_next_jakarta_day():
+    stops = [day_row(-0.11, 1, 2), day_row(-0.11, 3, 4), day_row(0.02, 6, 7), day_row(0.02, 30, 31)]
+    research = metrics.portfolio(stops, -0.10, 0.0031)
+    limited = metrics.portfolio(stops, -0.10, 0.0031, LIMITS)
+    assert research["taken"] == [0, 1, 2, 3] and research["refused_limits"] == 0
+    assert limited["taken"] == [0, 1, 3] and limited["refused_limits"] == 1
+
+
+def test_open_losses_count_toward_the_limits_at_the_signal_candle():
+    rows = [day_row(-0.10, 1, 20), day_row(-0.10, 2, 20), day_row(0.02, 5, 6)]
+    deep = metrics.portfolio(rows, -0.10, 0.0031, LIMITS, lambda row, time: -0.11)
+    flat = metrics.portfolio(rows, -0.10, 0.0031, LIMITS, lambda row, time: 0.0)
+    assert deep["taken"] == [0, 1] and flat["taken"] == [0, 1, 2]
+
+
+def test_worst_month_is_the_largest_realised_monthly_loss_of_the_account():
+    rows = [day_row(-0.10, 1, 2), day_row(0.05, 24 * 40, 24 * 40 + 1)]
+    loss = 0.005 / (1.0031 - 0.9 * 0.9969) * 0.10
+    assert metrics.portfolio(rows, -0.10, 0.0031)["worst_month"] == pytest.approx(-loss)
+
+
+def test_cross_asset_ranking_puts_tier_before_win_rate_before_drawdown():
+    def entry(cid, tier, win_rate, drawdown):
+        summary = {"win_rate": win_rate, "max_drawdown": drawdown}
+        return {"id": cid, "tier": tier, "costs": {plan.PRIMARY_COST: {"all": summary}}}
+
+    entries = [
+        entry("a", "T3", 0.9, 0.01),
+        entry("b", "T2", 0.6, 0.2),
+        entry("c", "T2", 0.7, 0.3),
+        entry("d", "T2", 0.7, 0.1),
+    ]
+    assert [item["id"] for item in sorted(entries, key=strategy_search.cross_rank_key)] == ["d", "c", "b", "a"]
+
+
 def test_rounds_stay_within_the_search_budget_and_ids_are_unique():
     ids = [candidate.id for candidate in plan.round1_candidates()]
     current = [candidate.id for candidate in plan.candidates()]

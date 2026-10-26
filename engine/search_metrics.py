@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from dataclasses import dataclass
 from statistics import NormalDist
 
@@ -67,8 +68,26 @@ def rolling_min_win_rate(wins: np.ndarray, window: int = plan.ROLLING_WINDOW) ->
     return float(sums.min() / window)
 
 
-def max_drawdown(rows: list[Row], stoploss: float, fee: float) -> float:
-    """Realised-equity drawdown with the risk layer's sizing: risk_per_trade of equity lost at the stop."""
+@dataclass(frozen=True)
+class Limits:
+    """The risk layer's loss limits: daily loss from the day-start equity and drawdown from the realised peak."""
+
+    max_daily_loss: float
+    max_total_drawdown: float
+    timezone: str
+
+
+Mark = Callable[[Row, pd.Timestamp], float]
+
+
+def portfolio(
+    rows: list[Row], stoploss: float, fee: float, limits: Limits | None = None, mark: Mark | None = None
+) -> dict:
+    """One account over all rows with the risk layer's sizing and slot cap, and the loss limits when given.
+
+    mark(row, time) returns the open profit ratio of row at time; with limits the open trades count in the
+    daily loss and the drawdown checked at each entry's signal candle, as the bot checks them.
+    """
     per_stake = loss_ratio_at_stop(stoploss, fee)
     events = sorted(
         [(row.entry_time, 0, i) for i, row in enumerate(rows)] + [(row.exit_time, 1, i) for i, row in enumerate(rows)]
@@ -76,17 +95,52 @@ def max_drawdown(rows: list[Row], stoploss: float, fee: float) -> float:
     equity = peak = 1.0
     drawdown = 0.0
     stakes: dict[int, float] = {}
+    closed: list[tuple[pd.Timestamp, float]] = []
+    taken: list[int] = []
+    refused_slots = refused_limits = 0
+    monthly: dict[str, float] = {}
     for _, kind, i in events:
         if kind == 0:
             if len(stakes) >= plan.MAX_OPEN_TRADES:
+                refused_slots += 1
+                continue
+            if limits is not None and _breached(rows[i].signal_time, equity, peak, closed, stakes, rows, limits, mark):
+                refused_limits += 1
                 continue
             free = equity - sum(stakes.values())
             stakes[i] = max(0.0, min(equity * plan.RISK_PER_TRADE / per_stake, free))
+            taken.append(i)
         elif i in stakes:
-            equity += stakes.pop(i) * rows[i].profit
+            pnl = stakes.pop(i) * rows[i].profit
+            equity += pnl
+            closed.append((rows[i].exit_time, pnl))
+            month = rows[i].exit_time.strftime("%Y-%m")
+            monthly[month] = monthly.get(month, 0.0) + pnl
             peak = max(peak, equity)
             drawdown = max(drawdown, 1 - equity / peak)
-    return drawdown
+    return {
+        "max_drawdown": drawdown,
+        "taken": sorted(taken),
+        "refused_slots": refused_slots,
+        "refused_limits": refused_limits,
+        "worst_month": min(monthly.values(), default=0.0),
+        "final_equity": equity,
+    }
+
+
+def _breached(now, equity, peak, closed, stakes, rows, limits: Limits, mark: Mark | None) -> bool:
+    open_pnl = sum(stake * mark(rows[j], now) for j, stake in stakes.items()) if mark is not None else 0.0
+    start = now.tz_convert(limits.timezone).normalize()
+    day_start_equity = 1.0 + sum(pnl for time, pnl in closed if time < start)
+    daily = sum(pnl for time, pnl in closed if time >= start) + open_pnl
+    daily_loss = max(0.0, -daily) / day_start_equity if day_start_equity > 0 else 1.0
+    total = max(0.0, peak - (equity + open_pnl)) / peak
+    return daily_loss >= limits.max_daily_loss or total >= limits.max_total_drawdown
+
+
+def max_drawdown(rows: list[Row], stoploss: float, fee: float) -> float:
+    """Realised-equity drawdown with the risk layer's sizing: risk_per_trade of equity lost at the stop."""
+    return portfolio(rows, stoploss, fee)["max_drawdown"]
 
 
 def summarize(rows: list[Row], start: pd.Timestamp, end: pd.Timestamp, stoploss: float, fee: float) -> dict:
@@ -103,6 +157,7 @@ def summarize(rows: list[Row], start: pd.Timestamp, end: pd.Timestamp, stoploss:
     entries = [start, *(row.entry_time for row in rows), end]
     gaps = [(b - a).total_seconds() / 86400 for a, b in zip(entries, entries[1:])]
     lo, hi = bootstrap_ci(profits)
+    account = portfolio(rows, stoploss, fee)
     out.update(
         {
             "win_rate": float(wins.mean()),
@@ -116,7 +171,8 @@ def summarize(rows: list[Row], start: pd.Timestamp, end: pd.Timestamp, stoploss:
             else None,
             "largest_loss": float(profits.min()),
             "worst5_mean": float(np.sort(profits)[:5].mean()),
-            "max_drawdown": max_drawdown(rows, stoploss, fee),
+            "max_drawdown": account["max_drawdown"],
+            "worst_month_idr": account["worst_month"] * plan.CAPITAL_IDR,
             "rolling30_min_win_rate": rolling_min_win_rate(wins),
             "longest_days_without_entry": round(max(gaps), 1),
             "days_without_entry_at_end": round(gaps[-1], 1),

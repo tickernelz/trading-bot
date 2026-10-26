@@ -36,8 +36,13 @@ def summary_row(summary: dict) -> list[str]:
         pct(summary.get("largest_loss")),
         pct(summary.get("worst5_mean")),
         pct(summary.get("max_drawdown"), 1, sign=False),
+        rupiah(summary.get("worst_month_idr")),
         num(summary.get("trades_per_month"), 1),
     ]
+
+
+def rupiah(value: float | None) -> str:
+    return "-" if value is None else f"Rp {value:,.0f}"
 
 
 SUMMARY_HEAD = [
@@ -51,6 +56,7 @@ SUMMARY_HEAD = [
     "Largest loss",
     "Worst 5 mean",
     "Max DD",
+    "Worst month (Rp 2M)",
     "Trades/month",
 ]
 

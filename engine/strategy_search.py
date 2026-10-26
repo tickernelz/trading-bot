@@ -593,6 +593,133 @@ def presample(args, ledger_entry: dict) -> dict:
     return out
 
 
+def account_marker(trades: list[Trade], candles: dict[str, pd.DataFrame], costs: Costs) -> metrics.Mark:
+    """Open profit ratio of a trade at a 1h close, for the loss limits of the account model."""
+    entries = {(trade.pair, trade.entry_time): trade.entry_price for trade in trades}
+    closes = {pair: frame.set_index("date")["close"] for pair, frame in candles.items()}
+
+    def mark(row: metrics.Row, time: pd.Timestamp) -> float:
+        close = closes[row.pair].get(time)
+        if close is None or time < row.entry_time:
+            return 0.0
+        return costs.profit_ratio(entries[(row.pair, row.entry_time)], float(close))
+
+    return mark
+
+
+def account_view(rows, stoploss: float, costs: Costs, limits: metrics.Limits | None, mark) -> dict:
+    fee = mean_fee(costs)
+    account = metrics.portfolio(rows, stoploss, fee, limits, mark)
+    kept = [rows[i] for i in account["taken"]]
+    profits = np.array([row.profit for row in kept], dtype=float)
+    return {
+        "trades": len(kept),
+        "refused_slots": account["refused_slots"],
+        "refused_limits": account["refused_limits"],
+        "win_rate": float((profits > 0).mean()) if len(profits) else None,
+        "mean": float(profits.mean()) if len(profits) else None,
+        "max_drawdown": account["max_drawdown"],
+        "worst_month_idr": account["worst_month"] * plan.CAPITAL_IDR,
+        "rows": kept,
+    }
+
+
+RISK_LIMITS = metrics.Limits(plan.MAX_DAILY_LOSS, plan.MAX_TOTAL_DRAWDOWN, plan.DAILY_RESET_TIMEZONE)
+
+
+def cross_asset(args, ledger_entry: dict) -> dict:
+    """Named configurations on IDR pairs never used to select them, judged with their walk-forward folds."""
+    wf_candles = load_candles(args.datadir, plan.HOLDOUT_START)
+    cross = load_candles(args.cross_datadir, plan.HOLDOUT_START, plan.CROSS_PAIRS)
+    fear_greed = load_fear_greed(args.fear_greed)
+    regimes = regime_by_hour(wf_candles[plan.REGIME_PAIR])
+    by_id = {candidate.id: candidate for candidate in plan.candidates()}
+    start, end = plan.WALK_FORWARD_START, plan.HOLDOUT_START
+    primary = plan.COSTS[plan.PRIMARY_COST]
+    results = []
+    for cid in args.candidate:
+        candidate = by_id[cid]
+        signals = build_signals(candidate, cross, fear_greed, by_id)
+        wf_signals = build_signals(candidate, wf_candles, fear_greed, by_id)
+        stoploss = stoploss_of(signals)
+        trades = trades_of(signals, primary)
+        wf_trades = trades_of(wf_signals, primary)
+        all_rows = rows_of(trades, primary, regimes, start, end)
+        all_wf_rows = rows_of(wf_trades, primary, regimes, start, end)
+        accounts = {}
+        for mode, limits in (("research", None), ("loss_limits", RISK_LIMITS)):
+            accounts[mode] = {
+                "cross": account_view(all_rows, stoploss, primary, limits, account_marker(trades, cross, primary)),
+                "walk_forward": account_view(
+                    all_wf_rows, stoploss, primary, limits, account_marker(wf_trades, wf_candles, primary)
+                ),
+            }
+        chosen = accounts["research" if args.research_mode else "loss_limits"]
+        rows = all_rows if args.research_mode else chosen["cross"]["rows"]
+        wf_rows = all_wf_rows if args.research_mode else chosen["walk_forward"]["rows"]
+        costs = {}
+        for name, cost in plan.COSTS.items():
+            kept = {(row.pair, row.entry_time) for row in rows}
+            priced = [row for row in rows_of(trades, cost, regimes, start, end) if (row.pair, row.entry_time) in kept]
+            costs[name] = report(priced, start, end, stoploss, cost)
+        spread = [
+            trade for trade in trades if (trade.pair, trade.entry_time) in {(row.pair, row.entry_time) for row in rows}
+        ]
+        spread_profits = np.array(
+            [
+                Costs(
+                    primary.buy + plan.CROSS_HALF_SPREAD[trade.pair], primary.sell + plan.CROSS_HALF_SPREAD[trade.pair]
+                ).profit_ratio(trade.entry_price, trade.exit_price)
+                for trade in spread
+            ],
+            dtype=float,
+        )
+        null = null_distribution(signals, primary, regimes, start, end)
+        checks = metrics.target_checks(rows, wf_rows, [wf_rows, rows])
+        summary = costs[plan.PRIMARY_COST]["all"]
+        mean = summary.get("mean", 0.0)
+        ci_low = summary.get("ci95", [0.0, 0.0])[0]
+        adjusted = metrics.adjusted_lower(np.array([row.profit for row in rows], dtype=float), plan.cumulative_trials())
+        beaten = bool(mean > null["mean_p95"])
+        results.append(
+            {
+                "id": cid,
+                "tier": metrics.tier(checks["met"], mean, min(ci_low, adjusted), beaten),
+                "provisional": "until forward data",
+                "ci_low": ci_low,
+                "ci_low_adjusted": adjusted,
+                "null": null,
+                "null_beaten": beaten,
+                "checks": checks,
+                "costs": costs,
+                "half_spread_mean": float(spread_profits.mean()) if len(spread_profits) else None,
+                "accounts": {
+                    mode: {side: {k: v for k, v in view.items() if k != "rows"} for side, view in sides.items()}
+                    for mode, sides in accounts.items()
+                },
+            }
+        )
+        print(f"{cid}: {checks['trades']} cross-asset trades, tier {results[-1]['tier']}", file=sys.stderr)
+    ranked = sorted(results, key=cross_rank_key)
+    ledger_entry["selected"] = ranked[0]["id"] if ranked else None
+    ledger_entry["tier"] = ranked[0]["tier"] if ranked else None
+    return {
+        "round": plan.ROUND,
+        "period": [start.isoformat(), end.isoformat()],
+        "pairs": list(plan.CROSS_PAIRS),
+        "research_mode": args.research_mode,
+        "cumulative_trials": plan.cumulative_trials(),
+        "results": results,
+        "ranked": [entry["id"] for entry in ranked],
+    }
+
+
+def cross_rank_key(entry: dict) -> tuple:
+    """Tier first, then the higher net win rate, then the lower drawdown."""
+    primary = entry["costs"][plan.PRIMARY_COST]["all"]
+    return (entry["tier"], -(primary.get("win_rate") or 0.0), primary.get("max_drawdown", 1.0))
+
+
 def comparators(candles, fear_greed, regimes, by_id, start, end) -> dict:
     costs = plan.COSTS[plan.PRIMARY_COST]
     swing = build_signals(by_id["K-SwingEmaRsi"], candles, fear_greed, by_id)
@@ -609,6 +736,7 @@ COMMANDS = {
     "validate": ("validation", validate),
     "holdout": ("holdout", holdout),
     "presample": ("presample", presample),
+    "cross-asset": ("cross_asset", cross_asset),
 }
 GUARDS = {"holdout": (HOLDOUT_KINDS, "holdout"), "presample": (PRESAMPLE_KINDS, "presample")}
 PERIODS = {
@@ -617,6 +745,7 @@ PERIODS = {
     "validation": tuple(pd.Timestamp(day, tz="UTC") for day in plan.STAGE2_IN_SAMPLE),
     "holdout": (plan.HOLDOUT_START, plan.DATA_END),
     "presample": (plan.PRESAMPLE_START, plan.PRESAMPLE_END),
+    "cross_asset": (plan.WALK_FORWARD_START, plan.HOLDOUT_START),
 }
 
 
@@ -624,6 +753,8 @@ def data_hashes(args) -> dict[str, str]:
     out = {pair: sha256(pair_file(args.datadir, pair)) for pair in pairs_of(args.command)}
     if args.wf_datadir:
         out |= {f"walk_forward {pair}": sha256(pair_file(args.wf_datadir, pair)) for pair in plan.PAIRS}
+    if args.cross_datadir:
+        out |= {f"cross {pair}": sha256(pair_file(args.cross_datadir, pair)) for pair in plan.CROSS_PAIRS}
     return out | {"fear_greed": sha256(args.fear_greed)}
 
 
@@ -641,13 +772,19 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--out", required=True, type=Path)
     parser.add_argument("--ledger", type=Path, default=DEFAULT_LEDGER)
     parser.add_argument("--wf-datadir", type=Path, help="walk-forward candles, for presample")
-    parser.add_argument("--candidate")
+    parser.add_argument("--cross-datadir", type=Path, help="candles of the cross-asset pairs, for cross-asset")
+    parser.add_argument("--research-mode", action="store_true", help="cross-asset tier without the loss limits")
+    parser.add_argument("--candidate", action="append")
     parser.add_argument("--replay", action="store_true")
     args = parser.parse_args(argv)
-    if args.command in GUARDS and not args.candidate:
-        parser.error(f"{args.command} needs --candidate")
     if args.command == "presample" and not args.wf_datadir:
         parser.error("presample needs --wf-datadir")
+    if args.command == "cross-asset" and not (args.cross_datadir and args.candidate):
+        parser.error("cross-asset needs --cross-datadir and at least one --candidate")
+    if args.command in GUARDS:
+        if len(args.candidate or []) != 1:
+            parser.error(f"{args.command} needs exactly one --candidate")
+        args.candidate = args.candidate[0]
     if args.replay and args.command not in GUARDS:
         parser.error("--replay applies to holdout and presample")
     kind, run = COMMANDS[args.command]
@@ -663,6 +800,7 @@ def main(argv: list[str]) -> int:
         "git_dirty": os.environ.get("TRADING_BOT_GIT_DIRTY", "unknown"),
         "started_at": datetime.now(UTC).isoformat(),
         "candidate": args.candidate,
+        "research_mode": args.research_mode if args.command == "cross-asset" else True,
         "period": [period[0].isoformat(), period[1].isoformat()],
     }
     try:
