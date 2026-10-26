@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import re
 import signal
+import shutil
 import socket
 import subprocess
 import sys
@@ -11,15 +12,16 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import IO
 
+from engine.exitcodes import REFUSED
 from engine.settings import load_settings
 from gateway.settings import load_gateway_settings
 from tbapp import paths
 from tbapp.provision import read_env_file
 
-REFUSED = 2
 SECRET_NAME = re.compile(r"(KEY|TOKEN|SECRET|PASSWORD|PASS)$", re.IGNORECASE)
 LOG_LIMIT = 10 * 1024 * 1024
 STOP_GRACE_S = 25
+ROTATE_EVERY_S = 30
 HEALTHY_AFTER_S = 60
 MAX_BACKOFF_S = 60
 
@@ -52,7 +54,6 @@ def inherited_environment() -> dict[str, str]:
 def build_children(home: Path) -> list[Child]:
     config = home / "config"
     run = home / "run"
-    secrets = home / "secrets"
     bot_b = load_settings(config / "bot-b.yaml")
     children = [
         Child("bot-a", config / "bot-a.yaml", run / "bot-a", ("ft.env",)),
@@ -67,8 +68,6 @@ def build_children(home: Path) -> list[Child]:
     if pwa is not None:
         gateway_env["TRADING_BOT_PWA_DIR"] = str(pwa)
     children.append(Child("gateway", config / "gateway.yaml", run / "gateway", ("gateway.env",), gateway_env))
-    for child in children:
-        child.extra_env["TRADING_BOT_SECRETS"] = str(secrets)
     return children
 
 
@@ -137,6 +136,18 @@ class Supervisor:
             path.replace(path.with_suffix(".log.old"))
         return open(path, "ab")
 
+    def rotate(self, child: Child) -> None:
+        if child.log is None or child.proc is None:
+            return
+        path = Path(child.log.name)
+        try:
+            if path.stat().st_size <= LOG_LIMIT:
+                return
+            shutil.copyfile(path, path.with_suffix(".log.old"))
+            child.log.truncate(0)
+        except OSError:
+            pass
+
     def start(self, child: Child) -> None:
         child.log = self.open_log(child)
         flags = subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0
@@ -201,15 +212,20 @@ class Supervisor:
         for child in self.children:
             self.start(child)
         try:
+            next_rotation = 0.0
             while not self.stopping:
                 now = time.monotonic()
                 for child in self.children:
                     if child.proc is not None:
+                        if now >= next_rotation:
+                            self.rotate(child)
                         code = child.proc.poll()
                         if code is not None:
                             self.exited(child, code)
                     elif child.retry_at is not None and now >= child.retry_at:
                         self.start(child)
+                if now >= next_rotation:
+                    next_rotation = now + ROTATE_EVERY_S
                 if not self.announced and accepting(self.gateway_port):
                     self.announced = True
                     print(f"ready: http://127.0.0.1:{self.gateway_port}", flush=True)

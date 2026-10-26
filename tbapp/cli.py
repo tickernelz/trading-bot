@@ -5,6 +5,7 @@ import multiprocessing
 import sys
 from pathlib import Path
 
+from engine.exitcodes import REFUSED
 from tbapp import paths, version
 from tbapp.provision import DEFAULT_PORT_BASE, Ports, check_port_base, provision
 
@@ -66,7 +67,7 @@ def run(home: Path, port_base: int) -> int:
     if busy:
         listing = ", ".join(f"{name} on {port}" for name, port in busy.items())
         print(f"trading-bot: refusing to start: ports already in use: {listing}", file=sys.stderr)
-        return 2
+        return REFUSED
     if paths.pwa_dir() is None:
         print("trading-bot: web panel files not found; only the API will be served", file=sys.stderr)
     return Supervisor(home).run()

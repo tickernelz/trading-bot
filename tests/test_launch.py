@@ -8,6 +8,7 @@ from freqtrade.enums import RunMode
 from freqtrade.resolvers import StrategyResolver
 
 from engine import launch
+from engine.exitcodes import REFUSED
 from engine.settings import load_settings
 from tests.conftest import EXAMPLE
 
@@ -119,7 +120,7 @@ def test_invalid_config_refuses_to_start(monkeypatch, tmp_path, example_raw, wri
     example_raw["risk"]["max_daily_loss_pct"] = 0
     monkeypatch.setenv("TRADING_BOT_CONFIG", str(write_config(example_raw)))
     monkeypatch.setenv("TRADING_BOT_USERDIR", str(tmp_path / "user_data"))
-    assert launch.main(["trade"]) == 2
+    assert launch.main(["trade"]) == REFUSED
     assert exec_calls == []
     assert not (tmp_path / "user_data").exists()
     assert "refusing to start" in capsys.readouterr().err
@@ -131,7 +132,7 @@ def test_missing_api_secret_refuses_to_start(monkeypatch, tmp_path, exec_calls, 
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("TRADING_BOT_CONFIG", str(EXAMPLE))
     monkeypatch.setenv("TRADING_BOT_USERDIR", str(tmp_path / "user_data"))
-    assert launch.main([command]) == 2
+    assert launch.main([command]) == REFUSED
     assert exec_calls == []
 
 
@@ -175,7 +176,7 @@ def test_swarm_bot_refuses_to_start_without_shadow_token(monkeypatch, tmp_path, 
     monkeypatch.delenv("SHADOW_TOKEN")
     monkeypatch.setenv("TRADING_BOT_CONFIG", str(EXAMPLE))
     monkeypatch.setenv("TRADING_BOT_USERDIR", str(tmp_path / "user_data"))
-    assert launch.main(["trade"]) == 2
+    assert launch.main(["trade"]) == REFUSED
     assert exec_calls == []
     assert "SHADOW_TOKEN" in capsys.readouterr().err
 
@@ -200,7 +201,7 @@ def test_recorded_live_mode_stops_the_engine_before_it_starts(monkeypatch, tmp_p
         monkeypatch.setenv(name, value)
     monkeypatch.setenv("TRADING_BOT_CONFIG", str(EXAMPLE))
     monkeypatch.setenv("TRADING_BOT_USERDIR", str(userdir))
-    assert launch.main(["trade"]) == 2
+    assert launch.main(["trade"]) == REFUSED
     assert exec_calls == [] and not (userdir / "trading-bot.freqtrade.json").exists()
 
 

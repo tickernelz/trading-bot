@@ -5,6 +5,7 @@ from pathlib import Path
 
 import uvicorn
 
+from engine.exitcodes import REFUSED
 from engine.settings import ConfigError
 from gateway.app import Gateway, create_app
 from gateway.redact import install_log_redaction
@@ -21,7 +22,7 @@ def main() -> int:
         gateway = Gateway(settings, dict(os.environ))
     except (OSError, ValueError, ConfigError) as exc:
         print(f"trading-bot gateway: refusing to start: {exc}", file=sys.stderr)
-        return 2
+        return REFUSED
     pwa_dir = os.environ.get("TRADING_BOT_PWA_DIR")
     uvicorn.run(
         create_app(gateway, pwa_dir=Path(pwa_dir) if pwa_dir else None),

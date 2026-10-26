@@ -4,6 +4,7 @@ import pytest
 import yaml
 
 from engine import analyst_service
+from engine.exitcodes import REFUSED
 from tests.conftest import EXAMPLE
 
 KEY = "sk-analyst-0123456789abcdef"
@@ -49,7 +50,7 @@ def test_service_starts_on_the_configured_loopback_port(monkeypatch, tmp_path, s
 )
 def test_service_refuses_to_start_without_its_token_or_model_key(monkeypatch, tmp_path, started, capsys, env, fragment):
     prepare(monkeypatch, tmp_path, env=env)
-    assert analyst_service.main() == 2
+    assert analyst_service.main() == REFUSED
     assert started == []
     err = capsys.readouterr().err
     assert fragment in err and KEY not in err and TOKEN not in err
@@ -57,11 +58,11 @@ def test_service_refuses_to_start_without_its_token_or_model_key(monkeypatch, tm
 
 def test_service_refuses_a_config_without_an_analyst_section(monkeypatch, tmp_path, started, capsys):
     prepare(monkeypatch, tmp_path, mutate=lambda raw: raw.pop("analyst"))
-    assert analyst_service.main() == 2 and started == []
+    assert analyst_service.main() == REFUSED and started == []
     assert "no analyst section" in capsys.readouterr().err
 
 
 def test_service_refuses_a_provider_without_a_resolvable_base_url(monkeypatch, tmp_path, started, capsys):
     prepare(monkeypatch, tmp_path, mutate=lambda raw: raw["providers"][0].update(base_url="from_import"))
-    assert analyst_service.main() == 2 and started == []
+    assert analyst_service.main() == REFUSED and started == []
     assert "base_url" in capsys.readouterr().err

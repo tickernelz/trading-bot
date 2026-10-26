@@ -148,9 +148,11 @@ def main() -> int:
             ok = True
         elif isinstance(answer.get("error"), dict) or "code" in answer:
             print("health:", status, json.dumps(answer)[:300])
+            if os.environ.get("SMOKE_REQUIRE_ENGINE") == "1":
+                print("FAIL: the engine did not come up within", args.engine_wait, "s")
+                return 1
             print("RESULT: gateway answered, engine did not come up within", args.engine_wait, "s")
             ok = True
-            return 0 if os.environ.get("SMOKE_REQUIRE_ENGINE") != "1" else 1
         else:
             print("FAIL: unexpected health answer", status, body[:300])
             return 1

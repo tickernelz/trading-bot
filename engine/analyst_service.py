@@ -26,6 +26,7 @@ from tb_swarm.analyst import (
 )
 from tb_swarm.errors import ConfigError, ProviderError
 
+from engine.exitcodes import REFUSED
 from engine.logredact import install as install_log_redaction
 from engine.settings import Analyst, Settings, load_settings
 from engine.settings import ConfigError as SettingsError
@@ -150,7 +151,7 @@ def main() -> int:
         service = build_service(settings, analyst, raw, userdir, dict(os.environ))
     except (SettingsError, ConfigError) as exc:
         print(f"trading-bot analyst: refusing to start: {exc}", file=sys.stderr)
-        return 2
+        return REFUSED
     uvicorn.run(create_app(service, token), host=analyst.listen, port=analyst.port, log_level="warning")
     return 0
 

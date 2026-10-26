@@ -67,9 +67,10 @@ def read_env_file(path: Path) -> dict[str, str]:
 
 
 def write_private(path: Path, text: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8")
-    os.chmod(path, 0o600)
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+        handle.write(text)
 
 
 def env_text(values: dict[str, str]) -> str:

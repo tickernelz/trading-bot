@@ -23,6 +23,7 @@ from tb_swarm.outcome import DecisionOutcome
 from tb_swarm.runner import SwarmRunner
 
 from engine.decisions import DecisionStore
+from engine.exitcodes import REFUSED
 from engine.logredact import install as install_log_redaction
 from engine.settings import ConfigError, Settings, load_settings
 from engine.shadow_client import TOKEN_HEADER
@@ -206,15 +207,15 @@ def main() -> int:
         settings = load_settings(config_file)
     except ConfigError as exc:
         print(f"trading-bot shadow: refusing to start: {exc}", file=sys.stderr)
-        return 2
+        return REFUSED
     if not settings.swarm.enabled or settings.shadow is None:
         print("trading-bot shadow: refusing to start: swarm is disabled in this config", file=sys.stderr)
-        return 2
+        return REFUSED
     token = os.environ.get(settings.shadow.token_env, "")
     if len(token) < 32:
         message = f"{settings.shadow.token_env} needs at least 32 characters"
         print(f"trading-bot shadow: refusing to start: {message}", file=sys.stderr)
-        return 2
+        return REFUSED
     raw = yaml.safe_load(Path(config_file).read_text(encoding="utf-8"))
     store = DecisionStore(userdir / settings.shadow.database)
     service = ShadowService(settings, raw, store, dict(os.environ))
