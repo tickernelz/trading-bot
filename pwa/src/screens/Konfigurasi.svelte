@@ -2,7 +2,7 @@
   import BotSwitch from "../components/BotSwitch.svelte";
   import Confirm from "../components/Confirm.svelte";
   import NumField from "../components/NumField.svelte";
-  import { show } from "../lib/audit";
+  import { actionLabel, show } from "../lib/audit";
   import { explain, explainRead, idempotencyKey, restartText, send } from "../lib/control";
   import { clock, dayClock, rupiah } from "../lib/format";
   import { gateway } from "../lib/gateway.svelte";
@@ -376,9 +376,9 @@
   <ol class="log">
     {#each groups as row (row.id)}
       <li>
-        <p><span class="num muted">{dayClock(row.ts)}</span> <b>{row.action}</b> <span class="muted">{t("cfg.by", { actor: actorText(row.actor) })}</span></p>
+        <p><span class="num muted">{dayClock(row.ts)}</span> <b>{actionLabel(row.action)}</b> <span class="muted">{t("cfg.by", { actor: actorText(row.actor) })}</span></p>
         {#each row.items as c (c.key)}
-          <p class="small num"><code>{c.key}</code> {show(c.old)} → <b>{show(c.new)}</b></p>
+          <p class="small"><code>{c.key}</code> {show(c.old)} → <b>{show(c.new)}</b></p>
         {/each}
       </li>
     {/each}
@@ -525,6 +525,7 @@
   .log p {
     margin: 0;
     font-size: var(--step-0);
+    overflow-wrap: anywhere;
   }
   @media (min-width: 960px) {
     .bar {

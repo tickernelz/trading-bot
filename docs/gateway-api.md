@@ -720,7 +720,7 @@ Bagian `analytics` boleh tidak ada; default di atas berlaku. Kunci tak dikenal d
 
 ## 15. PWA tahap 2 (ZHA-3777)
 
-Layar tahap 2 (Kontrol, Konfigurasi, Provider dan key, Swarm per keputusan, Riwayat, A vs B, Audit) memakai kontrak gateway yang sudah dibangun di cabang tugasnya, apa adanya, dan hanya menulis rancangan untuk endpoint yang belum dimiliki cabang mana pun. Saat ditulis (2026-10-26) ketiga cabang belum di `main`, jadi nomor bagian di cabang itu (2a memakai 12 dan 13, 2b memakai 14) bentrok dengan nomor di `main`; rujukan di bawah memakai nomor tugas.
+Layar tahap 2 (Kontrol, Konfigurasi, Provider dan key, Swarm per keputusan, Riwayat, A vs B, Audit) memakai kontrak gateway yang sudah dibangun di cabang tugasnya, apa adanya, dan hanya menulis rancangan untuk endpoint yang belum dimiliki cabang mana pun. Saat ditulis (2026-10-26) gateway tahap 1 (ZHA-3764) sudah di `main`, sedangkan 2a, 2b, dan 2c belum; nomor bagian di cabang itu (2a memakai 13, 2b memakai 14) bentrok dengan nomor di `main`, dan `main` sendiri memakai nomor 12 dua kali (N2 dan gateway tahap 1). Rujukan di bawah memakai nama tugas, bukan nomor.
 
 ### 15.1 Kontrak yang dipakai apa adanya
 
@@ -737,7 +737,7 @@ Layar tahap 2 (Kontrol, Konfigurasi, Provider dan key, Swarm per keputusan, Riwa
 
 Isi `rancangan`, menunggu ZHA-3776 (swarm per keputusan, riwayat, A vs B). Dipakai PWA dan gateway tiruan; tugas gateway menangkap ulang bentuknya.
 
-- `GET /gw/v1/decisions` menambah `status=ok|skip` dan `bot=A|B` di samping `pair`, `before` (waktu `candle`, bagian 12.1), dan `limit`. Setiap baris dan event `gw.decision` menambah `outcome`:
+- `GET /gw/v1/decisions` menambah `status=ok|skip` dan `bot=A|B` di samping `pair`, `before` (waktu `candle`, bagian N2 ZHA-3781), dan `limit`. Setiap baris dan event `gw.decision` menambah `outcome`:
 
 ```json
 {"state": "settled", "basis": "price", "horizon_h": 4, "price_at": 1463932000, "price_after": 1471200000, "return_pct": 0.5, "return_after_fees_pct": 0.1, "trade_id": null, "is_open": null, "profit_abs": null, "profit_pct": null, "settles_at": "2026-10-25T21:00:00Z"}
@@ -748,4 +748,3 @@ Isi `rancangan`, menunggu ZHA-3776 (swarm per keputusan, riwayat, A vs B). Dipak
 - Harian, mingguan, bulanan per bot: bagian 5.7 dengan `bot`. Per alasan exit dan durasi: 5.8. Per pair, tag entry, alasan exit: 5.9.
 - `GET /gw/v1/equity` menambah `window=total` (sejak start dry-run, satu titik per jam). `GET /gw/v1/profit?window=total&bot=B` meneruskan `max_drawdown` (rasio) dan `max_drawdown_abs` dari `/profit` Freqtrade.
 - `GET /gw/v1/overview?bot=` menambah `state` (`running`, `paused`, `stopped`) dari `/show_config` bot itu, supaya layar Kontrol membaca keadaan Bot B. Tanpa itu PWA memakai `/gw/v1/health` untuk bot pertama dan menulis "keadaan tidak terbaca" untuk bot lain.
-

@@ -142,7 +142,7 @@
   }
   .row {
     display: grid;
-    grid-template-columns: 7.4em 1fr auto;
+    grid-template-columns: 7.4em minmax(0, 1fr) minmax(0, 6.5em);
     gap: var(--space-2);
     width: 100%;
     min-height: 52px;
@@ -172,7 +172,10 @@
   }
   .res {
     font-size: var(--step--1);
-    white-space: nowrap;
+    text-align: right;
+  }
+  .what {
+    overflow-wrap: anywhere;
   }
   .detail {
     padding-bottom: var(--space-2);
