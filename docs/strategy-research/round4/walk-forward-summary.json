@@ -1,0 +1,2154 @@
+{
+ "selected": "F3-tsmom-55-btcabove-sma100-sl20",
+ "eligible": [
+  "F3-tsmom-55-btcabove-sma100-sl20",
+  "M-tsmom-90-sma100",
+  "M-tsmom-90-nofilter",
+  "P-don1d-30-mid-sl20",
+  "M-tsmom-60-sma100",
+  "M-tsmom-60-nofilter",
+  "M-tsmom-30-sma100",
+  "M-tsmom-30-nofilter",
+  "L-don1d-30-nofilter-trail3atr",
+  "F3-don1d20-exit20-btc_above_sma100-sl20",
+  "K-SwingEmaRsi"
+ ],
+ "results": [
+  {
+   "id": "P-don1d-90-mid-sl20",
+   "family": "P round 1 positive trend rules on five pairs",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "--c-",
+   "all": {
+    "trades": 40,
+    "trades_per_month": 0.873,
+    "win_rate": 0.425,
+    "wilson_lower": 0.28509392559950375,
+    "mean": 0.19974284494611466,
+    "ci95": [
+     -0.009145021162217047,
+     0.49018824093119556
+    ],
+    "median": -0.03817312708941367,
+    "profit_factor": 3.987751563275184,
+    "payoff_ratio": 5.395193291489954,
+    "largest_loss": -0.20495860758211493,
+    "worst5_mean": -0.20250877073338538,
+    "max_drawdown": 0.013886088756934312,
+    "worst_month_idr": -20085.113328079973,
+    "monthly_profit_idr": 6361.256579546559,
+    "monthly_profit_idr_research_risk": 21824.74398045109,
+    "max_drawdown_research_risk": 0.05511110670131436,
+    "worst_month_idr_research_risk": -81598.47125133626,
+    "rolling30_min_win_rate": 0.4666666666666667,
+    "longest_days_without_entry": 204.4,
+    "days_without_entry_at_end": 204.4,
+    "exit_reasons": {
+     "exit_signal": 36,
+     "stoploss": 4
+    }
+   },
+   "fold_win_rates": {
+    "F1": 1.0,
+    "F2": 0.125,
+    "F3": 0.5,
+    "F4": 0.6,
+    "F5": 0.7142857142857143,
+    "F6": 0.3333333333333333,
+    "F7": 0.14285714285714285,
+    "F8": null
+   },
+   "fold_std": 0.3164520908730834,
+   "regimes": {
+    "bear": {
+     "trades": 2,
+     "win_rate": 1.0
+    },
+    "range": {
+     "trades": 4,
+     "win_rate": 0.75
+    },
+    "bull": {
+     "trades": 34,
+     "win_rate": 0.35294117647058826
+    }
+   },
+   "sensitivity": {
+    "taker": 0.19974284494611466,
+    "stress_041": 0.19736671385468393,
+    "no_tax": 0.20227281822445967,
+    "slip_005": 0.19854242841702963,
+    "slip_010": 0.19734320864777394
+   }
+  },
+  {
+   "id": "F3-don1d55-exit55-btc_above_sma100-sl20",
+   "family": "F3 shortlist: Donchian with the BTC regime gate",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 57,
+    "trades_per_month": 1.244,
+    "win_rate": 0.49122807017543857,
+    "wilson_lower": 0.36616282418407425,
+    "mean": 0.15305051813596646,
+    "ci95": [
+     0.028922324361080005,
+     0.3106529077812031
+    ],
+    "median": -0.00991216137982931,
+    "profit_factor": 4.123117055672178,
+    "payoff_ratio": 4.270371236231898,
+    "largest_loss": -0.20495860758211493,
+    "worst5_mean": -0.1856669027070761,
+    "max_drawdown": 0.014543472883095432,
+    "worst_month_idr": -15763.209929274952,
+    "monthly_profit_idr": 6281.100575050935,
+    "monthly_profit_idr_research_risk": 23059.16300013955,
+    "max_drawdown_research_risk": 0.05738145574096731,
+    "worst_month_idr_research_risk": -82225.17759580606,
+    "rolling30_min_win_rate": 0.36666666666666664,
+    "longest_days_without_entry": 195.8,
+    "days_without_entry_at_end": 8.4,
+    "exit_reasons": {
+     "end": 2,
+     "exit_signal": 53,
+     "stoploss": 2
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.5,
+    "F2": 0.5454545454545454,
+    "F3": 0.6,
+    "F4": 0.4444444444444444,
+    "F5": 0.625,
+    "F6": 0.2857142857142857,
+    "F7": 0.375,
+    "F8": 0.5
+   },
+   "fold_std": 0.11363280188650708,
+   "regimes": {
+    "bear": {
+     "trades": 8,
+     "win_rate": 0.625
+    },
+    "range": {
+     "trades": 5,
+     "win_rate": 0.8
+    },
+    "bull": {
+     "trades": 44,
+     "win_rate": 0.4318181818181818
+    }
+   },
+   "sensitivity": {
+    "taker": 0.15305051813596646,
+    "stress_041": 0.15076686276958984,
+    "no_tax": 0.15548202836480796,
+    "slip_005": 0.15189682015254344,
+    "slip_010": 0.15074427235271778
+   }
+  },
+  {
+   "id": "L-don1d-55-nofilter-trail4atr",
+   "family": "L Donchian 1d with ATR trailing exit",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "---d",
+   "all": {
+    "trades": 60,
+    "trades_per_month": 1.309,
+    "win_rate": 0.5166666666666667,
+    "wilson_lower": 0.39307810032592494,
+    "mean": 0.1475762021824988,
+    "ci95": [
+     0.03048680079118175,
+     0.28902501205722236
+    ],
+    "median": 0.005203775344473027,
+    "profit_factor": 3.5537702295515596,
+    "payoff_ratio": 3.3244947308708137,
+    "largest_loss": -0.20495860758211493,
+    "worst5_mean": -0.20367195934084528,
+    "max_drawdown": 0.012757500286787016,
+    "worst_month_idr": -24512.000150175387,
+    "monthly_profit_idr": 6885.923315619102,
+    "monthly_profit_idr_research_risk": 24956.95825458677,
+    "max_drawdown_research_risk": 0.05073292868151058,
+    "worst_month_idr_research_risk": -151023.55725991802,
+    "rolling30_min_win_rate": 0.36666666666666664,
+    "longest_days_without_entry": 111.7,
+    "days_without_entry_at_end": 11.4,
+    "exit_reasons": {
+     "end": 2,
+     "stoploss": 4,
+     "trail": 54
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.3333333333333333,
+    "F2": 0.6,
+    "F3": 0.7777777777777778,
+    "F4": 0.5,
+    "F5": 0.7142857142857143,
+    "F6": 0.25,
+    "F7": 0.5,
+    "F8": 0.25
+   },
+   "fold_std": 0.20183477498200922,
+   "regimes": {
+    "bear": {
+     "trades": 14,
+     "win_rate": 0.5
+    },
+    "range": {
+     "trades": 5,
+     "win_rate": 0.6
+    },
+    "bull": {
+     "trades": 41,
+     "win_rate": 0.5121951219512195
+    }
+   },
+   "sensitivity": {
+    "taker": 0.1475762021824988,
+    "stress_041": 0.14530338888315025,
+    "no_tax": 0.1499961683766017,
+    "slip_005": 0.14642798158898793,
+    "slip_010": 0.14528090571836957
+   }
+  },
+  {
+   "id": "L-don1d-90-nofilter-trail4atr",
+   "family": "L Donchian 1d with ATR trailing exit",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "--c-",
+   "all": {
+    "trades": 45,
+    "trades_per_month": 0.982,
+    "win_rate": 0.5333333333333333,
+    "wilson_lower": 0.3907745474012537,
+    "mean": 0.1470888305534306,
+    "ci95": [
+     0.005332102073093297,
+     0.32288035518124786
+    ],
+    "median": 0.006232594966203431,
+    "profit_factor": 3.2256993405084775,
+    "payoff_ratio": 2.822486922944918,
+    "largest_loss": -0.20495860758211493,
+    "worst5_mean": -0.20495860758211487,
+    "max_drawdown": 0.018033209765534797,
+    "worst_month_idr": -23379.485188872062,
+    "monthly_profit_idr": 4746.551143706146,
+    "monthly_profit_idr_research_risk": 17128.17061716132,
+    "max_drawdown_research_risk": 0.0710750925442103,
+    "worst_month_idr_research_risk": -127191.28305862904,
+    "rolling30_min_win_rate": 0.5,
+    "longest_days_without_entry": 204.4,
+    "days_without_entry_at_end": 204.4,
+    "exit_reasons": {
+     "stoploss": 5,
+     "trail": 40
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.6666666666666666,
+    "F2": 0.5,
+    "F3": 0.7142857142857143,
+    "F4": 0.5714285714285714,
+    "F5": 0.7142857142857143,
+    "F6": 0.0,
+    "F7": 0.5,
+    "F8": null
+   },
+   "fold_std": 0.24857872640263215,
+   "regimes": {
+    "bear": {
+     "trades": 3,
+     "win_rate": 0.6666666666666666
+    },
+    "range": {
+     "trades": 4,
+     "win_rate": 1.0
+    },
+    "bull": {
+     "trades": 38,
+     "win_rate": 0.47368421052631576
+    }
+   },
+   "sensitivity": {
+    "taker": 0.1470888305534306,
+    "stress_041": 0.14481698250999983,
+    "no_tax": 0.14950776899629212,
+    "slip_005": 0.14594109760521953,
+    "slip_010": 0.14479450889374115
+   }
+  },
+  {
+   "id": "L-don1d-90-sma100-trail4atr",
+   "family": "L Donchian 1d with ATR trailing exit",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "--c-",
+   "all": {
+    "trades": 44,
+    "trades_per_month": 0.96,
+    "win_rate": 0.5,
+    "wilson_lower": 0.35831760539989393,
+    "mean": 0.143639600570649,
+    "ci95": [
+     0.000143366593281776,
+     0.32075105925627295
+    ],
+    "median": 0.0019373201077261815,
+    "profit_factor": 3.0972456992846946,
+    "payoff_ratio": 3.097245699284695,
+    "largest_loss": -0.20495860758211493,
+    "worst5_mean": -0.20495860758211487,
+    "max_drawdown": 0.018033209765534686,
+    "worst_month_idr": -23210.159207617664,
+    "monthly_profit_idr": 4428.625235693762,
+    "monthly_profit_idr_research_risk": 15848.508028736496,
+    "max_drawdown_research_risk": 0.0710750925442104,
+    "worst_month_idr_research_risk": -123545.23835395963,
+    "rolling30_min_win_rate": 0.5,
+    "longest_days_without_entry": 204.4,
+    "days_without_entry_at_end": 204.4,
+    "exit_reasons": {
+     "stoploss": 5,
+     "trail": 39
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.6666666666666666,
+    "F2": 0.375,
+    "F3": 0.6666666666666666,
+    "F4": 0.5714285714285714,
+    "F5": 0.7142857142857143,
+    "F6": 0.0,
+    "F7": 0.5,
+    "F8": null
+   },
+   "fold_std": 0.24906354683440124,
+   "regimes": {
+    "bear": {
+     "trades": 3,
+     "win_rate": 0.6666666666666666
+    },
+    "range": {
+     "trades": 4,
+     "win_rate": 1.0
+    },
+    "bull": {
+     "trades": 37,
+     "win_rate": 0.43243243243243246
+    }
+   },
+   "sensitivity": {
+    "taker": 0.143639600570649,
+    "stress_041": 0.1413745838433107,
+    "no_tax": 0.14605126540506677,
+    "slip_005": 0.14249531878924537,
+    "slip_010": 0.1413521778039206
+   }
+  },
+  {
+   "id": "L-don1d-30-sma100-trail4atr",
+   "family": "L Donchian 1d with ATR trailing exit",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "--c-",
+   "all": {
+    "trades": 67,
+    "trades_per_month": 1.462,
+    "win_rate": 0.44776119402985076,
+    "wilson_lower": 0.334763933612968,
+    "mean": 0.13847388924092216,
+    "ci95": [
+     0.016147434307503098,
+     0.2916071726040346
+    ],
+    "median": -0.03290275307926882,
+    "profit_factor": 3.213979368270403,
+    "payoff_ratio": 3.963907887533497,
+    "largest_loss": -0.20495860758211493,
+    "worst5_mean": -0.2049586075821149,
+    "max_drawdown": 0.016411819297503794,
+    "worst_month_idr": -17863.96297383477,
+    "monthly_profit_idr": 7039.161777171455,
+    "monthly_profit_idr_research_risk": 25064.47298065373,
+    "max_drawdown_research_risk": 0.06428800672099799,
+    "worst_month_idr_research_risk": -93738.15045181673,
+    "rolling30_min_win_rate": 0.4,
+    "longest_days_without_entry": 102.3,
+    "days_without_entry_at_end": 8.6,
+    "exit_reasons": {
+     "end": 2,
+     "stoploss": 7,
+     "trail": 58
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.25,
+    "F2": 0.38461538461538464,
+    "F3": 0.7142857142857143,
+    "F4": 0.4444444444444444,
+    "F5": 0.5555555555555556,
+    "F6": 0.2222222222222222,
+    "F7": 0.6666666666666666,
+    "F8": 0.3333333333333333
+   },
+   "fold_std": 0.1842471030951745,
+   "regimes": {
+    "bear": {
+     "trades": 16,
+     "win_rate": 0.4375
+    },
+    "range": {
+     "trades": 3,
+     "win_rate": 0.6666666666666666
+    },
+    "bull": {
+     "trades": 48,
+     "win_rate": 0.4375
+    }
+   },
+   "sensitivity": {
+    "taker": 0.13847388924092216,
+    "stress_041": 0.13621910337876608,
+    "no_tax": 0.1408746608146025,
+    "slip_005": 0.13733477607151798,
+    "slip_010": 0.13619679854532526
+   }
+  },
+  {
+   "id": "L-don1d-55-sma100-trail4atr",
+   "family": "L Donchian 1d with ATR trailing exit",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "--c-",
+   "all": {
+    "trades": 57,
+    "trades_per_month": 1.244,
+    "win_rate": 0.47368421052631576,
+    "wilson_lower": 0.3498716798112527,
+    "mean": 0.13788727649641863,
+    "ci95": [
+     0.017265246378490185,
+     0.2909827833145856
+    ],
+    "median": -0.029002449300443822,
+    "profit_factor": 3.1108834778659267,
+    "payoff_ratio": 3.4565371976288075,
+    "largest_loss": -0.20495860758211493,
+    "worst5_mean": -0.2049586075821149,
+    "max_drawdown": 0.019289615538742977,
+    "worst_month_idr": -23959.1456360733,
+    "monthly_profit_idr": 6048.950716990742,
+    "monthly_profit_idr_research_risk": 21620.35828370623,
+    "max_drawdown_research_risk": 0.07545676636153431,
+    "worst_month_idr_research_risk": -137951.59105073055,
+    "rolling30_min_win_rate": 0.43333333333333335,
+    "longest_days_without_entry": 192.8,
+    "days_without_entry_at_end": 8.6,
+    "exit_reasons": {
+     "end": 2,
+     "stoploss": 8,
+     "trail": 47
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.3333333333333333,
+    "F2": 0.4,
+    "F3": 0.625,
+    "F4": 0.5,
+    "F5": 0.7142857142857143,
+    "F6": 0.25,
+    "F7": 0.5,
+    "F8": 0.5
+   },
+   "fold_std": 0.15018471714205328,
+   "regimes": {
+    "bear": {
+     "trades": 11,
+     "win_rate": 0.5454545454545454
+    },
+    "range": {
+     "trades": 3,
+     "win_rate": 0.6666666666666666
+    },
+    "bull": {
+     "trades": 43,
+     "win_rate": 0.4418604651162791
+    }
+   },
+   "sensitivity": {
+    "taker": 0.13788727649641863,
+    "stress_041": 0.1356336524405502,
+    "no_tax": 0.14028681104286891,
+    "slip_005": 0.13674875026915598,
+    "slip_010": 0.13561135909995056
+   }
+  },
+  {
+   "id": "P-don1d-60-mid-sl20",
+   "family": "P round 1 positive trend rules on five pairs",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 60,
+    "trades_per_month": 1.309,
+    "win_rate": 0.4166666666666667,
+    "wilson_lower": 0.30064278558341617,
+    "mean": 0.1334828864781436,
+    "ci95": [
+     0.014627232693291215,
+     0.28099846360730873
+    ],
+    "median": -0.021993305220927184,
+    "profit_factor": 3.4733298424029595,
+    "payoff_ratio": 4.862661779364143,
+    "largest_loss": -0.20495860758211493,
+    "worst5_mean": -0.190542720507006,
+    "max_drawdown": 0.010902002830893043,
+    "worst_month_idr": -12723.482175832072,
+    "monthly_profit_idr": 5606.715214792057,
+    "monthly_profit_idr_research_risk": 20354.328414489144,
+    "max_drawdown_research_risk": 0.04318780652861065,
+    "worst_month_idr_research_risk": -59553.325199759325,
+    "rolling30_min_win_rate": 0.3,
+    "longest_days_without_entry": 102.3,
+    "days_without_entry_at_end": 11.4,
+    "exit_reasons": {
+     "end": 2,
+     "exit_signal": 56,
+     "stoploss": 2
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.4,
+    "F2": 0.3,
+    "F3": 0.6,
+    "F4": 0.4444444444444444,
+    "F5": 0.7142857142857143,
+    "F6": 0.2857142857142857,
+    "F7": 0.25,
+    "F8": 0.25
+   },
+   "fold_std": 0.17261233599171047,
+   "regimes": {
+    "bear": {
+     "trades": 12,
+     "win_rate": 0.5
+    },
+    "range": {
+     "trades": 5,
+     "win_rate": 0.6
+    },
+    "bull": {
+     "trades": 43,
+     "win_rate": 0.37209302325581395
+    }
+   },
+   "sensitivity": {
+    "taker": 0.1334828864781436,
+    "stress_041": 0.13123798546497156,
+    "no_tax": 0.13587313321004207,
+    "slip_005": 0.1323487671140689,
+    "slip_010": 0.1312157784146125
+   }
+  },
+  {
+   "id": "L-don1d-30-nofilter-trail4atr",
+   "family": "L Donchian 1d with ATR trailing exit",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 83,
+    "trades_per_month": 1.811,
+    "win_rate": 0.4578313253012048,
+    "wilson_lower": 0.35489376982070636,
+    "mean": 0.1297477891836901,
+    "ci95": [
+     0.02672285444209716,
+     0.26381360288506556
+    ],
+    "median": -0.026479927651569368,
+    "profit_factor": 3.3475032229823976,
+    "payoff_ratio": 3.9641485535317864,
+    "largest_loss": -0.20495860758211493,
+    "worst5_mean": -0.2049586075821149,
+    "max_drawdown": 0.019719462642029173,
+    "worst_month_idr": -18633.741115645764,
+    "monthly_profit_idr": 7595.07787059821,
+    "monthly_profit_idr_research_risk": 27134.777058767322,
+    "max_drawdown_research_risk": 0.07691766471178563,
+    "worst_month_idr_research_risk": -120589.40844438328,
+    "rolling30_min_win_rate": 0.36666666666666664,
+    "longest_days_without_entry": 109.0,
+    "days_without_entry_at_end": 8.3,
+    "exit_reasons": {
+     "end": 3,
+     "stoploss": 5,
+     "trail": 75
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.23076923076923078,
+    "F2": 0.5384615384615384,
+    "F3": 0.7,
+    "F4": 0.6666666666666666,
+    "F5": 0.5,
+    "F6": 0.2222222222222222,
+    "F7": 0.6666666666666666,
+    "F8": 0.2
+   },
+   "fold_std": 0.2162051689437799,
+   "regimes": {
+    "bear": {
+     "trades": 30,
+     "win_rate": 0.36666666666666664
+    },
+    "range": {
+     "trades": 7,
+     "win_rate": 0.42857142857142855
+    },
+    "bull": {
+     "trades": 46,
+     "win_rate": 0.5217391304347826
+    }
+   },
+   "sensitivity": {
+    "taker": 0.1297477891836901,
+    "stress_041": 0.12751028565644462,
+    "no_tax": 0.13213015948074522,
+    "slip_005": 0.1286174070142559,
+    "slip_010": 0.12748815178362943
+   }
+  },
+  {
+   "id": "P-don1d-30-mid-sl20",
+   "family": "P round 1 positive trend rules on five pairs",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 106,
+    "trades_per_month": 2.313,
+    "win_rate": 0.37735849056603776,
+    "wilson_lower": 0.2908975998954711,
+    "mean": 0.10837856708896244,
+    "ci95": [
+     0.02464140461306883,
+     0.21439108785331493
+    ],
+    "median": -0.02021208829525567,
+    "profit_factor": 3.875043148735777,
+    "payoff_ratio": 6.393821195414032,
+    "largest_loss": -0.19295490435446294,
+    "worst5_mean": -0.15193798207936615,
+    "max_drawdown": 0.017479765415396198,
+    "worst_month_idr": -15643.285528083758,
+    "monthly_profit_idr": 6224.537278181064,
+    "monthly_profit_idr_research_risk": 22578.90408590102,
+    "max_drawdown_research_risk": 0.06853547392536308,
+    "worst_month_idr_research_risk": -94447.77178531529,
+    "rolling30_min_win_rate": 0.3,
+    "longest_days_without_entry": 93.2,
+    "days_without_entry_at_end": 8.3,
+    "exit_reasons": {
+     "end": 2,
+     "exit_signal": 104
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.26666666666666666,
+    "F2": 0.35294117647058826,
+    "F3": 0.7272727272727273,
+    "F4": 0.3333333333333333,
+    "F5": 0.375,
+    "F6": 0.4,
+    "F7": 0.5454545454545454,
+    "F8": 0.09090909090909091
+   },
+   "fold_std": 0.1879946728958787,
+   "regimes": {
+    "bear": {
+     "trades": 34,
+     "win_rate": 0.23529411764705882
+    },
+    "range": {
+     "trades": 12,
+     "win_rate": 0.5833333333333334
+    },
+    "bull": {
+     "trades": 60,
+     "win_rate": 0.4166666666666667
+    }
+   },
+   "sensitivity": {
+    "taker": 0.10837856708896244,
+    "stress_041": 0.10618338602542896,
+    "no_tax": 0.11071587476188406,
+    "slip_005": 0.10726956614094932,
+    "slip_010": 0.10616167081565392
+   }
+  },
+  {
+   "id": "L-don1d-90-sma100-trail3atr",
+   "family": "L Donchian 1d with ATR trailing exit",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 58,
+    "trades_per_month": 1.266,
+    "win_rate": 0.39655172413793105,
+    "wilson_lower": 0.2808875779487437,
+    "mean": 0.1066521311997775,
+    "ci95": [
+     -0.004585622515867261,
+     0.25509320244317046
+    ],
+    "median": -0.02411268592407717,
+    "profit_factor": 2.957014782760578,
+    "payoff_ratio": 4.49980510420088,
+    "largest_loss": -0.20495860758211493,
+    "worst5_mean": -0.19761132850735652,
+    "max_drawdown": 0.016039552856664807,
+    "worst_month_idr": -14067.40967134177,
+    "monthly_profit_idr": 4816.356468421379,
+    "monthly_profit_idr_research_risk": 17399.93251052807,
+    "max_drawdown_research_risk": 0.06321766221019864,
+    "worst_month_idr_research_risk": -66303.20295987117,
+    "rolling30_min_win_rate": 0.3333333333333333,
+    "longest_days_without_entry": 204.4,
+    "days_without_entry_at_end": 204.4,
+    "exit_reasons": {
+     "stoploss": 4,
+     "trail": 54
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.6666666666666666,
+    "F2": 0.2,
+    "F3": 0.4444444444444444,
+    "F4": 0.2857142857142857,
+    "F5": 0.7142857142857143,
+    "F6": 0.2,
+    "F7": 0.5,
+    "F8": null
+   },
+   "fold_std": 0.21156413976753174,
+   "regimes": {
+    "bear": {
+     "trades": 3,
+     "win_rate": 0.6666666666666666
+    },
+    "range": {
+     "trades": 4,
+     "win_rate": 0.75
+    },
+    "bull": {
+     "trades": 51,
+     "win_rate": 0.35294117647058826
+    }
+   },
+   "sensitivity": {
+    "taker": 0.1066521311997775,
+    "stress_041": 0.10446036940063966,
+    "no_tax": 0.10898579822863547,
+    "slip_005": 0.10554485765708839,
+    "slip_010": 0.10443868801497364
+   }
+  },
+  {
+   "id": "L-don1d-90-nofilter-trail3atr",
+   "family": "L Donchian 1d with ATR trailing exit",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 60,
+    "trades_per_month": 1.309,
+    "win_rate": 0.4,
+    "wilson_lower": 0.2856949053488256,
+    "mean": 0.10500699677385131,
+    "ci95": [
+     -0.0024692619970954773,
+     0.2435758842008108
+    ],
+    "median": -0.02411268592407717,
+    "profit_factor": 2.9694483057067544,
+    "payoff_ratio": 4.454172458560132,
+    "largest_loss": -0.20495860758211493,
+    "worst5_mean": -0.19761132850735652,
+    "max_drawdown": 0.016951939996081133,
+    "worst_month_idr": -15917.305550860749,
+    "monthly_profit_idr": 4938.675900869604,
+    "monthly_profit_idr_research_risk": 17897.227011791194,
+    "max_drawdown_research_risk": 0.06666384599622888,
+    "worst_month_idr_research_risk": -67056.4251819391,
+    "rolling30_min_win_rate": 0.3,
+    "longest_days_without_entry": 204.4,
+    "days_without_entry_at_end": 204.4,
+    "exit_reasons": {
+     "stoploss": 4,
+     "trail": 56
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.6666666666666666,
+    "F2": 0.18181818181818182,
+    "F3": 0.5,
+    "F4": 0.2857142857142857,
+    "F5": 0.7142857142857143,
+    "F6": 0.2,
+    "F7": 0.5,
+    "F8": null
+   },
+   "fold_std": 0.21669120783382548,
+   "regimes": {
+    "bear": {
+     "trades": 3,
+     "win_rate": 0.6666666666666666
+    },
+    "range": {
+     "trades": 4,
+     "win_rate": 0.75
+    },
+    "bull": {
+     "trades": 53,
+     "win_rate": 0.3584905660377358
+    }
+   },
+   "sensitivity": {
+    "taker": 0.10500699677385131,
+    "stress_041": 0.10281849321882423,
+    "no_tax": 0.10733719460416019,
+    "slip_005": 0.10390136928937022,
+    "slip_010": 0.10279684406441951
+   }
+  },
+  {
+   "id": "F3-don1d55-exit20-btc_above_sma200-sl20",
+   "family": "F3 shortlist: Donchian with the BTC regime gate",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "--c-",
+   "all": {
+    "trades": 76,
+    "trades_per_month": 1.658,
+    "win_rate": 0.47368421052631576,
+    "wilson_lower": 0.36542100190605514,
+    "mean": 0.097732113465288,
+    "ci95": [
+     0.02680937348688753,
+     0.18746837496501545
+    ],
+    "median": -0.005836576986265718,
+    "profit_factor": 3.8044457109950356,
+    "payoff_ratio": 4.227161901105594,
+    "largest_loss": -0.19295490435446294,
+    "worst5_mean": -0.14482134336544425,
+    "max_drawdown": 0.010544614641259997,
+    "worst_month_idr": -14896.866432903586,
+    "monthly_profit_idr": 5343.312709588766,
+    "monthly_profit_idr_research_risk": 20000.623578545707,
+    "max_drawdown_research_risk": 0.04179840651621869,
+    "worst_month_idr_research_risk": -71452.23729715872,
+    "rolling30_min_win_rate": 0.43333333333333335,
+    "longest_days_without_entry": 204.4,
+    "days_without_entry_at_end": 204.4,
+    "exit_reasons": {
+     "exit_signal": 76
+    }
+   },
+   "fold_win_rates": {
+    "F1": null,
+    "F2": 0.375,
+    "F3": 0.6470588235294118,
+    "F4": 0.3076923076923077,
+    "F5": 0.6363636363636364,
+    "F6": 0.3333333333333333,
+    "F7": 0.5,
+    "F8": null
+   },
+   "fold_std": 0.15093233881078624,
+   "regimes": {
+    "range": {
+     "trades": 10,
+     "win_rate": 0.9
+    },
+    "bull": {
+     "trades": 66,
+     "win_rate": 0.4090909090909091
+    }
+   },
+   "sensitivity": {
+    "taker": 0.097732113465288,
+    "stress_041": 0.0955580180615484,
+    "no_tax": 0.10004697029110479,
+    "slip_005": 0.09663376494913545,
+    "slip_010": 0.09553651143571812
+   }
+  },
+  {
+   "id": "F3-don1d55-exit20-btc_above_sma100-sl20",
+   "family": "F3 shortlist: Donchian with the BTC regime gate",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "--c-",
+   "all": {
+    "trades": 80,
+    "trades_per_month": 1.746,
+    "win_rate": 0.475,
+    "wilson_lower": 0.36924733297407564,
+    "mean": 0.09732632132043424,
+    "ci95": [
+     0.027727989508617646,
+     0.1817976505552688
+    ],
+    "median": -0.00888456456892539,
+    "profit_factor": 3.687657225016455,
+    "payoff_ratio": 4.075831669755029,
+    "largest_loss": -0.19295490435446294,
+    "worst5_mean": -0.14765135849994138,
+    "max_drawdown": 0.014352450518332338,
+    "worst_month_idr": -15089.20956986911,
+    "monthly_profit_idr": 5720.153746208823,
+    "monthly_profit_idr_research_risk": 21469.16056036785,
+    "max_drawdown_research_risk": 0.05649345837105335,
+    "worst_month_idr_research_risk": -75173.60307727287,
+    "rolling30_min_win_rate": 0.4,
+    "longest_days_without_entry": 195.8,
+    "days_without_entry_at_end": 8.4,
+    "exit_reasons": {
+     "end": 2,
+     "exit_signal": 78
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.5,
+    "F2": 0.4,
+    "F3": 0.6470588235294118,
+    "F4": 0.3076923076923077,
+    "F5": 0.5833333333333334,
+    "F6": 0.3333333333333333,
+    "F7": 0.5,
+    "F8": 0.5
+   },
+   "fold_std": 0.11759466729315372,
+   "regimes": {
+    "bear": {
+     "trades": 8,
+     "win_rate": 0.625
+    },
+    "range": {
+     "trades": 7,
+     "win_rate": 0.8571428571428571
+    },
+    "bull": {
+     "trades": 65,
+     "win_rate": 0.4153846153846154
+    }
+   },
+   "sensitivity": {
+    "taker": 0.09732632132043424,
+    "stress_041": 0.09515302960169773,
+    "no_tax": 0.09964032242680468,
+    "slip_005": 0.09622837882428849,
+    "slip_010": 0.09513153092609475
+   }
+  },
+  {
+   "id": "L-don1d-55-nofilter-trail3atr",
+   "family": "L Donchian 1d with ATR trailing exit",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 81,
+    "trades_per_month": 1.767,
+    "win_rate": 0.4074074074074074,
+    "wilson_lower": 0.3069627781339348,
+    "mean": 0.0954270740786395,
+    "ci95": [
+     0.008064855434100576,
+     0.20317129363198677
+    ],
+    "median": -0.024824345382725044,
+    "profit_factor": 2.9620448203565224,
+    "payoff_ratio": 4.308428829609487,
+    "largest_loss": -0.20495860758211493,
+    "worst5_mean": -0.1930463456020461,
+    "max_drawdown": 0.018015038761317714,
+    "worst_month_idr": -18213.635379112457,
+    "monthly_profit_idr": 6086.967539119303,
+    "monthly_profit_idr_research_risk": 22019.754014041217,
+    "max_drawdown_research_risk": 0.0700887236094293,
+    "worst_month_idr_research_risk": -75637.80717669603,
+    "rolling30_min_win_rate": 0.3333333333333333,
+    "longest_days_without_entry": 102.3,
+    "days_without_entry_at_end": 11.4,
+    "exit_reasons": {
+     "end": 2,
+     "stoploss": 3,
+     "trail": 76
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.3333333333333333,
+    "F2": 0.3333333333333333,
+    "F3": 0.6666666666666666,
+    "F4": 0.3125,
+    "F5": 0.5555555555555556,
+    "F6": 0.2222222222222222,
+    "F7": 0.5,
+    "F8": 0.25
+   },
+   "fold_std": 0.1585071753462391,
+   "regimes": {
+    "bear": {
+     "trades": 14,
+     "win_rate": 0.42857142857142855
+    },
+    "range": {
+     "trades": 7,
+     "win_rate": 0.5714285714285714
+    },
+    "bull": {
+     "trades": 60,
+     "win_rate": 0.38333333333333336
+    }
+   },
+   "sensitivity": {
+    "taker": 0.0954270740786395,
+    "stress_041": 0.09325754388299984,
+    "no_tax": 0.09773707012276601,
+    "slip_005": 0.09433103189620808,
+    "slip_010": 0.09323608241720359
+   }
+  },
+  {
+   "id": "E-ema1d-20-100-trail3atr",
+   "family": "E EMA trend 1d with ATR trailing exit",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 71,
+    "trades_per_month": 1.549,
+    "win_rate": 0.39436619718309857,
+    "wilson_lower": 0.288934012922929,
+    "mean": 0.09428646463340119,
+    "ci95": [
+     -0.003286075211843432,
+     0.22797461008115244
+    ],
+    "median": -0.04530619834079186,
+    "profit_factor": 2.785272647878577,
+    "payoff_ratio": 4.277382994956386,
+    "largest_loss": -0.20495860758211482,
+    "worst5_mean": -0.1738880438550095,
+    "max_drawdown": 0.018080711173217523,
+    "worst_month_idr": -20309.06265675881,
+    "monthly_profit_idr": 5441.2741865381695,
+    "monthly_profit_idr_research_risk": 19361.937184208422,
+    "max_drawdown_research_risk": 0.07103465353628946,
+    "worst_month_idr_research_risk": -114366.34459781031,
+    "rolling30_min_win_rate": 0.26666666666666666,
+    "longest_days_without_entry": 194.2,
+    "days_without_entry_at_end": 194.2,
+    "exit_reasons": {
+     "exit_signal": 9,
+     "stoploss": 1,
+     "trail": 61
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.0,
+    "F2": 0.4375,
+    "F3": 0.6,
+    "F4": 0.4444444444444444,
+    "F5": 0.42857142857142855,
+    "F6": 0.25,
+    "F7": 0.4,
+    "F8": null
+   },
+   "fold_std": 0.190833544341582,
+   "regimes": {
+    "bear": {
+     "trades": 5,
+     "win_rate": 0.0
+    },
+    "range": {
+     "trades": 10,
+     "win_rate": 0.4
+    },
+    "bull": {
+     "trades": 56,
+     "win_rate": 0.42857142857142855
+    }
+   },
+   "sensitivity": {
+    "taker": 0.09428646463340119,
+    "stress_041": 0.09211919345316423,
+    "no_tax": 0.09659405540257257,
+    "slip_005": 0.09319156370089429,
+    "slip_010": 0.09209775433404095
+   }
+  },
+  {
+   "id": "F3-don1d90-exit20-btc_above_sma100-sl20",
+   "family": "F3 shortlist: Donchian with the BTC regime gate",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 63,
+    "trades_per_month": 1.375,
+    "win_rate": 0.4126984126984127,
+    "wilson_lower": 0.29958465626751724,
+    "mean": 0.0923461674971331,
+    "ci95": [
+     0.013635043135494664,
+     0.1917912266938568
+    ],
+    "median": -0.029245096415239313,
+    "profit_factor": 3.200023638841978,
+    "payoff_ratio": 4.5538797937366615,
+    "largest_loss": -0.19295490435446294,
+    "worst5_mean": -0.15542148162361477,
+    "max_drawdown": 0.014178705786759505,
+    "worst_month_idr": -14724.56754687078,
+    "monthly_profit_idr": 3894.1087299853016,
+    "monthly_profit_idr_research_risk": 14534.167865595915,
+    "max_drawdown_research_risk": 0.05586343943100225,
+    "worst_month_idr_research_risk": -68440.4074568709,
+    "rolling30_min_win_rate": 0.36666666666666664,
+    "longest_days_without_entry": 204.4,
+    "days_without_entry_at_end": 204.4,
+    "exit_reasons": {
+     "exit_signal": 63
+    }
+   },
+   "fold_win_rates": {
+    "F1": 1.0,
+    "F2": 0.16666666666666666,
+    "F3": 0.6153846153846154,
+    "F4": 0.36363636363636365,
+    "F5": 0.5,
+    "F6": 0.16666666666666666,
+    "F7": 0.5,
+    "F8": null
+   },
+   "fold_std": 0.2884154248810757,
+   "regimes": {
+    "bear": {
+     "trades": 1,
+     "win_rate": 1.0
+    },
+    "range": {
+     "trades": 5,
+     "win_rate": 0.6
+    },
+    "bull": {
+     "trades": 57,
+     "win_rate": 0.38596491228070173
+    }
+   },
+   "sensitivity": {
+    "taker": 0.0923461674971331,
+    "stress_041": 0.09018273914069085,
+    "no_tax": 0.09464966663956345,
+    "slip_005": 0.09125320795128548,
+    "slip_010": 0.09016133803561856
+   }
+  },
+  {
+   "id": "L-don1d-55-sma100-trail3atr",
+   "family": "L Donchian 1d with ATR trailing exit",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 76,
+    "trades_per_month": 1.658,
+    "win_rate": 0.40789473684210525,
+    "wilson_lower": 0.30443802768639416,
+    "mean": 0.09222573168781112,
+    "ci95": [
+     -1.1947367451317127e-05,
+     0.21273601426426947
+    ],
+    "median": -0.02737618470181813,
+    "profit_factor": 2.7598736418048997,
+    "payoff_ratio": 4.00626818971679,
+    "largest_loss": -0.20495860758211493,
+    "worst5_mean": -0.201189014773237,
+    "max_drawdown": 0.02327530913845821,
+    "worst_month_idr": -18181.179843719467,
+    "monthly_profit_idr": 5553.940547998959,
+    "monthly_profit_idr_research_risk": 19901.160494925298,
+    "max_drawdown_research_risk": 0.09060026064055149,
+    "worst_month_idr_research_risk": -75092.16111769984,
+    "rolling30_min_win_rate": 0.3333333333333333,
+    "longest_days_without_entry": 192.8,
+    "days_without_entry_at_end": 8.6,
+    "exit_reasons": {
+     "end": 2,
+     "stoploss": 4,
+     "trail": 70
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.3333333333333333,
+    "F2": 0.3076923076923077,
+    "F3": 0.6363636363636364,
+    "F4": 0.3125,
+    "F5": 0.5555555555555556,
+    "F6": 0.2222222222222222,
+    "F7": 0.5,
+    "F8": 0.5
+   },
+   "fold_std": 0.1457873265415417,
+   "regimes": {
+    "bear": {
+     "trades": 11,
+     "win_rate": 0.45454545454545453
+    },
+    "range": {
+     "trades": 5,
+     "win_rate": 0.6
+    },
+    "bull": {
+     "trades": 60,
+     "win_rate": 0.38333333333333336
+    }
+   },
+   "sensitivity": {
+    "taker": 0.09222573168781112,
+    "stress_041": 0.09006254185854345,
+    "no_tax": 0.09452897685966714,
+    "slip_005": 0.09113289264540035,
+    "slip_010": 0.09004114311303396
+   }
+  },
+  {
+   "id": "M-tsmom-90-sma100",
+   "family": "M time-series momentum 1d with trend filter",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 106,
+    "trades_per_month": 2.313,
+    "win_rate": 0.25471698113207547,
+    "wilson_lower": 0.18136424047824729,
+    "mean": 0.09119302033304133,
+    "ci95": [
+     -0.010676327866771602,
+     0.22393395004762268
+    ],
+    "median": -0.03999536855184366,
+    "profit_factor": 2.670277642303837,
+    "payoff_ratio": 7.813034583037152,
+    "largest_loss": -0.20495860758211504,
+    "worst5_mean": -0.20495860758211495,
+    "max_drawdown": 0.02448076906835661,
+    "worst_month_idr": -27640.37026936395,
+    "monthly_profit_idr": 6541.9968968072335,
+    "monthly_profit_idr_research_risk": 20205.434656657584,
+    "max_drawdown_research_risk": 0.09596971689935485,
+    "worst_month_idr_research_risk": -114401.29680155184,
+    "rolling30_min_win_rate": 0.16666666666666666,
+    "longest_days_without_entry": 181.0,
+    "days_without_entry_at_end": 181.0,
+    "exit_reasons": {
+     "exit_signal": 99,
+     "stoploss": 7
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.1111111111111111,
+    "F2": 0.3333333333333333,
+    "F3": 0.2631578947368421,
+    "F4": 0.15384615384615385,
+    "F5": 0.3888888888888889,
+    "F6": 0.2,
+    "F7": 0.18181818181818182,
+    "F8": null
+   },
+   "fold_std": 0.10009016137012179,
+   "regimes": {
+    "bear": {
+     "trades": 12,
+     "win_rate": 0.3333333333333333
+    },
+    "range": {
+     "trades": 12,
+     "win_rate": 0.5
+    },
+    "bull": {
+     "trades": 82,
+     "win_rate": 0.2073170731707317
+    }
+   },
+   "sensitivity": {
+    "taker": 0.09119302033304133,
+    "stress_041": 0.08903187582337602,
+    "no_tax": 0.09349408776143939,
+    "slip_005": 0.09010121458187734,
+    "slip_010": 0.08901049731061406
+   }
+  },
+  {
+   "id": "L-don1d-30-sma100-trail3atr",
+   "family": "L Donchian 1d with ATR trailing exit",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 91,
+    "trades_per_month": 1.986,
+    "win_rate": 0.3956043956043956,
+    "wilson_lower": 0.3013318196389939,
+    "mean": 0.08704126333299766,
+    "ci95": [
+     0.00420652088953898,
+     0.19475752403759908
+    ],
+    "median": -0.01862974624867153,
+    "profit_factor": 2.881461142153701,
+    "payoff_ratio": 4.402232300512599,
+    "largest_loss": -0.20495860758211493,
+    "worst5_mean": -0.18790702700597517,
+    "max_drawdown": 0.02509728580220727,
+    "worst_month_idr": -22982.645413440885,
+    "monthly_profit_idr": 5692.177912733687,
+    "monthly_profit_idr_research_risk": 20380.278288386842,
+    "max_drawdown_research_risk": 0.09710398520458674,
+    "worst_month_idr_research_risk": -93856.56090548479,
+    "rolling30_min_win_rate": 0.3333333333333333,
+    "longest_days_without_entry": 98.3,
+    "days_without_entry_at_end": 8.6,
+    "exit_reasons": {
+     "end": 2,
+     "stoploss": 2,
+     "trail": 87
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.2222222222222222,
+    "F2": 0.3125,
+    "F3": 0.6363636363636364,
+    "F4": 0.2777777777777778,
+    "F5": 0.5454545454545454,
+    "F6": 0.3,
+    "F7": 0.5384615384615384,
+    "F8": 0.3333333333333333
+   },
+   "fold_std": 0.1533887473525191,
+   "regimes": {
+    "bear": {
+     "trades": 17,
+     "win_rate": 0.35294117647058826
+    },
+    "range": {
+     "trades": 5,
+     "win_rate": 0.6
+    },
+    "bull": {
+     "trades": 69,
+     "win_rate": 0.391304347826087
+    }
+   },
+   "sensitivity": {
+    "taker": 0.08704126333299766,
+    "stress_041": 0.08488834151783184,
+    "no_tax": 0.08933357568999648,
+    "slip_005": 0.08595361167014401,
+    "slip_010": 0.08486704434575695
+   }
+  },
+  {
+   "id": "E-ema1d-50-200-trail3atr",
+   "family": "E EMA trend 1d with ATR trailing exit",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 61,
+    "trades_per_month": 1.331,
+    "win_rate": 0.36065573770491804,
+    "wilson_lower": 0.25174111519874504,
+    "mean": 0.08294045694571198,
+    "ci95": [
+     -0.023070137927140247,
+     0.21900762839406412
+    ],
+    "median": -0.057703702274469304,
+    "profit_factor": 2.252386447499223,
+    "payoff_ratio": 3.9928668842031674,
+    "largest_loss": -0.20495860758211493,
+    "worst5_mean": -0.1926883052846397,
+    "max_drawdown": 0.020315182386689834,
+    "worst_month_idr": -22746.90830134031,
+    "monthly_profit_idr": 5690.658544130755,
+    "monthly_profit_idr_research_risk": 19752.708748396853,
+    "max_drawdown_research_risk": 0.07954883580041605,
+    "worst_month_idr_research_risk": -126267.01074849164,
+    "rolling30_min_win_rate": 0.3,
+    "longest_days_without_entry": 194.2,
+    "days_without_entry_at_end": 194.2,
+    "exit_reasons": {
+     "exit_signal": 7,
+     "stoploss": 3,
+     "trail": 51
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.0,
+    "F2": 0.3333333333333333,
+    "F3": 0.36363636363636365,
+    "F4": 0.4444444444444444,
+    "F5": 0.4,
+    "F6": 0.3,
+    "F7": 0.4,
+    "F8": null
+   },
+   "fold_std": 0.14897877034281035,
+   "regimes": {
+    "bear": {
+     "trades": 4,
+     "win_rate": 0.5
+    },
+    "bull": {
+     "trades": 48,
+     "win_rate": 0.375
+    },
+    "range": {
+     "trades": 9,
+     "win_rate": 0.2222222222222222
+    }
+   },
+   "sensitivity": {
+    "taker": 0.08294045694571198,
+    "stress_041": 0.0807956569156418,
+    "no_tax": 0.08522412167407668,
+    "slip_005": 0.0818569083919459,
+    "slip_010": 0.08077444008603621
+   }
+  },
+  {
+   "id": "L-don1d-30-nofilter-trail3atr",
+   "family": "L Donchian 1d with ATR trailing exit",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 112,
+    "trades_per_month": 2.444,
+    "win_rate": 0.4017857142857143,
+    "wilson_lower": 0.31570580671863374,
+    "mean": 0.07767942220915233,
+    "ci95": [
+     0.008690809451789419,
+     0.16574775422320406
+    ],
+    "median": -0.017675382802497586,
+    "profit_factor": 2.733169021379651,
+    "payoff_ratio": 4.069384987387481,
+    "largest_loss": -0.20495860758211493,
+    "worst5_mean": -0.19167661981485304,
+    "max_drawdown": 0.022396395107761702,
+    "worst_month_idr": -18228.806740894357,
+    "monthly_profit_idr": 4733.921676995045,
+    "monthly_profit_idr_research_risk": 17161.005361901793,
+    "max_drawdown_research_risk": 0.08732103093494259,
+    "worst_month_idr_research_risk": -101680.5476799708,
+    "rolling30_min_win_rate": 0.3,
+    "longest_days_without_entry": 93.2,
+    "days_without_entry_at_end": 8.3,
+    "exit_reasons": {
+     "end": 3,
+     "stoploss": 3,
+     "trail": 106
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.2857142857142857,
+    "F2": 0.3333333333333333,
+    "F3": 0.7142857142857143,
+    "F4": 0.3333333333333333,
+    "F5": 0.5,
+    "F6": 0.4,
+    "F7": 0.5384615384615384,
+    "F8": 0.09090909090909091
+   },
+   "fold_std": 0.18724790611864192,
+   "regimes": {
+    "bear": {
+     "trades": 32,
+     "win_rate": 0.28125
+    },
+    "range": {
+     "trades": 11,
+     "win_rate": 0.5454545454545454
+    },
+    "bull": {
+     "trades": 69,
+     "win_rate": 0.43478260869565216
+    }
+   },
+   "sensitivity": {
+    "taker": 0.07767942220915233,
+    "stress_041": 0.07554504183548048,
+    "no_tax": 0.07995199266230964,
+    "slip_005": 0.07660113764431895,
+    "slip_010": 0.0755239280793881
+   }
+  },
+  {
+   "id": "F3-don1d20-exit20-btc_above_sma100-sl20",
+   "family": "F3 shortlist: Donchian with the BTC regime gate",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 126,
+    "trades_per_month": 2.749,
+    "win_rate": 0.373015873015873,
+    "wilson_lower": 0.29350523838305403,
+    "mean": 0.06813615264474983,
+    "ci95": [
+     0.018375771242204308,
+     0.13100704195264803
+    ],
+    "median": -0.030127266864387436,
+    "profit_factor": 2.831327697297466,
+    "payoff_ratio": 4.759040172053187,
+    "largest_loss": -0.14336594585821272,
+    "worst5_mean": -0.1256057615116919,
+    "max_drawdown": 0.011978892604288527,
+    "worst_month_idr": -13862.237092118427,
+    "monthly_profit_idr": 3666.1164775351194,
+    "monthly_profit_idr_research_risk": 13867.9065220213,
+    "max_drawdown_research_risk": 0.047562762267598035,
+    "worst_month_idr_research_risk": -66153.85279666644,
+    "rolling30_min_win_rate": 0.16666666666666666,
+    "longest_days_without_entry": 191.7,
+    "days_without_entry_at_end": 8.4,
+    "exit_reasons": {
+     "end": 4,
+     "exit_signal": 122
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.125,
+    "F2": 0.28,
+    "F3": 0.47619047619047616,
+    "F4": 0.3888888888888889,
+    "F5": 0.35,
+    "F6": 0.38461538461538464,
+    "F7": 0.5,
+    "F8": 0.4
+   },
+   "fold_std": 0.11819444208927006,
+   "regimes": {
+    "bear": {
+     "trades": 22,
+     "win_rate": 0.2727272727272727
+    },
+    "range": {
+     "trades": 8,
+     "win_rate": 0.75
+    },
+    "bull": {
+     "trades": 96,
+     "win_rate": 0.3645833333333333
+    }
+   },
+   "sensitivity": {
+    "taker": 0.06813615264474983,
+    "stress_041": 0.06602067303770585,
+    "no_tax": 0.07038859860448951,
+    "slip_005": 0.06706741670825364,
+    "slip_010": 0.06599974625211862
+   }
+  },
+  {
+   "id": "M-tsmom-30-sma100",
+   "family": "M time-series momentum 1d with trend filter",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 155,
+    "trades_per_month": 3.382,
+    "win_rate": 0.2967741935483871,
+    "wilson_lower": 0.2304753779487965,
+    "mean": 0.06635861603370587,
+    "ci95": [
+     0.006811268043641151,
+     0.14195313826028752
+    ],
+    "median": -0.02247781163131879,
+    "profit_factor": 2.424879058341152,
+    "payoff_ratio": 5.745909073025774,
+    "largest_loss": -0.20495860758211504,
+    "worst5_mean": -0.20495860758211498,
+    "max_drawdown": 0.022602872964755605,
+    "worst_month_idr": -26607.79591795321,
+    "monthly_profit_idr": 5882.860380061139,
+    "monthly_profit_idr_research_risk": 20851.587884150646,
+    "max_drawdown_research_risk": 0.08799043526328165,
+    "worst_month_idr_research_risk": -144684.83709417286,
+    "rolling30_min_win_rate": 0.2,
+    "longest_days_without_entry": 89.0,
+    "days_without_entry_at_end": 10.0,
+    "exit_reasons": {
+     "end": 2,
+     "exit_signal": 143,
+     "stoploss": 10
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.13333333333333333,
+    "F2": 0.2727272727272727,
+    "F3": 0.375,
+    "F4": 0.3548387096774194,
+    "F5": 0.42857142857142855,
+    "F6": 0.2,
+    "F7": 0.3333333333333333,
+    "F8": 0.2
+   },
+   "fold_std": 0.10246259669296646,
+   "regimes": {
+    "bear": {
+     "trades": 26,
+     "win_rate": 0.3076923076923077
+    },
+    "range": {
+     "trades": 9,
+     "win_rate": 0.2222222222222222
+    },
+    "bull": {
+     "trades": 120,
+     "win_rate": 0.3
+    }
+   },
+   "sensitivity": {
+    "taker": 0.06635861603370587,
+    "stress_041": 0.06424665689775741,
+    "no_tax": 0.06860731359007213,
+    "slip_005": 0.06529165863194981,
+    "slip_010": 0.06422576493743794
+   }
+  },
+  {
+   "id": "M-tsmom-90-nofilter",
+   "family": "M time-series momentum 1d with trend filter",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 154,
+    "trades_per_month": 3.36,
+    "win_rate": 0.22727272727272727,
+    "wilson_lower": 0.1681972365228107,
+    "mean": 0.06309760114725736,
+    "ci95": [
+     -0.00794119443379973,
+     0.15920529451978624
+    ],
+    "median": -0.02597407698527393,
+    "profit_factor": 2.456344217062675,
+    "payoff_ratio": 8.351570338013095,
+    "largest_loss": -0.20495860758211504,
+    "worst5_mean": -0.20495860758211498,
+    "max_drawdown": 0.03252129281397764,
+    "worst_month_idr": -25273.366543901047,
+    "monthly_profit_idr": 6407.411708023059,
+    "monthly_profit_idr_research_risk": 19648.536556220453,
+    "max_drawdown_research_risk": 0.1253881626440101,
+    "worst_month_idr_research_risk": -97134.62019822134,
+    "rolling30_min_win_rate": 0.06666666666666667,
+    "longest_days_without_entry": 186.0,
+    "days_without_entry_at_end": 186.0,
+    "exit_reasons": {
+     "exit_signal": 147,
+     "stoploss": 7
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.08695652173913043,
+    "F2": 0.25925925925925924,
+    "F3": 0.2413793103448276,
+    "F4": 0.11764705882352941,
+    "F5": 0.38461538461538464,
+    "F6": 0.2857142857142857,
+    "F7": 0.09090909090909091,
+    "F8": null
+   },
+   "fold_std": 0.11363975252233115,
+   "regimes": {
+    "bear": {
+     "trades": 29,
+     "win_rate": 0.20689655172413793
+    },
+    "range": {
+     "trades": 25,
+     "win_rate": 0.4
+    },
+    "bull": {
+     "trades": 100,
+     "win_rate": 0.19
+    }
+   },
+   "sensitivity": {
+    "taker": 0.06309760114725736,
+    "stress_041": 0.06099210056106725,
+    "no_tax": 0.06533942199620438,
+    "slip_005": 0.06203390659152514,
+    "slip_010": 0.06097127249013037
+   }
+  },
+  {
+   "id": "M-tsmom-60-sma100",
+   "family": "M time-series momentum 1d with trend filter",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 140,
+    "trades_per_month": 3.055,
+    "win_rate": 0.2571428571428571,
+    "wilson_lower": 0.19191048647976897,
+    "mean": 0.06278313366680695,
+    "ci95": [
+     -0.004300774210214641,
+     0.148368295448364
+    ],
+    "median": -0.028065909774147135,
+    "profit_factor": 2.2965500880067538,
+    "payoff_ratio": 6.63447803201951,
+    "largest_loss": -0.20495860758211493,
+    "worst5_mean": -0.20222700062805704,
+    "max_drawdown": 0.02266674884251252,
+    "worst_month_idr": -20105.15398901723,
+    "monthly_profit_idr": 6147.61237366146,
+    "monthly_profit_idr_research_risk": 20729.482777829933,
+    "max_drawdown_research_risk": 0.08884716201158782,
+    "worst_month_idr_research_risk": -114401.86577006937,
+    "rolling30_min_win_rate": 0.1,
+    "longest_days_without_entry": 89.0,
+    "days_without_entry_at_end": 10.0,
+    "exit_reasons": {
+     "end": 2,
+     "exit_signal": 134,
+     "stoploss": 4
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.15384615384615385,
+    "F2": 0.16216216216216217,
+    "F3": 0.35714285714285715,
+    "F4": 0.25,
+    "F5": 0.4,
+    "F6": 0.16666666666666666,
+    "F7": 0.5,
+    "F8": 0.2
+   },
+   "fold_std": 0.13004462565280323,
+   "regimes": {
+    "bear": {
+     "trades": 25,
+     "win_rate": 0.32
+    },
+    "range": {
+     "trades": 6,
+     "win_rate": 0.3333333333333333
+    },
+    "bull": {
+     "trades": 109,
+     "win_rate": 0.23853211009174313
+    }
+   },
+   "sensitivity": {
+    "taker": 0.06278313366680695,
+    "stress_041": 0.06067825589404782,
+    "no_tax": 0.06502429137837765,
+    "slip_005": 0.06171975375513618,
+    "slip_010": 0.06065743398411723
+   }
+  },
+  {
+   "id": "R3-random-L-exits",
+   "family": "R random entry control",
+   "deployable": false,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 73,
+    "trades_per_month": 1.593,
+    "win_rate": 0.3561643835616438,
+    "wilson_lower": 0.2560450046657549,
+    "mean": 0.06164821567176443,
+    "ci95": [
+     -0.028049004430758386,
+     0.18890414500065866
+    ],
+    "median": -0.04607625962532014,
+    "profit_factor": 1.8237090063006962,
+    "payoff_ratio": 3.2967047421589504,
+    "largest_loss": -0.20495860758211504,
+    "worst5_mean": -0.20495860758211498,
+    "max_drawdown": 0.03956627037815441,
+    "worst_month_idr": -25227.922642135538,
+    "monthly_profit_idr": 1282.438702319144,
+    "monthly_profit_idr_research_risk": 4244.201594986396,
+    "max_drawdown_research_risk": 0.15368547633259533,
+    "worst_month_idr_research_risk": -116494.36224274515,
+    "rolling30_min_win_rate": 0.26666666666666666,
+    "longest_days_without_entry": 67.2,
+    "days_without_entry_at_end": 13.2,
+    "exit_reasons": {
+     "end": 3,
+     "stoploss": 13,
+     "trail": 57
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.4444444444444444,
+    "F2": 0.36363636363636365,
+    "F3": 0.4444444444444444,
+    "F4": 0.3333333333333333,
+    "F5": 0.2,
+    "F6": 0.3,
+    "F7": 0.3,
+    "F8": 0.6
+   },
+   "fold_std": 0.12188126987340195,
+   "regimes": {
+    "bear": {
+     "trades": 18,
+     "win_rate": 0.5
+    },
+    "range": {
+     "trades": 10,
+     "win_rate": 0.4
+    },
+    "bull": {
+     "trades": 45,
+     "win_rate": 0.28888888888888886
+    }
+   },
+   "sensitivity": {
+    "taker": 0.06164821567176443,
+    "stress_041": 0.059545585642299316,
+    "no_tax": 0.06388698011029947,
+    "slip_005": 0.060585971315372175,
+    "slip_010": 0.05952478596753553
+   }
+  },
+  {
+   "id": "F3-tsmom-55-btcabove-sma100-sl20",
+   "family": "F3 shortlist: time-series momentum with the BTC regime gate",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 162,
+    "trades_per_month": 3.535,
+    "win_rate": 0.24074074074074073,
+    "wilson_lower": 0.1814009536353176,
+    "mean": 0.05953410237199275,
+    "ci95": [
+     -0.0020810311007701597,
+     0.14000228936728173
+    ],
+    "median": -0.02047447003280345,
+    "profit_factor": 2.4867765584950714,
+    "payoff_ratio": 7.842910684484456,
+    "largest_loss": -0.20495860758211493,
+    "worst5_mean": -0.1867298163126638,
+    "max_drawdown": 0.024521467632387717,
+    "worst_month_idr": -16795.755509074395,
+    "monthly_profit_idr": 7143.832509216352,
+    "monthly_profit_idr_research_risk": 24002.853983032146,
+    "max_drawdown_research_risk": 0.09552944129890772,
+    "worst_month_idr_research_risk": -100609.14153752066,
+    "rolling30_min_win_rate": 0.06666666666666667,
+    "longest_days_without_entry": 91.0,
+    "days_without_entry_at_end": 3.0,
+    "exit_reasons": {
+     "end": 5,
+     "exit_signal": 154,
+     "stoploss": 3
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.2,
+    "F2": 0.1951219512195122,
+    "F3": 0.3125,
+    "F4": 0.2692307692307692,
+    "F5": 0.47058823529411764,
+    "F6": 0.11538461538461539,
+    "F7": 0.2,
+    "F8": 0.2727272727272727
+   },
+   "fold_std": 0.1065207373410842,
+   "regimes": {
+    "bear": {
+     "trades": 32,
+     "win_rate": 0.34375
+    },
+    "range": {
+     "trades": 8,
+     "win_rate": 0.375
+    },
+    "bull": {
+     "trades": 122,
+     "win_rate": 0.20491803278688525
+    }
+   },
+   "sensitivity": {
+    "taker": 0.05953410237199275,
+    "stress_041": 0.057435659415085355,
+    "no_tax": 0.06176840864669845,
+    "slip_005": 0.05847397331602512,
+    "slip_010": 0.057414901159756344
+   }
+  },
+  {
+   "id": "M-tsmom-60-nofilter",
+   "family": "M time-series momentum 1d with trend filter",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 201,
+    "trades_per_month": 4.386,
+    "win_rate": 0.2835820895522388,
+    "wilson_lower": 0.22578226345787256,
+    "mean": 0.05030304738719397,
+    "ci95": [
+     0.002276950939904208,
+     0.11312737298148286
+    ],
+    "median": -0.018805160337801996,
+    "profit_factor": 2.382182771025475,
+    "payoff_ratio": 6.0181459478538315,
+    "largest_loss": -0.20495860758211493,
+    "worst5_mean": -0.19892252004515223,
+    "max_drawdown": 0.025379215658841492,
+    "worst_month_idr": -28383.28603758913,
+    "monthly_profit_idr": 6146.5684418196,
+    "monthly_profit_idr_research_risk": 20679.652259753657,
+    "max_drawdown_research_risk": 0.09865731367003805,
+    "worst_month_idr_research_risk": -159686.66285547972,
+    "rolling30_min_win_rate": 0.1,
+    "longest_days_without_entry": 73.0,
+    "days_without_entry_at_end": 2.0,
+    "exit_reasons": {
+     "end": 5,
+     "exit_signal": 193,
+     "stoploss": 3
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.12,
+    "F2": 0.3111111111111111,
+    "F3": 0.375,
+    "F4": 0.23333333333333334,
+    "F5": 0.36,
+    "F6": 0.13043478260869565,
+    "F7": 0.5,
+    "F8": 0.3157894736842105
+   },
+   "fold_std": 0.12807675455578893,
+   "regimes": {
+    "bear": {
+     "trades": 60,
+     "win_rate": 0.31666666666666665
+    },
+    "range": {
+     "trades": 10,
+     "win_rate": 0.6
+    },
+    "bull": {
+     "trades": 131,
+     "win_rate": 0.24427480916030533
+    }
+   },
+   "sensitivity": {
+    "taker": 0.05030304738719397,
+    "stress_041": 0.048222886845429525,
+    "no_tax": 0.05251788755502448,
+    "slip_005": 0.049252154569668076,
+    "slip_010": 0.048202309443737906
+   }
+  },
+  {
+   "id": "M-tsmom-30-nofilter",
+   "family": "M time-series momentum 1d with trend filter",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 288,
+    "trades_per_month": 6.284,
+    "win_rate": 0.3055555555555556,
+    "wilson_lower": 0.2552038517799586,
+    "mean": 0.040834333690984916,
+    "ci95": [
+     0.006399655173134818,
+     0.08364441885113433
+    ],
+    "median": -0.017225821271241115,
+    "profit_factor": 2.3014214360050893,
+    "payoff_ratio": 5.230503263647931,
+    "largest_loss": -0.20495860758211504,
+    "worst5_mean": -0.2049586075821149,
+    "max_drawdown": 0.027682626185736137,
+    "worst_month_idr": -29025.56683127833,
+    "monthly_profit_idr": 5882.039047649723,
+    "monthly_profit_idr_research_risk": 20992.17996331326,
+    "max_drawdown_research_risk": 0.106630169121681,
+    "worst_month_idr_research_risk": -168843.83753071562,
+    "rolling30_min_win_rate": 0.1,
+    "longest_days_without_entry": 48.0,
+    "days_without_entry_at_end": 5.0,
+    "exit_reasons": {
+     "end": 4,
+     "exit_signal": 278,
+     "stoploss": 6
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.2708333333333333,
+    "F2": 0.3055555555555556,
+    "F3": 0.34782608695652173,
+    "F4": 0.35,
+    "F5": 0.3793103448275862,
+    "F6": 0.23684210526315788,
+    "F7": 0.37037037037037035,
+    "F8": 0.2553191489361702
+   },
+   "fold_std": 0.05504888653379796,
+   "regimes": {
+    "bear": {
+     "trades": 110,
+     "win_rate": 0.3
+    },
+    "range": {
+     "trades": 29,
+     "win_rate": 0.27586206896551724
+    },
+    "bull": {
+     "trades": 149,
+     "win_rate": 0.31543624161073824
+    }
+   },
+   "sensitivity": {
+    "taker": 0.040834333690984916,
+    "stress_041": 0.03877292625544168,
+    "no_tax": 0.04302920658605144,
+    "slip_005": 0.03979291490406314,
+    "slip_010": 0.0387525343635662
+   }
+  },
+  {
+   "id": "K-SwingEmaRsi",
+   "family": "K benchmark",
+   "deployable": true,
+   "tier": "T4",
+   "checks": "----",
+   "all": {
+    "trades": 1411,
+    "trades_per_month": 30.787,
+    "win_rate": 0.3798724309000709,
+    "wilson_lower": 0.35490620970707804,
+    "mean": -0.006454443827193322,
+    "ci95": [
+     -0.007664968293017986,
+     -0.005244479437691326
+    ],
+    "median": -0.013289101671429604,
+    "profit_factor": 0.5464044783370994,
+    "payoff_ratio": 0.891984922658511,
+    "largest_loss": -0.036313463735896945,
+    "worst5_mean": -0.03607254210183104,
+    "max_drawdown": 0.6877953796554946,
+    "worst_month_idr": -113379.45589181325,
+    "monthly_profit_idr": -49924.82986630198,
+    "monthly_profit_idr_research_risk": -144600.44553705642,
+    "max_drawdown_research_risk": 0.9699686259518173,
+    "worst_month_idr_research_risk": -213867.3821879068,
+    "rolling30_min_win_rate": 0.06666666666666667,
+    "longest_days_without_entry": 9.1,
+    "days_without_entry_at_end": 1.1,
+    "exit_reasons": {
+     "exit_signal": 712,
+     "roi": 455,
+     "stoploss": 244
+    }
+   },
+   "fold_win_rates": {
+    "F1": 0.4101123595505618,
+    "F2": 0.33879781420765026,
+    "F3": 0.39634146341463417,
+    "F4": 0.34782608695652173,
+    "F5": 0.4530386740331492,
+    "F6": 0.36548223350253806,
+    "F7": 0.36507936507936506,
+    "F8": 0.36607142857142855
+   },
+   "fold_std": 0.03754554833504795,
+   "regimes": {
+    "bear": {
+     "trades": 363,
+     "win_rate": 0.39944903581267216
+    },
+    "range": {
+     "trades": 167,
+     "win_rate": 0.4491017964071856
+    },
+    "bull": {
+     "trades": 881,
+     "win_rate": 0.358683314415437
+    }
+   },
+   "sensitivity": {
+    "taker": -0.006454443827193322,
+    "stress_041": -0.008406160548631516,
+    "no_tax": -0.0043709309583670215,
+    "slip_005": -0.007420743358810834,
+    "slip_010": -0.008422604194930485
+   }
+  }
+ ],
+ "selected_null": {
+  "shuffles": 1000,
+  "entry_rate_per_bar": {
+   "BTC/IDR": 0.001045400238948626,
+   "ETH/IDR": 0.0013142174432497014,
+   "SOL/IDR": 0.002001194743130227,
+   "XRP/IDR": 0.0014635603345280765,
+   "DOGE/IDR": 0.001015531660692951
+  },
+  "mean_p95": 0.03218870292161416,
+  "mean_p50": 0.011336057725277437,
+  "win_rate_p95": 0.21879515895953752,
+  "win_rate_p50": 0.17647058823529413,
+  "trades_median": 171.0
+ }
+}
