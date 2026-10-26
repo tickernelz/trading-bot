@@ -12,6 +12,11 @@ from pathlib import Path
 from typing import Any
 
 SHADOW_KEY = "shadow_decision_id"
+COLUMNS = (
+    "decision_id, ts, bot, pair, timeframe, candle, rate, mode, status, reason, required, answered, verdict,"
+    " iqr_limit, aggregate, voters, input_tokens, output_tokens, reasoning_tokens, cost, settled_at, settle_seq,"
+    " CASE WHEN json_valid(request) THEN json_extract(request, '$.state.entry_tag') END AS entry_tag"
+)
 PUBLIC_VOTER_FIELDS = ("voter_id", "provider", "model", "status", "latency_s", "error_kind", "answers")
 
 SCHEMA = """
@@ -159,7 +164,7 @@ class DecisionStore:
     def recent(
         self, limit: int, *, pair: str | None = None, before: datetime | None = None, status: str | None = None
     ) -> list[dict[str, Any]]:
-        """Newest settled decisions first, optionally for one pair, one status, or candles before a moment."""
+        """Newest candle first, then newest settle; the cursor is inclusive so a page boundary never drops rows."""
         where = ["settle_seq IS NOT NULL"]
         params: list[Any] = []
         if pair is not None:
@@ -169,16 +174,18 @@ class DecisionStore:
             where.append("status = ?")
             params.append(status)
         if before is not None:
-            where.append("candle < ?")
+            where.append("candle <= ?")
             params.append(before.astimezone(UTC).isoformat())
         rows = self._db.execute(
-            f"SELECT * FROM decisions WHERE {' AND '.join(where)} ORDER BY settle_seq DESC LIMIT ?", (*params, limit)
+            f"SELECT {COLUMNS} FROM decisions WHERE {' AND '.join(where)}"
+            " ORDER BY candle DESC, settle_seq DESC LIMIT ?",
+            (*params, limit),
         )
         return [public_decision(row) for row in rows]
 
     def settled_after(self, settle_seq: int) -> list[tuple[int, dict[str, Any]]]:
         rows = self._db.execute(
-            "SELECT * FROM decisions WHERE settle_seq > ? ORDER BY settle_seq", (settle_seq,)
+            f"SELECT {COLUMNS} FROM decisions WHERE settle_seq > ? ORDER BY settle_seq", (settle_seq,)
         ).fetchall()
         return [(row["settle_seq"], public_decision(row)) for row in rows]
 
@@ -264,7 +271,7 @@ class DecisionStore:
 
     def get(self, decision_id: str) -> dict[str, Any] | None:
         row = self._db.execute(
-            "SELECT * FROM decisions WHERE decision_id = ? AND settle_seq IS NOT NULL", (decision_id,)
+            f"SELECT {COLUMNS} FROM decisions WHERE decision_id = ? AND settle_seq IS NOT NULL", (decision_id,)
         ).fetchone()
         return public_decision(row) if row else None
 
@@ -291,12 +298,15 @@ class DecisionStore:
         return result
 
 
-def linked_trades(trades_db: str | Path) -> dict[str, sqlite3.Row]:
-    """Trades keyed by the shadow decision id stored in their custom data; empty when the database is absent."""
+def linked_trades(trades_db: str | Path, timeout: float = 0.5) -> dict[str, sqlite3.Row]:
+    """Trades keyed by the shadow decision id in their custom data; empty when the database is absent.
+
+    The database belongs to another process, so the busy timeout is short and a lock surfaces as sqlite3.Error.
+    """
     path = Path(trades_db)
     if not path.exists():
         return {}
-    trades = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    trades = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=timeout)
     trades.row_factory = sqlite3.Row
     try:
         return {
@@ -313,9 +323,6 @@ def linked_trades(trades_db: str | Path) -> dict[str, sqlite3.Row]:
 
 def public_decision(row: sqlite3.Row) -> dict[str, Any]:
     voters: Iterable[dict[str, Any]] = json.loads(row["voters"] or "[]")
-    stored = json.loads(row["request"] or "{}")
-    state = stored.get("state")
-    state = state if isinstance(state, dict) else {}
     return {
         "decision_id": row["decision_id"],
         "ts": row["settled_at"] or row["ts"],
@@ -325,7 +332,7 @@ def public_decision(row: sqlite3.Row) -> dict[str, Any]:
         "timeframe": row["timeframe"],
         "candle": row["candle"],
         "rate": row["rate"],
-        "entry_tag": state.get("entry_tag"),
+        "entry_tag": row["entry_tag"],
         "mode": row["mode"],
         "status": row["status"],
         "reason": row["reason"],

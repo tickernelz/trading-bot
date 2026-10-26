@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import shutil
 import sqlite3
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -118,6 +119,7 @@ def replay(tmp_path):
         recorded_at = datetime.fromisoformat(recorded("run.json")["recorded_at"])
         gateway.clock = lambda: recorded_at
         client = TestClient(create_app(gateway))
+        client.last_userdir = base / "bot-b"
         clients.append(gateway)
         token = client.post("/gw/v1/session", json={"password": PASSWORD}).json()["token"]
         return client, {"Authorization": f"Bearer {token}"}
@@ -219,7 +221,8 @@ def test_decision_list_filters_and_carries_outcomes(replay):
 
     assert ids("status=skip") == [SOL]
     assert ids("pair=BTC/IDR") == [BTC_SECOND, BTC_FIRST]
-    assert ids("before=2026-10-26T01:00:00Z") == [ETH, SOL, BTC_FIRST]
+    assert ids("before=2026-10-26T01:00:00Z") == [BTC_SECOND, ETH, SOL, BTC_FIRST]
+    assert ids("before=2026-10-26T00:00:00Z") == [ETH, SOL, BTC_FIRST]
     assert client.get("/gw/v1/decisions/0123", headers=headers).json()["error"]["code"] == "not_found"
     assert client.get("/gw/v1/decisions?horizons=0", headers=headers).status_code == 400
 
@@ -291,3 +294,36 @@ def test_total_equity_stacks_both_bots_from_the_first_bot_start(replay):
     }
     assert {series["points"][0][0] for series in equity["series"]} == {"2026-10-26T00:54:49.005Z"}
     assert [series["start_equity"] for series in equity["series"]] == [2000000.0, 2000000.0]
+
+
+def test_pages_union_to_every_decision_on_a_shared_candle(replay):
+    client, headers = replay()
+    first = client.get("/gw/v1/decisions?bot=B&limit=2", headers=headers).json()
+    second = client.get(
+        "/gw/v1/decisions?bot=B&limit=2", headers=headers, params={"before": first[-1]["candle"]}
+    ).json()
+    assert [row["decision_id"] for row in first] == [BTC_SECOND, ETH]
+    assert [row["decision_id"] for row in second] == [ETH, SOL, BTC_FIRST]
+    assert {row["decision_id"] for row in first + second} == {
+        row["decision_id"] for row in client.get("/gw/v1/decisions?bot=B", headers=headers).json()
+    }
+    assert [row["decision_id"] for row in first] + [
+        row["decision_id"] for row in second if row["decision_id"] != first[-1]["decision_id"]
+    ] == [BTC_SECOND, ETH, SOL, BTC_FIRST]
+
+
+def test_a_locked_trade_database_answers_503_instead_of_hanging(replay):
+    client, headers = replay()
+    holder = sqlite3.connect(Path(client.last_userdir) / DRY_RUN_DB, timeout=5)
+    holder.execute("BEGIN EXCLUSIVE")
+    try:
+        started = time.monotonic()
+        response = client.get("/gw/v1/decisions?bot=B&limit=4", headers=headers)
+        elapsed = time.monotonic() - started
+    finally:
+        holder.rollback()
+        holder.close()
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "upstream_error"
+    assert elapsed < 2.0
+    assert client.get("/gw/v1/decisions?bot=B&limit=4", headers=headers).status_code == 200

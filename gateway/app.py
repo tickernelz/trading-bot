@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import secrets
+import sqlite3
 import time
 from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager, suppress
@@ -459,18 +460,23 @@ class Gateway:
         if not decisions:
             return []
         timeframe = self.engine_settings(bot).exchange.timeframe
-        links = linked_trades(Path(bot.userdir) / DRY_RUN_DB)
+        try:
+            links = await asyncio.to_thread(linked_trades, Path(bot.userdir) / DRY_RUN_DB)
+        except sqlite3.Error as exc:
+            raise ApiError(503, "upstream_error", f"trade database is busy: {exc}", 1000) from exc
         closed, opened = await self.closed_and_open(bot)
         by_id = {trade["trade_id"]: trade for trade in [*closed, *opened]}
+        pairs = sorted({decision["pair"] for decision in decisions})
+        frames = await asyncio.gather(
+            *(
+                self.ft(bot, "/pair_candles", ttl=CANDLE_TTL_S, pair=pair, timeframe=timeframe, limit=1500)
+                for pair in pairs
+            ),
+            return_exceptions=True,
+        )
         candles: dict[str, dict[int, Candle]] = {}
-        for pair in sorted({decision["pair"] for decision in decisions}):
-            try:
-                frame = await self.ft(
-                    bot, "/pair_candles", ttl=CANDLE_TTL_S, pair=pair, timeframe=timeframe, limit=1500
-                )
-            except ApiError:
-                frame = {}
-            candles[pair] = by_open_time(frame)
+        for pair, frame in zip(pairs, frames, strict=True):
+            candles[pair] = by_open_time({} if isinstance(frame, BaseException) else frame)
         now = self.clock()
         result = []
         for decision in decisions:
@@ -1114,7 +1120,7 @@ def create_app(gateway: Gateway) -> FastAPI:
                 continue
             recent = store.recent(limit, pair=pair, before=before, status=status)
             rows += await gateway.explained(ref, recent, steps, cost_pct)
-        rows.sort(key=lambda row: row["ts"], reverse=True)
+        rows.sort(key=lambda row: (row["candle"], row["ts"]), reverse=True)
         return rows[:limit]
 
     @app.get("/gw/v1/decisions/{decision_id}", dependencies=[Depends(reader)])

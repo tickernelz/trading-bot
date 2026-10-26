@@ -73,6 +73,11 @@ def main() -> None:
             trades = table(userdir / DRY_RUN_DB, "SELECT id, is_open, close_profit_abs, close_profit FROM trades")
             decisions_db = userdir / "swarm_decisions.sqlite"
             decisions = table(decisions_db, "SELECT * FROM decisions ORDER BY ts") if decisions_db.exists() else []
+            for decision in decisions:
+                voters = json.loads(decision["voters"] or "[]")
+                for voter in voters:
+                    voter.pop("error", None)
+                decision["voters"] = json.dumps(voters)
             bot = {"id": settings["bot_id"], "answers": answers, "custom_data": links, "trades": trades}
             bot["decisions"] = decisions
             (args.out / f"{name}.json").write_text(json.dumps(bot, indent=1, sort_keys=True) + "\n", encoding="utf-8")
