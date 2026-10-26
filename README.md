@@ -1,74 +1,75 @@
-<p align="center"><img src="docs/media/banner.png" alt="Trading Bot: bot swing crypto spot dengan swarm voter, median, dan panel PWA" width="100%"></p>
+<p align="center"><img src="docs/media/banner.png" alt="Trading Bot: a spot crypto swing bot with a voter swarm, median aggregation and a PWA control panel" width="100%"></p>
 
 <p align="center">
   <img alt="Mode" src="https://img.shields.io/badge/mode-dry--run-1c1f26">
   <img alt="Engine" src="https://img.shields.io/badge/engine-Freqtrade%202026.9-1c1f26">
   <img alt="Python" src="https://img.shields.io/badge/python-3.12%2B-1c1f26">
   <img alt="PWA" src="https://img.shields.io/badge/panel-PWA%20(Svelte)-1c1f26">
-  <img alt="Lisensi" src="https://img.shields.io/badge/lisensi-GPL--3.0-1c1f26">
+  <img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-1c1f26">
 </p>
 
-Bot trading crypto spot yang berjalan 24 jam di PC sendiri, dengan panel kontrol PWA untuk ponsel dan desktop. Strategi aturan swing 1 jam membuat kandidat entry; **swarm** voter (banyak model, satu pertanyaan, hasil digabung dengan **median**) hanya boleh menyaring; batas rugi dan ukuran posisi dijaga **kode**, bukan prompt. English summary: an always-on spot crypto swing bot on Freqtrade, with an LLM voter swarm as an entry filter only, hard risk limits enforced in code, and a PWA control panel. Dry-run only.
+An always-on spot crypto swing bot that runs on your own PC, with a PWA control panel for phone and desktop. A rule-based 1-hour swing strategy proposes entries. A **swarm** of voters (many models, one typed question, answers combined with the **median**) may only filter them. Loss limits and position sizing are enforced by **code**, not by prompts.
 
-> **Status jujur.** Proyek ini belum terbukti menghasilkan uang. Semuanya berjalan dry-run: tidak ada akun exchange, tidak ada key exchange, tidak ada uang sungguhan, dan mode live sengaja tidak bisa menyala di build ini. Backtest 3 tahun pada data Indodax setelah fee 0,2% dan pajak 0,21% per sisi memberi ekspektasi **negatif**: out-of-sample −0,832% per trade (221 trade, CI 95% −1,098% sampai −0,561%). Rinciannya di [docs/stage2-backtest.md](docs/stage2-backtest.md). Bukan nasihat keuangan.
+> **Honest status.** This project has not been shown to make money. Everything runs in dry-run: no exchange account, no exchange keys, no real funds, and live mode is deliberately unable to start in this build. A 3-year backtest on Indodax data, after a 0.2% fee and 0.21% tax per side, gives a **negative** expectancy: out-of-sample -0.832% per trade (221 trades, 95% CI -1.098% to -0.561%). Details in [docs/stage2-backtest.md](docs/stage2-backtest.md). Not financial advice.
 
-## Tampilan
+## Screens
 
-Layar di bawah dari gateway tiruan berdata contoh (penanda "contoh data" tampil di panel), bukan dari lari bot sungguhan.
+The screens below come from the PWA running against a mock gateway with sample data (the panel shows a "sample data" badge), not from a live bot run.
 
 <p align="center">
-  <img src="docs/media/phone-ringkas.png" alt="Ringkas di ponsel: keadaan Aman, jejak rugi hari ini terhadap batas harian, posisi terbuka" width="30%">
-  <img src="docs/media/phone-grafik.png" alt="Grafik kandel per pair dengan penanda entry dan batas" width="30%">
-  <img src="docs/media/phone-kontrol.png" alt="Kontrol: hentikan entry baru, exit paksa, dengan konfirmasi dua langkah" width="30%">
+  <img src="docs/media/phone-summary.png" alt="Summary on a phone: state Safe, today's loss trace against the daily limit, open positions" width="30%">
+  <img src="docs/media/phone-chart.png" alt="Candlestick chart per pair with entry markers and limits" width="30%">
+  <img src="docs/media/phone-control.png" alt="Control: hold new entries, force exit, with two-step confirmation" width="30%">
 </p>
 
 <p align="center">
-  <img src="docs/media/desk-ringkas.png" alt="Desktop, Ringkas" width="49%">
-  <img src="docs/media/desk-grafik.png" alt="Desktop, Grafik live" width="49%">
-  <img src="docs/media/desk-swarm.png" alt="Desktop, keputusan swarm per voter" width="49%">
-  <img src="docs/media/desk-ab.png" alt="Desktop, kurva ekuitas bot A lawan bot B" width="49%">
-  <img src="docs/media/desk-provider.png" alt="Desktop, provider dan key" width="49%">
-  <img src="docs/media/desk-konfigurasi.png" alt="Desktop, editor konfigurasi dengan batas risiko dalam rupiah" width="49%">
+  <img src="docs/media/desk-summary.png" alt="Desktop, Summary" width="49%">
+  <img src="docs/media/desk-chart.png" alt="Desktop, live chart" width="49%">
+  <img src="docs/media/desk-swarm.png" alt="Desktop, per-voter swarm decision" width="49%">
+  <img src="docs/media/desk-ab.png" alt="Desktop, equity curves of bot A versus bot B" width="49%">
+  <img src="docs/media/desk-providers.png" alt="Desktop, providers and keys" width="49%">
+  <img src="docs/media/desk-config.png" alt="Desktop, configuration editor with risk limits in rupiah" width="49%">
 </p>
 
-Arah visualnya ditulis di [PRODUCT.md](PRODUCT.md) dan [DESIGN.md](DESIGN.md): satu jawaban besar yang terbaca dalam dua detik (Aman, Ditahan, Berhenti), warna sinyal hangat hanya untuk risiko, untung dan rugi selalu berpenanda plus atau minus dan arah, bukan sekadar merah dan hijau.
+The visual direction is written down in [PRODUCT.md](PRODUCT.md) and [DESIGN.md](DESIGN.md): one large answer readable in two seconds (Safe, Held, Stopped), a warm signal colour reserved for risk, and gains and losses always marked with a sign and a direction rather than only red and green.
 
-## Cara kerja
+## How it works
 
 ```mermaid
 flowchart LR
-    S[Strategi swing 1 jam\nEMA 20/50 + RSI] --> C[Kandidat entry]
-    C --> R{Lapisan risiko\nkode deterministik}
-    R -- lolos --> W[Swarm voter\nmedian + sebaran + kuorum]
-    W -- bayangan: hanya dicatat --> O[Order dry-run\nFreqtrade]
-    R -- batas terlewati --> X[Entry baru ditahan]
+    S[1h swing strategy\nEMA 20/50 + RSI] --> C[Entry candidate]
+    C --> R{Risk layer\ndeterministic code}
+    R -- passes --> W[Voter swarm\nmedian + spread + quorum]
+    W -- shadow: recorded only --> O[Dry-run order\nFreqtrade]
+    R -- limit crossed --> X[New entries held]
     O --> G[Gateway]
     W --> G
-    G --> P[PWA\nponsel dan desktop]
+    G --> P[PWA\nphone and desktop]
 ```
 
-1. **Engine**: Freqtrade 2026.9 sebagai git submodule di `vendor/freqtrade` (tidak dimodifikasi). Strategi, konfigurasi, dan data pengguna ada di luar vendor.
-2. **Lapisan risiko** (`engine/risk.py`): risiko per trade, batas rugi harian, batas drawdown total, maksimal posisi, kill switch. Tidak melewati AI. Menaikkan batas atau pindah mode butuh konfirmasi dua langkah; menurunkannya langsung.
-3. **Swarm** (`swarm/tb_swarm`): voter dari banyak vendor menjawab pertanyaan bertipe yang sama dengan urutan opsi diacak. Agregasi memakai median, sebaran, dan kuorum; kurang dari kuorum berarti gagal tertutup. Adapter: System One wire (`/v1/systemone`), decisions API OpenRouter dan OpenAI, serta LLM biasa dengan structured output. Menambah voter cukup menambah satu blok konfigurasi. Mode `veto` ditolak skema sampai gerbang adopsinya lolos, jadi saat ini swarm hanya **bayangan**: mencatat apa yang akan diputuskan, tanpa memengaruhi order.
-4. **Gateway** (`gateway/`): satu-satunya pintu PWA ke bot. Autentikasi sesi, endpoint baca, feed WebSocket, kontrol dua langkah dengan `Idempotency-Key` dan log audit, Web Push. API Freqtrade tidak pernah dibuka ke jaringan.
-5. **Agen analis** (deepagents): laporan harian dan tanya-jawab dengan tool baca saja. Tidak ada tool yang bisa membuat order atau mengubah konfigurasi.
-6. **PWA** (`pwa/`, Svelte + Vite): panel buatan sendiri, bukan FreqUI.
+1. **Engine**: Freqtrade 2026.9 as a git submodule in `vendor/freqtrade` (unmodified). Strategy, configuration and user data live outside the vendor tree.
+2. **Risk layer** (`engine/risk.py`): risk per trade, daily loss limit, total drawdown limit, maximum open positions, kill switch. It never goes through an AI. Raising a limit or switching mode takes a two-step confirmation; lowering a limit applies immediately.
+3. **Swarm** (`swarm/tb_swarm`): voters from several vendors answer the same typed question with the option order shuffled. Aggregation uses the median, the spread and a quorum; below quorum the entry fails closed. Adapters: the System One wire (`/v1/systemone`), the OpenRouter and OpenAI decisions APIs, and ordinary LLMs with structured output. Adding a voter is one block of configuration. `veto` mode is rejected by the schema until its adoption gate passes, so the swarm is **shadow only** today: it records what it would decide and never affects an order.
+4. **Gateway** (`gateway/`): the only door between the PWA and the bot. Session auth, read endpoints, a WebSocket feed, two-step controls with an `Idempotency-Key` and an audit log, Web Push. The Freqtrade API is never exposed to the network.
+5. **Analyst agent** (deepagents): a daily report and Q&A with read-only tools. No tool can place an order or change configuration.
+6. **PWA** (`pwa/`, Svelte + Vite): a purpose-built panel, not FreqUI.
 
-## Fitur
+## Features
 
-- Keadaan Aman, Ditahan, Berhenti dengan meter rugi harian dan drawdown total terhadap batas, penanda mode dry-run atau live, dan usia data.
-- Grafik kandel live per pair dengan penanda entry dan exit, feed aksi waktu nyata, posisi dan order, kesehatan mesin dan provider.
-- Keputusan swarm per voter (jawaban, median, sebaran, kuorum) beserta hasil sesudahnya: apakah entry yang akan dilewati ternyata rugi.
-- Bot A (aturan saja) lawan bot B (aturan + swarm bayangan) dengan kurva ekuitas bertumpuk.
-- Kontrol: jeda, hentikan entry, exit paksa, kunci pair, blacklist, dengan konfirmasi dua langkah yang menyebut konsekuensinya dalam rupiah.
-- Editor konfigurasi tervalidasi skema, catatan perubahan, registri provider dan voter, uji koneksi provider. Key hanya bisa dimasukkan dari mesin bot sendiri dan tidak pernah dikembalikan utuh.
-- Analitik: what-if konfigurasi, papan skor voter, uji stres, ekspor CSV, backtest dari UI, tampilan portofolio.
-- Mesin waktu (geser ke keputusan lampau), lapisan berita dan Fear and Greed, tampilan terakhir saat offline, kanal Telegram opsional, dua bahasa (Indonesia dan Inggris).
-- Notifikasi Web Push: fill, batas terlewati, kill switch, heartbeat hilang, kuorum gagal, ringkasan harian.
+- A Safe, Held or Stopped state with meters for the daily loss and the total drawdown against their limits, a dry-run or live badge, and the age of the data.
+- Live candlestick chart per pair with entry and exit markers, a real-time activity feed, positions and orders, engine and provider health.
+- Per-voter swarm decisions (answer, median, spread, quorum) with the outcome afterwards: did an entry that would have been skipped turn out to lose?
+- Bot A (rules only) against bot B (rules plus shadow swarm) with stacked equity curves.
+- Controls: pause, hold new entries, force exit, pair locks, blacklist, each with a two-step confirmation that states the consequence in rupiah.
+- A schema-validated configuration editor with a change log, provider and voter registry, and a connection test per provider. Keys can only be entered from the bot's own machine and are never returned in full.
+- Analytics: configuration what-if, voter scoreboard, stress test, CSV export, backtest from the UI, portfolio view.
+- Time machine (step back through past decisions), news and Fear and Greed layer, last view available offline, an optional Telegram channel.
+- Web Push notifications: fills, limit crossed, kill switch, heartbeat lost, quorum failed, daily summary.
+- Languages: English (default) and Indonesian, with more addable. See [docs/i18n.md](docs/i18n.md).
 
-## Mulai cepat
+## Quick start
 
-Mencoba PWA tanpa bot, dengan gateway tiruan:
+Try the PWA without a bot, against the mock gateway:
 
 ```bash
 git clone --recurse-submodules https://github.com/tickernelz/trading-bot.git
@@ -78,7 +79,7 @@ npm run mock-gateway &
 npm run build && npm run preview
 ```
 
-Buka http://127.0.0.1:4173, kata sandi gateway tiruan `contoh`. Membangun dan menjalankan dry-run sungguhan (Docker):
+Open http://127.0.0.1:4173. The mock gateway password is `example`. To build and run the real dry-run (Docker):
 
 ```bash
 cp .env.example .env
@@ -88,46 +89,46 @@ docker compose build bot
 docker compose up -d bot
 ```
 
-Isi variabel di `.env` dulu. Langkah lengkap, susunan dua bot dengan swarm bayangan, gateway, dan batas CPU ada di [docs/operations.md](docs/operations.md).
+Fill in the variables in `.env` first. The full steps, the two-bot layout with the shadow swarm, the gateway and the CPU limits are in [docs/operations.md](docs/operations.md).
 
-## Konfigurasi
+## Configuration
 
-Satu berkas YAML, divalidasi skema saat start; konfigurasi salah berarti bot tidak start, bukan jalan dengan tebakan. Contoh lengkap di [config/config.example.yaml](config/config.example.yaml). Batas bawaan dan semuanya bisa diubah:
+One YAML file, validated against a schema at start. A bad configuration means the bot refuses to start instead of running on guesses. A full example is in [config/config.example.yaml](config/config.example.yaml). Defaults, all changeable:
 
-| Pengaturan | Bawaan |
+| Setting | Default |
 | --- | --- |
-| Modal awal | Rp 2.000.000, profit dikomposisi |
-| Rugi harian maksimal | 1,0% |
-| Drawdown total maksimal | 10,0% |
-| Risiko per trade | 0,5% |
-| Posisi terbuka maksimal | 3, spot saja, tanpa leverage |
-| Mode swarm | bayangan |
-| Biaya compute LLM | dicatat, tanpa batas |
+| Starting capital | Rp 2,000,000, profits compounded |
+| Maximum daily loss | 1.0% |
+| Maximum total drawdown | 10.0% |
+| Risk per trade | 0.5% |
+| Maximum open positions | 3, spot only, no leverage |
+| Swarm mode | shadow |
+| LLM compute cost | recorded, not limited |
 
-API key lewat variabel lingkungan (`api_key_env`) atau langsung di `config/config.yaml`. Keduanya ada di `.gitignore`; berkas config menyimpan key sebagai teks biasa di disk, jadi anggap bocor bila berkas itu tersalin keluar.
+API keys come from environment variables (`api_key_env`) or are written directly into `config/config.yaml`. Both are git-ignored. A key in the config file is stored as plain text on disk, so treat it as leaked if that file ever leaves the machine.
 
-## Batas yang perlu diketahui
+## Limits you should know about
 
-- Indodax tidak didukung resmi oleh Freqtrade 2026.9; data OHLCV terambil, tetapi jalur order live belum pernah dijalankan. Karena itu mode live tidak bisa menyala di build ini, dan stop loss berjalan di sisi bot (PC harus menyala).
-- Pajak 0,21% per sisi berasal dari sumber sekunder dan belum diverifikasi dari dokumen resmi.
-- Swarm diuji sebagai penyaring yang diukur, bukan sumber profit yang diasumsikan. Bukti ensemble menaikkan profit trading belum ditemukan; yang ada untuk prediksi peristiwa, bukan harga ([docs/research-swarm-pwa.md](docs/research-swarm-pwa.md)).
-- Selama pengujian semua voter memakai model yang sama, jadi kesalahan mereka berkorelasi. Nilai swarm baru bisa diukur dengan voter lintas vendor di forward test.
-- Uji mesin 7 hari non-stop pada aplikasi penuh sedang berjalan; hasilnya belum ada.
+- Indodax is not officially supported by Freqtrade 2026.9. OHLCV data works, but the live order path has never been run. For that reason live mode cannot start in this build, and the stop loss runs on the bot side, so the PC must stay on.
+- The 0.21% tax per side comes from a secondary source and has not been checked against an official document.
+- The swarm is built as a filter that gets measured, not as an assumed source of profit. Evidence that ensembles raise trading profit has not been found; what exists is for event forecasting, not prices ([docs/research-swarm-pwa.md](docs/research-swarm-pwa.md)).
+- During testing every voter used the same model, so their errors are correlated. The swarm's value can only be measured with voters from several vendors in a forward test.
+- A 7-day non-stop engine test on the complete application is in progress; there are no results yet.
 
-## Struktur
+## Layout
 
-| Jalur | Isi |
+| Path | Contents |
 | --- | --- |
-| `engine/` | launcher, skema konfigurasi, lapisan risiko, strategi, layanan bayangan, penyimpanan keputusan |
-| `swarm/` | paket `tb_swarm`: voter, adapter, agregasi, agen analis |
-| `gateway/`, `analytics/` | gateway PWA dan rute analitik |
-| `pwa/` | panel PWA dan gateway tiruan |
-| `scripts/` | menjalankan seluruh mesin sebagai unit systemd, ukur, rekam fixture, backtest |
-| `docker/`, `docker-compose.yml` | image turunan Freqtrade |
-| `docs/` | [plan](docs/plan.md), [kontrak gateway](docs/gateway-api.md), [operasi](docs/operations.md), [riset](docs/research-swarm-pwa.md), temuan per tahap |
-| `vendor/freqtrade` | submodule Freqtrade, terkunci di tag 2026.9 |
+| `engine/` | launcher, configuration schema, risk layer, strategy, shadow service, decision store |
+| `swarm/` | the `tb_swarm` package: voters, adapters, aggregation, analyst agent |
+| `gateway/`, `analytics/` | the PWA gateway and the analytics routes |
+| `pwa/` | the PWA panel and the mock gateway |
+| `scripts/` | run the whole stack as systemd units, measure, record fixtures, backtest |
+| `docker/`, `docker-compose.yml` | the image derived from Freqtrade |
+| `docs/` | [plan](docs/plan.md), [gateway contract](docs/gateway-api.md), [operations](docs/operations.md), [research](docs/research-swarm-pwa.md), [languages](docs/i18n.md), per-stage findings |
+| `vendor/freqtrade` | the Freqtrade submodule, pinned to tag 2026.9 |
 
-## Tes
+## Tests
 
 ```bash
 docker compose --profile test build tests
@@ -135,8 +136,8 @@ docker compose --profile test run --rm tests
 cd pwa && npm test
 ```
 
-Tes engine berjalan di dalam image turunan Freqtrade supaya versi Freqtrade, ccxt, dan pandas sama dengan mesin. Hook git (`git config core.hooksPath .githooks`) menolak komentar di kode kita dan commit yang bukan Conventional Commits.
+The engine tests run inside the Freqtrade-derived image so the Freqtrade, ccxt and pandas versions match the engine. The git hooks (`git config core.hooksPath .githooks`) reject comments in our code and commits that are not Conventional Commits.
 
-## Lisensi
+## License
 
-[GPL-3.0](LICENSE), sama dengan Freqtrade: strategi dan launcher mengimpor Freqtrade dan image Docker diturunkan darinya. Perangkat lunak ini disediakan apa adanya; trading menanggung risiko kehilangan seluruh modal.
+[GPL-3.0](LICENSE), the same as Freqtrade: the strategy and launcher import Freqtrade and the Docker image derives from it. The software is provided as is, and trading risks losing all of your capital.
