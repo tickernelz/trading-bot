@@ -31,16 +31,16 @@ TEXT_COLUMNS = {"pair", "enter_tag", "exit_reason"}
 FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
 
 TAX_BASIS = {
-    "regulation": "PMK 50/2025 (berlaku 1 Agustus 2025)",
-    "applies_to": "penjualan aset kripto lewat PPMSE yang merupakan PAKD dalam negeri: PPh Pasal 22 final atas nilai transaksi",
-    "rate_note": "0,21% untuk PAKD dalam negeri, 1% bila bukan PAKD dalam negeri; angka di bawah memakai pph22_final_pct dari konfigurasi",
-    "verified_against": "artikel Direktorat Jenderal Pajak, pajak.go.id, 31 Juli 2025 (disunting 8 September 2025)",
+    "regulation": "PMK 50/2025 (effective 1 August 2025)",
+    "applies_to": "sales of crypto assets through a domestic PPMSE that is a domestic PAKD: final Article 22 income tax (PPh 22) on the transaction value",
+    "rate_note": "0.21% for a domestic PAKD, 1% otherwise; the figures below use pph22_final_pct from the configuration",
+    "verified_against": "Directorate General of Taxes article, pajak.go.id, 31 July 2025 (edited 8 September 2025)",
     "not_verified": [
-        "status Indodax sebagai PAKD",
-        "teks resmi pasal PMK 50/2025 (hanya dibaca lewat artikel DJP)",
-        "PPN atas jasa platform dan biaya platform tidak dihitung",
+        "Indodax status as a PAKD",
+        "official text of the PMK 50/2025 articles (read only through the DGT article)",
+        "VAT on platform services and platform fees is not computed",
     ],
-    "disclaimer": "Informasi dari data dry-run, bukan nasihat pajak dan bukan laporan pajak. Dry-run tidak memotong pajak sungguhan.",
+    "disclaimer": "Information from dry-run data, not tax advice and not a tax report. The dry run does not withhold real tax.",
 }
 
 

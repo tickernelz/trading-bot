@@ -3,51 +3,51 @@
 <defs><marker id="ar" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#0b3a6e"/></marker></defs>
 <rect x="8" y="8" width="200" height="74" rx="8" fill="#eef2f8" stroke="#8795ad"/>
 <text x="108" y="26" text-anchor="middle" font-weight="700" fill="#0b3a6e">Data</text>
-<text x="108" y="42" text-anchor="middle">harga publik Indodax (Freqtrade)</text>
-<text x="108" y="56" text-anchor="middle">RSS berita: CoinDesk, Cointelegraph</text>
+<text x="108" y="42" text-anchor="middle">Indodax public prices (Freqtrade)</text>
+<text x="108" y="56" text-anchor="middle">News RSS: CoinDesk, Cointelegraph</text>
 <text x="108" y="70" text-anchor="middle">Fear and Greed (alternative.me)</text>
 <rect x="245" y="8" width="200" height="74" rx="8" fill="#dce8fb" stroke="#0b3a6e"/>
-<text x="345" y="26" text-anchor="middle" font-weight="700" fill="#0b3a6e">1. Engine Freqtrade</text>
-<text x="345" y="42" text-anchor="middle">di PC Zhafron (Docker, rekomendasi)</text>
+<text x="345" y="26" text-anchor="middle" font-weight="700" fill="#0b3a6e">1. Freqtrade Engine</text>
+<text x="345" y="42" text-anchor="middle">on the owner's PC (Docker, recommended)</text>
 <text x="345" y="56" text-anchor="middle">submodule vendor/freqtrade</text>
-<text x="345" y="70" text-anchor="middle">strategi swing 1-4 jam: kandidat entry</text>
+<text x="345" y="70" text-anchor="middle">1-4 hour swing strategy: entry candidates</text>
 <rect x="482" y="8" width="200" height="74" rx="8" fill="#fff0c2" stroke="#b58900"/>
-<text x="582" y="26" text-anchor="middle" font-weight="700" fill="#6b5200">2. Swarm (hanya penyaring)</text>
-<text x="582" y="42" text-anchor="middle">voter A (decision) + voter B (harga)</text>
-<text x="582" y="56" text-anchor="middle">median, sebaran, kuorum, fail-closed</text>
-<text x="582" y="70" text-anchor="middle">hanya batalkan atau kecilkan entry</text>
+<text x="582" y="26" text-anchor="middle" font-weight="700" fill="#6b5200">2. Swarm (filter only)</text>
+<text x="582" y="42" text-anchor="middle">voter A (decision) + voter B (price)</text>
+<text x="582" y="56" text-anchor="middle">median, spread, quorum, fail-closed</text>
+<text x="582" y="70" text-anchor="middle">can only cancel or reduce an entry</text>
 <rect x="482" y="125" width="200" height="74" rx="8" fill="#fbd9d6" stroke="#b3261e"/>
-<text x="582" y="143" text-anchor="middle" font-weight="700" fill="#8c1c14">3. Lapisan risiko deterministik</text>
-<text x="582" y="159" text-anchor="middle">risiko per trade, batas rugi harian</text>
-<text x="582" y="173" text-anchor="middle">dan total, kill switch, ukuran posisi</text>
-<text x="582" y="187" text-anchor="middle">tidak melewati AI</text>
+<text x="582" y="143" text-anchor="middle" font-weight="700" fill="#8c1c14">3. Deterministic risk layer</text>
+<text x="582" y="159" text-anchor="middle">risk per trade, daily loss limit</text>
+<text x="582" y="173" text-anchor="middle">and total loss limit, kill switch, position size</text>
+<text x="582" y="187" text-anchor="middle">does not pass through AI</text>
 <rect x="245" y="125" width="200" height="74" rx="8" fill="#d8f0e0" stroke="#1b7a3a"/>
-<text x="345" y="143" text-anchor="middle" font-weight="700" fill="#14602e">4. Order dan exit</text>
-<text x="345" y="159" text-anchor="middle">deterministik</text>
-<text x="345" y="173" text-anchor="middle">stop loss berjalan di sisi bot</text>
-<text x="345" y="187" text-anchor="middle">(bukan di exchange)</text>
+<text x="345" y="143" text-anchor="middle" font-weight="700" fill="#14602e">4. Orders and exits</text>
+<text x="345" y="159" text-anchor="middle">deterministic</text>
+<text x="345" y="173" text-anchor="middle">stop loss runs on the bot side</text>
+<text x="345" y="187" text-anchor="middle">(not on the exchange)</text>
 <rect x="8" y="125" width="200" height="74" rx="8" fill="#eef2f8" stroke="#8795ad"/>
-<text x="108" y="150" text-anchor="middle" font-weight="700" fill="#0b3a6e">Exchange Indodax</text>
-<text x="108" y="166" text-anchor="middle">dry-run: tanpa akun dan API key</text>
-<text x="108" y="180" text-anchor="middle">dukungan Freqtrade: belum terbukti</text>
+<text x="108" y="150" text-anchor="middle" font-weight="700" fill="#0b3a6e">Indodax Exchange</text>
+<text x="108" y="166" text-anchor="middle">dry-run: no account and no API key</text>
+<text x="108" y="180" text-anchor="middle">Freqtrade support: not yet proven</text>
 <rect x="8" y="262" width="200" height="86" rx="8" fill="#f3eefb" stroke="#6b4fa3"/>
-<text x="108" y="280" text-anchor="middle" font-weight="700" fill="#4b2f85">5. System 2 (di luar loop order)</text>
-<text x="108" y="296" text-anchor="middle">agen analis deepagents</text>
-<text x="108" y="310" text-anchor="middle">review harian, riset strategi</text>
-<text x="108" y="324" text-anchor="middle">tool hanya baca: metrik,</text>
-<text x="108" y="338" text-anchor="middle">riwayat trade, log voter</text>
+<text x="108" y="280" text-anchor="middle" font-weight="700" fill="#4b2f85">5. System 2 (outside the order loop)</text>
+<text x="108" y="296" text-anchor="middle">deepagents analyst agent</text>
+<text x="108" y="310" text-anchor="middle">daily review, strategy research</text>
+<text x="108" y="324" text-anchor="middle">read-only tools: metrics,</text>
+<text x="108" y="338" text-anchor="middle">trade history, voter logs</text>
 <rect x="245" y="262" width="200" height="86" rx="8" fill="#e6f4f1" stroke="#0f766e"/>
-<text x="345" y="280" text-anchor="middle" font-weight="700" fill="#0f766e">Gateway kecil (buatan sendiri)</text>
-<text x="345" y="296" text-anchor="middle">auth, endpoint baca, kill switch</text>
-<text x="345" y="310" text-anchor="middle">Web Push; key dari env atau config,</text>
-<text x="345" y="324" text-anchor="middle">tanpa endpoint yang kembalikan key</text>
-<text x="345" y="338" text-anchor="middle">HTTPS tunnel; API Freqtrade lokal</text>
+<text x="345" y="280" text-anchor="middle" font-weight="700" fill="#0f766e">Small gateway (self-built)</text>
+<text x="345" y="296" text-anchor="middle">auth, read endpoints, kill switch</text>
+<text x="345" y="310" text-anchor="middle">Web Push; keys from env or config,</text>
+<text x="345" y="324" text-anchor="middle">no endpoint that returns a key</text>
+<text x="345" y="338" text-anchor="middle">HTTPS tunnel; local Freqtrade API</text>
 <rect x="482" y="262" width="200" height="86" rx="8" fill="#e8eef7" stroke="#0b3a6e"/>
-<text x="582" y="280" text-anchor="middle" font-weight="700" fill="#0b3a6e">6. PWA (panel kontrol)</text>
-<text x="582" y="296" text-anchor="middle">dasbor, grafik dan aksi live,</text>
-<text x="582" y="310" text-anchor="middle">swarm, konfigurasi, provider</text>
-<text x="582" y="324" text-anchor="middle">(tanpa kolom key di ponsel)</text>
-<text x="582" y="338" text-anchor="middle">ponsel (Android, iOS) dan desktop</text>
+<text x="582" y="280" text-anchor="middle" font-weight="700" fill="#0b3a6e">6. PWA (control panel)</text>
+<text x="582" y="296" text-anchor="middle">dashboard, charts and live actions,</text>
+<text x="582" y="310" text-anchor="middle">swarm, configuration, providers</text>
+<text x="582" y="324" text-anchor="middle">(no key field on the phone)</text>
+<text x="582" y="338" text-anchor="middle">phone (Android, iOS) and desktop</text>
 <g stroke="#0b3a6e" stroke-width="1.6" fill="none" marker-end="url(#ar)">
 <line x1="208" y1="45" x2="243" y2="45"/>
 <line x1="445" y1="45" x2="480" y2="45"/>
@@ -61,8 +61,8 @@
 <g stroke="#6b4fa3" stroke-width="1.4" stroke-dasharray="5,3" fill="none" marker-end="url(#ar)">
 <line x1="208" y1="305" x2="243" y2="305"/>
 </g>
-<text x="345" y="232" text-anchor="middle" font-size="9.5" fill="#444">status, posisi, log voter (baca)</text>
-<text x="226" y="297" text-anchor="middle" font-size="9" fill="#4b2f85">baca</text>
-<text x="345" y="380" text-anchor="middle" font-size="10" fill="#8c1c14" font-weight="700">AI tidak memegang exit, stop loss, atau batas risiko, dan tidak punya tool untuk membuat order.</text>
-<text x="345" y="394" text-anchor="middle" font-size="9" fill="#555">Diagram sederhana; sumber: plan ZHA-3760 bagian 2, 4.1, 4.5, 6.</text>
+<text x="345" y="232" text-anchor="middle" font-size="9.5" fill="#444">status, positions, voter logs (read)</text>
+<text x="226" y="297" text-anchor="middle" font-size="9" fill="#4b2f85">read</text>
+<text x="345" y="380" text-anchor="middle" font-size="10" fill="#8c1c14" font-weight="700">The AI does not control exits, stop loss, or risk limits, and has no tool for creating orders.</text>
+<text x="345" y="394" text-anchor="middle" font-size="9" fill="#555">Simplified diagram; source: plan, sections 2, 4.1, 4.5, 6.</text>
 </svg></div>

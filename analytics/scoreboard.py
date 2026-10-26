@@ -112,9 +112,9 @@ def voter_row(stats: VoterStats, config: Scoreboard) -> dict[str, Any]:
         row.update({"brier": brier, "brier_baseline": baseline, "ece": ece, "bins": bins})
         row["shortfall"] = brier - baseline
         if ece > config.max_ece:
-            reasons.append(f"ece {ece:.3f} di atas batas {config.max_ece}")
+            reasons.append(f"ece {ece:.3f} above the limit {config.max_ece}")
         if brier > baseline + config.brier_margin:
-            reasons.append(f"brier {brier:.3f} lebih buruk dari penebak konstan {baseline:.3f} + {config.brier_margin}")
+            reasons.append(f"brier {brier:.3f} worse than the constant guesser {baseline:.3f} + {config.brier_margin}")
     if n < config.min_samples:
         return row
     row["status"] = "drifting" if reasons else "ok"
@@ -133,12 +133,12 @@ def scoreboard(decisions: tuple[RecordedDecision, ...], config: Scoreboard) -> d
         "voters": sorted(rows, key=lambda row: row["voter_id"]),
         "definition": {
             "take": list(TAKE),
-            "outcome": "trade tertutup dengan profit_abs > 0",
-            "probability": "jumlah probabilitas izinkan dan kecilkan; hanya dipakai bila semua jawaban voter membawa probabilitas",
-            "kind": "probabilistic bila semua jawaban berprobabilitas, choice_only bila ada jawaban tanpa probabilitas",
-            "drifting": "n >= min_samples dan: probabilistic: ece > max_ece atau brier > brier penebak konstan + brier_margin; choice_only: akurasi < akurasi penebak kelas mayoritas - accuracy_margin",
+            "outcome": "closed trade with profit_abs > 0",
+            "probability": "sum of the allow and reduce probabilities; used only when every voter answer carries probabilities",
+            "kind": "probabilistic when every answer carries probabilities, choice_only when any answer has none",
+            "drifting": "n >= min_samples and: probabilistic: ece > max_ece or brier > constant-guesser brier + brier_margin; choice_only: accuracy < majority-class guesser accuracy - accuracy_margin",
         },
-        "note": "Papan skor adalah data kalibrasi, bukan kesimpulan untung atau rugi.",
+        "note": "The scoreboard is calibration data, not a conclusion about profit or loss.",
     }
 
 

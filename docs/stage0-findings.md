@@ -1,39 +1,39 @@
-# Temuan Tahap 0b dan 0c
+# Stage 0b and 0c Findings
 
-Dokumen ini mencatat apa yang sudah terbukti di Tahap 0b dan 0c, angka yang terukur, dan apa yang masih belum terbukti. Sumber kebenaran tetap `docs/plan.md` revisi 10 pada ZHA-3760.
+This document records what has been proven in Stage 0b and 0c, the measured numbers, and what remains unproven. The source of truth remains `docs/plan.md` revision 10.
 
-Kode ada di `swarm/` (paket Python `tb_swarm`, `pyproject.toml` sendiri supaya tidak bertabrakan dengan `pyproject.toml` akar saat pekerjaan Tahap 0a berjalan). Vendor `vendor/freqtrade` tidak disentuh.
+The code is in `swarm/` (Python package `tb_swarm`, with its own `pyproject.toml` so it does not collide with the root `pyproject.toml` while Stage 0a work is in progress). The `vendor/freqtrade` vendor directory is untouched.
 
-## Ringkasan bukti
+## Evidence summary
 
-| Butir | Status | Bukti |
+| Item | Status | Evidence |
 | --- | --- | --- |
-| 1. Antarmuka `DecisionProvider` tiga primitif + tiga adapter | Terbukti | `swarm/tb_swarm/providers/`, 18 tes wire |
-| 2. Registri voter, kuorum 5/7, pengacakan opsi, median | Terbukti | `swarm/tb_swarm/{config,runner,shuffle,aggregate}.py`, 45 tes |
-| 3. Semua adapter diuji ke server stub lokal | Terbukti | `swarm/tb_swarm/stub_server.py`, tanpa key dan tanpa jaringan |
-| 4. Uji hidup `nutaraline/deepseek-v4.1-flash-1017` | Terbukti: 20/20 valid di setiap sel, dua kali (effort bawaan dan `high`) | `swarm/bench/live_nutaraline.py`, bagian Butir 4 |
-| 5. Agen analis deepagents 0.7.32 + uji ulang ZHA-3610 | Terbukti, termasuk latensi dan token hidup | `swarm/tb_swarm/agents.py`, 21 tes, `bench/bench_voter_overhead.py` |
-| 6. Kronos mini di CPU | Terbukti (waktu, memori, median antar jalur) | `swarm/bench/bench_kronos.py`, 10 konfigurasi |
-| 7. Temuan dan angka di dokumen ini | Dokumen ini | - |
-| 8. Tahap 0c: System One dan OpenAI Decisions hidup di Experiential Labs, adapter `openai_decisions` baru | Terbukti: 20/20 valid untuk `jev-latest`, `clef-flash`, `gpt-6-luna-decisions` | bagian "Tahap 0c", `swarm/bench/live_voters.py` |
-| 9. Tahap 0c: tujuh voter `llm_structured` dari tujuh provider dan kuorum 5 dari 7 nyata | Terbukti: 20/20 valid per voter terpilih; kuorum 18 dari 20 dan 20 dari 20 keputusan lolos | bagian "Tahap 0c", Butir 3 dan 4 |
-| 10. Tahap 0c: OpenRouter Decisions | Belum terbukti (tidak ada kunci) | bagian "Tahap 0c", Butir 2 |
+| 1. `DecisionProvider` interface, three primitives + three adapters | Proven | `swarm/tb_swarm/providers/`, 18 wire tests |
+| 2. Voter registry, 5/7 quorum, option shuffling, median | Proven | `swarm/tb_swarm/{config,runner,shuffle,aggregate}.py`, 45 tests |
+| 3. All adapters tested against a local stub server | Proven | `swarm/tb_swarm/stub_server.py`, no key and no network |
+| 4. Live test of `nutaraline/deepseek-v4.1-flash-1017` | Proven: 20/20 valid in every cell, twice (default effort and `high`) | `swarm/bench/live_nutaraline.py`, section Item 4 |
+| 5. deepagents 0.7.32 analyst agent + re-test of the earlier subagent tool-inheritance finding | Proven, including live latency and tokens | `swarm/tb_swarm/agents.py`, 21 tests, `bench/bench_voter_overhead.py` |
+| 6. Kronos mini on CPU | Proven (time, memory, median across paths) | `swarm/bench/bench_kronos.py`, 10 configurations |
+| 7. Findings and numbers in this document | This document | - |
+| 8. Stage 0c: System One and OpenAI Decisions live at Experiential Labs, new `openai_decisions` adapter | Proven: 20/20 valid for `jev-latest`, `clef-flash`, `gpt-6-luna-decisions` | section "Stage 0c", `swarm/bench/live_voters.py` |
+| 9. Stage 0c: seven `llm_structured` voters from seven providers and a real 5-of-7 quorum | Proven: 20/20 valid per selected voter; quorum passed on 18 of 20 and 20 of 20 decisions | section "Stage 0c", Items 3 and 4 |
+| 10. Stage 0c: OpenRouter Decisions | Not proven (no key) | section "Stage 0c", Item 2 |
 
-Suite: `170 passed` pada Tahap 0c (`cd swarm && .venv/bin/python -m pytest`, dijalankan lewat `heavy` pada commit `8eeb4a6`, yang pohon kodenya identik dengan commit terakhir; sesudahnya hanya dokumen yang berubah), tanpa jaringan, tanpa key; 43,1 detik, RSS puncak 206 MB (`/usr/bin/time -v`). Tahap 0b: `161 passed`, 28,5 detik, RSS 203 MB. `tests/test_settings.py` di akar (21 tes, termasuk validasi `config.example.yaml` oleh skema mesin) lulus di venv swarm.
+Suite: `170 passed` at Stage 0c (`cd swarm && .venv/bin/python -m pytest`, run via `heavy` on commit `8eeb4a6`, whose code tree is identical to the final commit; only documents changed afterwards), no network, no key; 43.1 seconds, peak RSS 206 MB (`/usr/bin/time -v`). Stage 0b: `161 passed`, 28.5 seconds, RSS 203 MB. `tests/test_settings.py` at the root (21 tests, including validation of `config.example.yaml` by the engine schema) passes in the swarm venv.
 
-## Butir 1: antarmuka keputusan
+## Item 1: decision interface
 
-`DecisionProvider` (`swarm/tb_swarm/providers/base.py`) punya satu metode abstrak `decide(request) -> DecisionResponse` plus tiga primitif tipis `noul()`, `choice()`, `score()` di atasnya. Pertanyaan bertipe pydantic: `NoulQuestion` (probabilitas 0..1), `ChoiceQuestion` (2 sampai 255 opsi, batas 255 dari dokumentasi Jev), `ScoreQuestion` (rubrik berurut, minimal 2 level).
+`DecisionProvider` (`swarm/tb_swarm/providers/base.py`) has one abstract method `decide(request) -> DecisionResponse` plus three thin primitives `noul()`, `choice()`, `score()` on top of it. Questions are typed with pydantic: `NoulQuestion` (probability 0..1), `ChoiceQuestion` (2 to 255 options, the 255 limit from the Jev documentation), `ScoreQuestion` (ordered rubric, at least 2 levels).
 
-Tiga adapter pada Tahap 0b; Tahap 0c menambah `openai_decisions` (`POST {base_url}/v1/decisions`, lihat bagian "Tahap 0c"):
+Three adapters in Stage 0b; Stage 0c adds `openai_decisions` (`POST {base_url}/v1/decisions`, see section "Stage 0c"):
 
-- `llm_structured` untuk tipe API `openai-completions`, `openai-responses`, dan `anthropic-messages` lewat LangChain (`ChatOpenAI`, `ChatAnthropic`). Tiga tipe ini nyata dipakai, bukan sekadar antarmuka: ketiganya mengirim request ke wire masing-masing dan diuji ke stub (`/v1/chat/completions`, `/v1/responses`, `/v1/messages`).
+- `llm_structured` for the API types `openai-completions`, `openai-responses`, and `anthropic-messages` via LangChain (`ChatOpenAI`, `ChatAnthropic`). These three types are actually used, not just interfaces: all three send requests over their respective wires and are tested against the stub (`/v1/chat/completions`, `/v1/responses`, `/v1/messages`).
 - `systemone`: `POST {base_url}/v1/systemone`.
-- `openrouter_decisions`: `POST {base_url}/api/alpha/decisions` dengan default `base_url` `https://openrouter.ai`.
+- `openrouter_decisions`: `POST {base_url}/api/alpha/decisions` with default `base_url` `https://openrouter.ai`.
 
-Pertanyaan dan jawaban divalidasi ketat (`swarm/tb_swarm/validate.py`): nama jawaban harus persis sama dengan nama pertanyaan, `noul` di [0, 1], `choice` harus salah satu kunci opsi, `score` di [0, N-1], probabilitas harus memuat semua opsi. Jawaban yang menyimpang dianggap voter gagal, tidak pernah ditebak.
+Questions and answers are validated strictly (`swarm/tb_swarm/validate.py`): the answer name must be exactly the same as the question name, `noul` in [0, 1], `choice` must be one of the option keys, `score` in [0, N-1], probabilities must cover all options. A deviating answer counts as a failed voter, never guessed.
 
-### Wire yang dikutip
+### Quoted wire
 
 OpenRouter Decisions (alpha), `POST /api/alpha/decisions`, https://openrouter.ai/docs/api/api-reference/alphadecisions/submit-a-decisions-request :
 
@@ -46,7 +46,7 @@ questions:
   urgency: {type: score,  instructions: '...', criteria: ['Can wait for the next release', '...']}
 ```
 
-Jawaban pada contoh resmi:
+Answer in the official example:
 
 ```yaml
 answers:
@@ -63,204 +63,204 @@ TypeSafe System One, `POST /v1/systemone`, https://docs.typesafe.ai/api/system-o
 
 ```yaml
 model: jev-latest
-state: 'teks bebas atau objek apa pun'
+state: 'free text or any object'
 questions:
   billing: {type: noul,   instructions: '...'}
   tone:    {type: choice, instructions: '...', criteria: {angry: '...', calm: '...'}}
   urgency: {type: score,  instructions: '...', criteria: ['Can wait', '...']}
 ```
 
-Jawaban: `model`, `answers` (kunci sama dengan nama pertanyaan), `usage: {input_tokens, output_tokens}`; `choice` dan `score` membawa `confidence` serta `probabilities`, `score` juga `legend`.
+Answer: `model`, `answers` (keys same as the question names), `usage: {input_tokens, output_tokens}`; `choice` and `score` carry `confidence` and `probabilities`, and `score` also `legend`.
 
-Yang belum terverifikasi dan karena itu ditandai:
+What is not yet verified and is therefore flagged:
 
-- Skema autentikasi OpenRouter: dokumentasi hanya menyebut skema `apiKey`; implementasi mengirim `Authorization: Bearer <key>` (perilaku umum OpenRouter) tetapi belum diuji hidup.
-- `base_url` OpenRouter di dokumentasi ditulis `https://openrouter.ai/api/v1` karena itu server default OpenAPI, sedangkan path endpoint-nya `/api/alpha/decisions` (bukan `/api/v1/...`). Adapter memakai base `https://openrouter.ai` + path tersebut; belum diuji hidup.
-- Header `TypeSafe-Danger-Zone-Images` dan `TypeSafe-Danger-Zone-Long-Context` tidak dipakai (di luar lingkup Tahap 0b).
-- Penamaan tipe API pada item provider (`openai-responses`, `anthropic-messages`) mengikuti konvensi OpenRouter/models.yml yang disebut plan, bukan spesifikasi resmi vendor.
+- OpenRouter authentication scheme: the documentation only mentions the `apiKey` scheme; the implementation sends `Authorization: Bearer <key>` (common OpenRouter behaviour) but it has not been tested live.
+- The OpenRouter `base_url` in the documentation is written `https://openrouter.ai/api/v1` because that is the default OpenAPI server, while the endpoint path is `/api/alpha/decisions` (not `/api/v1/...`). The adapter uses base `https://openrouter.ai` + that path; not tested live.
+- The headers `TypeSafe-Danger-Zone-Images` and `TypeSafe-Danger-Zone-Long-Context` are not used (outside the scope of Stage 0b).
+- The naming of API types on provider items (`openai-responses`, `anthropic-messages`) follows the OpenRouter/models.yml convention mentioned in the plan, not an official vendor specification.
 
-## Butir 2: registri voter dan penggabungan
+## Item 2: voter registry and aggregation
 
-Konfigurasi (`swarm/tb_swarm/config.py`) menerima `providers` (daftar atau peta) dan `swarm.voters` (id, adapter, provider, model, variation, timeout_s, weight, enabled, temperature, structured_mode, backend, extra_body). Divalidasi saat muat: id voter unik, provider dikenal, adapter cocok dengan tipe provider, model termasuk daftar model provider, dan jumlah voter aktif harus sanggup mencapai kuorum. Contoh `config/config.example.yaml` di repo lolos apa adanya (7 voter, `min_voters_answered: 5`).
+The configuration (`swarm/tb_swarm/config.py`) accepts `providers` (list or map) and `swarm.voters` (id, adapter, provider, model, variation, timeout_s, weight, enabled, temperature, structured_mode, backend, extra_body). Validated at load time: voter ids are unique, providers are known, the adapter matches the provider type, the model is in the provider's model list, and the number of enabled voters must be able to reach quorum. The `config/config.example.yaml` in the repo passes as is (7 voters, `min_voters_answered: 5`).
 
-Aturan keputusan (`swarm/tb_swarm/runner.py`):
+Decision rules (`swarm/tb_swarm/runner.py`):
 
-- Semua voter aktif dijalankan serentak, masing-masing dengan batas waktunya sendiri (`asyncio.wait_for`). Voter yang lewat batas, error HTTP, kunci salah, jawaban tidak valid, atau exception tak terduga dibuang dari keputusan itu dan dicatat alasannya (`timeout`, `failed`, `invalid`).
-- Kuorum: kurang dari `min_voters_answered` (5) jawaban sah berarti hasil `skip` dengan alasan `quorum_not_met`. Fail-closed: tidak ada agregat, sehingga konsumen tidak bisa mengambil keputusan.
-- Urutan opsi diacak per voter per keputusan dengan RNG ber-seed (`seed:decision_id:voter_id`), termasuk membalik rubrik `score`; jawaban dipulihkan ke urutan asli sebelum digabung. Voter tetap menjawab berdasarkan nama kunci, jadi pengacakan hanya menghapus bias posisi.
-- Penggabungan: median berbobot (bobot voter) untuk `noul` dan `score`, plus sebaran kuartil (q25, q75, IQR, min, maks); untuk `choice` dipakai median probabilitas per opsi (distribusi ternormalisasi; satu-panas bila model tidak memberi probabilitas), pemenang, jumlah suara, dan tingkat kesepakatan berbobot. Seri (dua opsi atau lebih dengan median tertinggi sama, mis. tanpa mayoritas pada surat suara satu-panas) berarti voter tidak sepakat: hasil `skip` dengan alasan `choice_tie:<pertanyaan>`, dicek sebelum gerbang sebaran.
-- `max_spread` opsional: bila IQR melebihi ambang, hasil `skip` dengan alasan `spread_exceeded:<pertanyaan>`. Ambang ini berlaku untuk `noul` dan untuk probabilitas pemenang `choice`; `score` tidak ikut diperiksa karena satuannya level rubrik, bukan probabilitas, sehingga satu angka ambang tidak bisa adil untuk keduanya.
-- Setiap keputusan dapat dicatat ke JSONL (`swarm.log_path`): request, status, agregat, dan satu baris per voter (status, latency, model, usage, jawaban, urutan opsi yang disajikan, rubrik yang dibalik).
+- All enabled voters run concurrently, each with its own time limit (`asyncio.wait_for`). A voter that exceeds the limit, returns an HTTP error, has a wrong key, returns an invalid answer, or raises an unexpected exception is dropped from that decision and the reason is recorded (`timeout`, `failed`, `invalid`).
+- Quorum: fewer than `min_voters_answered` (5) valid answers means a `skip` result with reason `quorum_not_met`. Fail-closed: there is no aggregate, so the consumer cannot take a decision.
+- Option order is shuffled per voter per decision with a seeded RNG (`seed:decision_id:voter_id`), including reversing the `score` rubric; answers are restored to the original order before being combined. Voters still answer by key name, so shuffling only removes position bias.
+- Aggregation: weighted median (voter weight) for `noul` and `score`, plus quartile spread (q25, q75, IQR, min, max); for `choice` the per-option median probability is used (normalised distribution; one-hot if the model gives no probabilities), the winner, the vote count, and the weighted agreement rate. A tie (two or more options with the same highest median, e.g. no majority on a one-hot ballot) means the voters disagree: a `skip` result with reason `choice_tie:<question>`, checked before the spread gate.
+- Optional `max_spread`: if the IQR exceeds the threshold, a `skip` result with reason `spread_exceeded:<question>`. This threshold applies to `noul` and to the winning probability of `choice`; `score` is not checked because its unit is a rubric level, not a probability, so a single threshold cannot be fair to both.
+- Every decision can be logged to JSONL (`swarm.log_path`): request, status, aggregate, and one line per voter (status, latency, model, usage, answer, presented option order, reversed rubric).
 
-## Butir 3: uji ke stub lokal
+## Item 3: test against a local stub
 
-`swarm/tb_swarm/stub_server.py` adalah server HTTP lokal (port acak) yang meniru lima wire: `/v1/systemone`, `/api/alpha/decisions`, `/v1/chat/completions`, `/v1/responses`, `/v1/messages`. Perilaku per model bisa diatur: kebijakan jawaban, delay, status gagal, keluaran rusak, jumlah token reasoning. Server menolak kunci salah dengan 401, sehingga tes bisa membuktikan jalur auth. Tidak ada jaringan keluar dan tidak ada key di tes: kunci yang dipakai hanya `stub-key-not-a-secret`.
+`swarm/tb_swarm/stub_server.py` is a local HTTP server (random port) that imitates five wires: `/v1/systemone`, `/api/alpha/decisions`, `/v1/chat/completions`, `/v1/responses`, `/v1/messages`. Behavior per model is configurable: answer policy, delay, failure status, malformed output, number of reasoning tokens. The server rejects a wrong key with 401, so tests can prove the auth path. There is no outbound network and no key in the tests: the only key used is `stub-key-not-a-secret`.
 
-Hasil stub bukan bukti kualitas model, hanya bukti bentuk wire, parsing, klasifikasi error, dan logika keputusan.
+Stub results are not evidence of model quality, only evidence of wire shape, parsing, error classification, and decision logic.
 
-## Butir 4: uji hidup nutaraline
+## Item 4: live test of nutaraline
 
-Dijalankan 2026-10-26 ke `https://nutaraline.co.uk/v1`, model `deepseek-v4.1-flash-1017`, tipe API `openai-completions`. Kunci diambil dari `NUTARALINE_API_KEY` di `.env` worktree yang di-gitignore (izin Zhafron lewat komentar Wira di ZHA-3763); nilai `apiKey` di `~/.omp/agent/models.yml` tidak dibaca. Pemeriksaan: nilai kunci tidak ada di berkas yang dilacak git, tidak ada di riwayat git, dan tidak ada di berkas keluaran.
+Run on 2026-10-26 against `https://nutaraline.co.uk/v1`, model `deepseek-v4.1-flash-1017`, API type `openai-completions`. The key was taken from `NUTARALINE_API_KEY` in the worktree's gitignored `.env` (permission from the owner via the operator's approval); the `apiKey` value in `~/.omp/agent/models.yml` was not read. Checks: the key value is not in any git-tracked file, not in git history, and not in any output file.
 
-`swarm/bench/live_nutaraline.py` mengirim 20 contoh keputusan trading (satu pertanyaan `choice`, satu `noul`, satu `score` per contoh), satu provider per sel dengan satu panggilan pemanasan yang tidak dihitung. Sel: backend `direct` x tiga mode (`prompt`, `json_object`, `json_schema`) dan backend `deepagents` x `prompt`.
+`swarm/bench/live_nutaraline.py` sends 20 trading decision samples (one `choice` question, one `noul`, one `score` per sample), one provider per cell with one warm-up call that is not counted. Cells: `direct` backend x three modes (`prompt`, `json_object`, `json_schema`) and `deepagents` backend x `prompt`.
 
-### Dukungan structured output
+### Structured output support
 
-Ketiga mode diterima server dan menghasilkan jawaban valid 20/20. `json_object` dan `json_schema` (strict) tidak ditolak oleh gateway. Catatan: ini membuktikan permintaan diterima dan jawabannya lolos validasi kita; belum membuktikan bahwa server benar-benar menegakkan skema (mode `prompt` juga 20/20, jadi pada 20 contoh ini tidak ada selisih yang bisa dikaitkan dengan penegakan).
+All three modes are accepted by the server and produce valid answers 20/20. `json_object` and `json_schema` (strict) are not rejected by the gateway. Note: this proves the request is accepted and the answer passes our validation; it does not yet prove that the server actually enforces the schema (`prompt` mode is also 20/20, so on these 20 samples there is no difference attributable to enforcement).
 
 ### Reasoning
 
-Tanpa parameter tambahan model menjawab tanpa reasoning (`reasoning_tokens` = 0 pada semua 80 panggilan). Reasoning baru aktif dengan `reasoning_effort: "high"` lewat `extra_body`: respons membawa `reasoning_content` dan `completion_tokens_details.reasoning_tokens`. Untuk tugas ini "reasoning aktif" di deskripsi butir 4 berarti harus dipilih lewat konfigurasi voter (`extra_body`), bukan bawaan model.
+Without extra parameters the model answers without reasoning (`reasoning_tokens` = 0 on all 80 calls). Reasoning only activates with `reasoning_effort: "high"` via `extra_body`: the response carries `reasoning_content` and `completion_tokens_details.reasoning_tokens`. For the stage 0 test, "reasoning enabled" means it must be selected through voter configuration (`extra_body`), not a model default.
 
-### Hasil 20 contoh per sel
+### Results of 20 samples per cell
 
-Laporan mentah (JSON per sel dan per kasus, termasuk jawaban dan token) dilampirkan pada ZHA-3763 sebagai `live_default.json`, `live_high.json` dan `live_nopace.json`; tabel di bawah dihitung dari berkas itu. Putaran yang dilaporkan di sini adalah putaran ulang kedua (2026-10-26) dengan `--interval 3`; putaran pertama (angka serupa, berkasnya tidak disimpan) tidak dipakai sebagai bukti.
+The raw report (JSON per cell and per case, including answers and tokens) is kept outside the repository as `live_default.json`, `live_high.json` and `live_nopace.json`; the tables below are computed from those files. The round reported here is the second re-run (2026-10-26) with `--interval 3`; the first round (similar numbers, file not saved) is not used as evidence.
 
-Effort bawaan (`live_default.json`, 0 percobaan ulang 429):
+Default effort (`live_default.json`, 0 retries on 429):
 
-| Backend | Mode | Valid | Latensi median | p90 | Maks | Token masuk (median) | Token keluar (median) | Token reasoning |
+| Backend | Mode | Valid | Median latency | p90 | Max | Input tokens (median) | Output tokens (median) | Reasoning tokens |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| direct | prompt | 20/20 | 1,36 s | 1,79 s | 6,14 s | 333 | 36 | 0 |
-| direct | json_object | 20/20 | 1,40 s | 1,74 s | 2,10 s | 333 | 36 | 0 |
-| direct | json_schema | 20/20 | 1,30 s | 1,50 s | 1,57 s | 654 | 36 | 0 |
-| deepagents | prompt | 20/20 | 1,75 s | 3,48 s | 5,33 s | 333 | 36 | 0 |
+| direct | prompt | 20/20 | 1.36 s | 1.79 s | 6.14 s | 333 | 36 | 0 |
+| direct | json_object | 20/20 | 1.40 s | 1.74 s | 2.10 s | 333 | 36 | 0 |
+| direct | json_schema | 20/20 | 1.30 s | 1.50 s | 1.57 s | 654 | 36 | 0 |
+| deepagents | prompt | 20/20 | 1.75 s | 3.48 s | 5.33 s | 333 | 36 | 0 |
 
-`reasoning_effort: high` (`live_high.json`, 0 percobaan ulang 429):
+`reasoning_effort: high` (`live_high.json`, 0 retries on 429):
 
-| Backend | Mode | Valid | Latensi median | p90 | Maks | Token masuk (median) | Token keluar (median) | Token reasoning (median / total) |
+| Backend | Mode | Valid | Median latency | p90 | Max | Input tokens (median) | Output tokens (median) | Reasoning tokens (median / total) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| direct | prompt | 20/20 | 4,38 s | 8,66 s | 10,28 s | 358 | 390 | 356 / 8.289 |
-| direct | json_object | 20/20 | 5,26 s | 10,47 s | 10,51 s | 358 | 506 | 473 / 9.641 |
-| direct | json_schema | 20/20 | 3,55 s | 5,20 s | 7,53 s | 679 | 267 | 234 / 5.607 |
-| deepagents | prompt | 20/20 | 4,06 s | 7,47 s | 8,12 s | 358 | 375 | 345 / 8.545 |
+| direct | prompt | 20/20 | 4.38 s | 8.66 s | 10.28 s | 358 | 390 | 356 / 8,289 |
+| direct | json_object | 20/20 | 5.26 s | 10.47 s | 10.51 s | 358 | 506 | 473 / 9,641 |
+| direct | json_schema | 20/20 | 3.55 s | 5.20 s | 7.53 s | 679 | 267 | 234 / 5,607 |
+| deepagents | prompt | 20/20 | 4.06 s | 7.47 s | 8.12 s | 358 | 375 | 345 / 8,545 |
 
-Biaya moneter tidak diukur: respons tidak membawa `usage.cost`.
+Monetary cost was not measured: responses do not carry `usage.cost`.
 
-### Temuan operasional
+### Operational findings
 
-- Mode `json_schema` hampir menggandakan token masuk (654 lawan 333) karena skema ikut dikirim; tanpa selisih kualitas yang terukur pada 20 contoh.
-- Reasoning `high` menaikkan latensi median dari sekitar 1,36 s menjadi 3,55 s sampai 5,26 s dan token keluar dari 36 menjadi sekitar 267 sampai 506. Latensi satu panggilan terlama pada effort `high` 10,51 s, dan pada effort bawaan 6,14 s; putaran pertama mencatat satu panggilan 27,6 s, jadi `timeout_s: 30` di `config.example.yaml` tipis untuk effort `high`.
-- Pembatasan laju per kunci terjadi tetapi tidak deterministik. Pada putaran pertama (empat sel berurutan tanpa jeda) tiga sel terakhir terkena HTTP 429 (`Laju request per key melebihi batas`), 19 dari 20 kasus gagal per sel; berkas laporan putaran itu tidak disimpan, jadi ini hanya catatan pengamatan, bukan data terlampir. Pada percobaan ulang dengan skrip yang sama tanpa jeda dan tanpa percobaan ulang (`--interval 0 --rate-limit-retries 0`, `live_nopace.json`) tidak ada satu pun 429 dan semua 80 panggilan valid. Jadi batas ada, pemicunya belum diketahui (kemungkinan bergantung pada beban gateway atau jendela waktu), dan tujuh voter paralel pada satu kunci belum diuji. Risiko kuorum 5 dari 7 tetap nyata tetapi belum terukur.
-- Skrip uji hidup kini memberi jeda `--interval` (bawaan 3 detik) setelah setiap panggilan selesai, sukses maupun gagal, dan mengulang hanya HTTP 429 (`--rate-limit-retries`, `--rate-limit-wait`).
+- `json_schema` mode nearly doubles input tokens (654 versus 333) because the schema is sent along; with no measurable quality difference on 20 samples.
+- `high` reasoning raises median latency from about 1.36 s to 3.55 s through 5.26 s and output tokens from 36 to about 267 through 506. The longest single call at `high` effort was 10.51 s, and at default effort 6.14 s; the first round recorded one call of 27.6 s, so `timeout_s: 30` in `config.example.yaml` is tight for `high` effort.
+- Per-key rate limiting occurs but is not deterministic. In the first round (four cells back to back with no pause) the last three cells hit HTTP 429 (`Laju request per key melebihi batas`), 19 of 20 cases failing per cell; the report file of that round was not saved, so this is only an observation note, not attached data. On a re-run with the same script with no pause and no retries (`--interval 0 --rate-limit-retries 0`, `live_nopace.json`) there was not a single 429 and all 80 calls were valid. So a limit exists, its trigger is not yet known (possibly dependent on gateway load or a time window), and seven parallel voters on one key have not been tested. The 5-of-7 quorum risk remains real but unmeasured.
+- The live-test script now applies an `--interval` pause (default 3 seconds) after every call completes, success or failure, and retries only HTTP 429 (`--rate-limit-retries`, `--rate-limit-wait`).
 
-Cara menjalankan ulang:
+How to re-run:
 
 ```sh
 cd swarm
 set -a && . ../.env && set +a
-.venv/bin/python bench/live_nutaraline.py --base-url https://nutaraline.co.uk/v1 --interval 3 --out <berkas keluaran>
+.venv/bin/python bench/live_nutaraline.py --base-url https://nutaraline.co.uk/v1 --interval 3 --out <output file>
 .venv/bin/python bench/live_nutaraline.py --base-url https://nutaraline.co.uk/v1 --interval 3 \
-  --extra-body '{"reasoning_effort":"high"}' --out <berkas keluaran>
+  --extra-body '{"reasoning_effort":"high"}' --out <output file>
 ```
 
-## Butir 5: deepagents 0.7.32
+## Item 5: deepagents 0.7.32
 
-Versi terpasang: `deepagents==0.7.32`, `langchain==1.4.7`, `langgraph==1.2.17`.
+Installed versions: `deepagents==0.7.32`, `langchain==1.4.7`, `langgraph==1.2.17`.
 
-### Agen analis
+### Analyst agent
 
-`swarm/tb_swarm/agents.py` membangun analis dengan tiga tool baca saja: `get_metrics`, `get_trade_history`, `get_voter_log`. Tidak ada argumen path: berkas yang dibaca tetap (`metrics.json`, `trades.jsonl`, `voter_decisions.jsonl`) di dalam direktori data, baris dibatasi 200, keluaran dipotong 20.000 karakter. Tidak ada tool order, tidak ada tool ubah konfigurasi, dan berkas konfigurasi atau `.env` tidak pernah dibuka.
+`swarm/tb_swarm/agents.py` builds the analyst with three read-only tools: `get_metrics`, `get_trade_history`, `get_voter_log`. There is no path argument: the files read are fixed (`metrics.json`, `trades.jsonl`, `voter_decisions.jsonl`) inside the data directory, lines are capped at 200, output is truncated at 20,000 characters. There is no order tool, no config-modification tool, and config files or `.env` are never opened.
 
-Batas itu ditegakkan dua lapis oleh `ToolAllowlist`, sebuah `AgentMiddleware`: daftar tool yang dikirim ke model disaring, dan setiap pemanggilan tool di luar daftar ditolak dengan `ToolMessage(status="error")` sebelum dieksekusi. Berlaku untuk jalur sinkron dan asinkron (dua tes terpisah). Tes mencoba `write_file`, `edit_file`, `delete`, `execute`, `task`, dan satu tool order palsu: keenamnya ditolak, tidak ada berkas berubah, dan direktori data tetap byte-identik.
+This boundary is enforced in two layers by `ToolAllowlist`, an `AgentMiddleware`: the tool list sent to the model is filtered, and every tool call outside the list is rejected with `ToolMessage(status="error")` before execution. This applies to both the synchronous and asynchronous paths (two separate tests). The tests try `write_file`, `edit_file`, `delete`, `execute`, `task`, and one fake order tool: all six are rejected, no file changes, and the data directory remains byte-identical.
 
-### Uji ulang ZHA-3610
+### Re-test of the earlier finding
 
-Temuan ZHA-3610 (deepagents 0.7.13) berulang di 0.7.32 pada dua bentuk subagen:
+The earlier finding (deepagents 0.7.13) recurs in 0.7.32 for two subagent shapes:
 
-| Bentuk subagen | Tool induk ikut? | Baris safety di prompt? |
+| Subagent shape | Parent tools included? | Safety line in prompt? |
 | --- | --- | --- |
-| Default `general-purpose` (dibuat otomatis) | Ya, `place_order` ikut | Tidak |
-| `SubAgent` tanpa kunci `tools` | Ya, `place_order` ikut | Tidak |
-| `SubAgent` dengan `tools=[]` | Tidak | Hanya bila prompt subagen sendiri memuatnya |
+| Default `general-purpose` (auto-created) | Yes, `place_order` included | No |
+| `SubAgent` without a `tools` key | Yes, `place_order` included | No |
+| `SubAgent` with `tools=[]` | No | Only if the subagent's own prompt contains it |
 
-Kesimpulan: batas keamanan tidak boleh ditaruh di prompt induk, dan pembatasan harus eksplisit per subagen (`tools=[]` atau middleware penyaring). Analis di repo ini memakai jalur yang lebih keras: `ToolAllowlist` juga menyaring `task` dari induk, jadi subagen tidak bisa dipanggil sama sekali (diuji: panggilan `task` ditolak).
+Conclusion: the safety boundary must not be placed in the parent prompt, and restriction must be explicit per subagent (`tools=[]` or a filtering middleware). The analyst in this repo uses a stricter path: `ToolAllowlist` also filters `task` from the parent, so subagents cannot be called at all (tested: the `task` call is rejected).
 
-### Biaya deepagents dibanding panggilan langsung
+### Cost of deepagents compared to direct calls
 
-`swarm/bench/bench_voter_overhead.py`, 30 sampel per jalur, dua voter identik (model yang sama, prompt yang sama) terhadap stub lokal, CPU sama:
+`swarm/bench/bench_voter_overhead.py`, 30 samples per path, two identical voters (same model, same prompt) against the local stub, same CPU:
 
-| Delay stub | Langsung (median) | Lewat deepagents (median) | Selisih |
+| Stub delay | Direct (median) | Via deepagents (median) | Difference |
 | --- | --- | --- | --- |
-| 0 ms | 4,0 ms (maks 5,6) | 9,9 ms (maks 19,5) | +5,9 ms |
-| 500 ms | 504,0 ms | 508,8 ms | +4,8 ms |
+| 0 ms | 4.0 ms (max 5.6) | 9.9 ms (max 19.5) | +5.9 ms |
+| 500 ms | 504.0 ms | 508.8 ms | +4.8 ms |
 
-Panjang prompt yang dikirim identik (selisih 0 karakter pada stub, karena profil default deepagents tidak menambah system prompt dan `ToolAllowlist` mengosongkan daftar tool). Artinya overhead deepagents di sini murni latency kerangka, sekitar 5-10 ms per pemanggilan, sementara latensi provider nyata berada di kisaran ratusan sampai ribuan milidetik. Angka provider nyata ada di bagian "Hidup: deepagents lawan panggilan langsung" di bawah.
+The length of the submitted prompt is identical (0 characters difference on the stub, because the default deepagents profile adds no system prompt and `ToolAllowlist` empties the tool list). This means the deepagents overhead here is purely framework latency, around 5-10 ms per call, while real provider latency is in the range of hundreds to thousands of milliseconds. The real provider numbers are in the section "Live: deepagents versus direct call" below.
 
-### Hidup: deepagents lawan panggilan langsung
+### Live: deepagents versus direct call
 
-Sel yang sama (`prompt`), model nutaraline, 20 contoh, dari laporan yang dilampirkan:
+The same cell (`prompt`), nutaraline model, 20 samples, from the attached report:
 
-| Effort | Jalur | Latensi median | p90 | Token masuk | Token keluar |
+| Effort | Path | Median latency | p90 | Input tokens | Output tokens |
 | --- | --- | --- | --- | --- | --- |
-| bawaan | direct | 1,36 s | 1,79 s | 333 | 36 |
-| bawaan | deepagents | 1,75 s | 3,48 s | 333 | 36 |
-| high | direct | 4,38 s | 8,66 s | 358 | 390 |
-| high | deepagents | 4,06 s | 7,47 s | 358 | 375 |
+| default | direct | 1.36 s | 1.79 s | 333 | 36 |
+| default | deepagents | 1.75 s | 3.48 s | 333 | 36 |
+| high | direct | 4.38 s | 8.66 s | 358 | 390 |
+| high | deepagents | 4.06 s | 7.47 s | 358 | 375 |
 
-Token masuk identik pada kedua jalur (333 dan 358): deepagents tidak menambah prompt. Latensi median pada effort bawaan: deepagents 1,75 s lawan direct 1,36 s (p90 3,48 s lawan 1,79 s); pada effort `high`: 4,06 s lawan 4,38 s (p90 7,47 s lawan 8,66 s). Arah selisihnya tidak konsisten antar effort dan antar putaran (putaran pertama menunjukkan deepagents sama pada effort bawaan, sekarang lebih lambat), jadi satu putaran 20 contoh tidak cukup untuk menyimpulkan keuntungan atau kerugian latensi. Overhead kerangka yang terukur pada stub (5-10 ms) jauh di bawah derau itu.
+Input tokens are identical on both paths (333 and 358): deepagents does not add to the prompt. Median latency at default effort: deepagents 1.75 s versus direct 1.36 s (p90 3.48 s versus 1.79 s); at `high` effort: 4.06 s versus 4.38 s (p90 7.47 s versus 8.66 s). The direction of the difference is not consistent across effort levels and across rounds (the first round showed deepagents equal at default effort, now it is slower), so a single round of 20 samples is not enough to conclude a latency gain or loss. The framework overhead measured on the stub (5-10 ms) is far below that noise.
 
-Keputusan: voter cepat tidak perlu deepagents (tidak ada manfaat terukur, dan satu lapisan lebih banyak yang harus dijaga batasnya); deepagents dipakai untuk agen analis yang memang butuh tool.
+Decision: the fast voter does not need deepagents (no measurable benefit, and one more layer whose boundaries must be maintained); deepagents is used for the analyst agent, which does need tools.
 
-### Agen voter
+### Voter agent
 
-`build_voter_agent` membuat agen tanpa tool sama sekali (`tools=[]` plus `ToolAllowlist(())`) dan dengan system prompt voter yang sama seperti jalur langsung, sehingga perbandingan langsung vs deepagents adil. Tes membuktikan tidak ada tool yang ditawarkan ke model dan jawaban yang dihasilkan identik dengan jalur langsung.
+`build_voter_agent` creates an agent with no tools at all (`tools=[]` plus `ToolAllowlist(())`) and with the same voter system prompt as the direct path, so the direct versus deepagents comparison is fair. Tests prove that no tool is offered to the model and that the resulting answer is identical to the direct path.
 
-## Butir 6: Kronos mini di CPU
+## Item 6: Kronos mini on CPU
 
-Model: `NeoQuasar/Kronos-mini` (4.108.032 parameter model + 3.958.042 parameter tokenizer, lisensi MIT, commit sumber `shiyu-coder/Kronos` 67b630e), tokenizer `NeoQuasar/Kronos-Tokenizer-2k`, `max_context` 2048, `torch==2.14.1+cu130` dipakai di CPU, data sintetis 512 lilin 1 jam (bukan data pasar nyata, karena akurasi tidak diuji di sini).
+Model: `NeoQuasar/Kronos-mini` (4,108,032 model parameters + 3,958,042 tokenizer parameters, MIT license, source commit `shiyu-coder/Kronos` 67b630e), tokenizer `NeoQuasar/Kronos-Tokenizer-2k`, `max_context` 2048, `torch==2.14.1+cu130` used on CPU, synthetic data of 512 1-hour candles (not real market data, because accuracy is not tested here).
 
-Mesin: Intel i5-12600K, 16 CPU logis, semua job lewat antrean `heavy` (kuota 400% CPU, nice 19). `T=1.0`, `top_p=0.9`.
+Machine: Intel i5-12600K, 16 logical CPUs, all jobs go through the `heavy` queue (400% CPU quota, nice 19). `T=1.0`, `top_p=0.9`.
 
-| Konfigurasi | Prediksi | Jalur | Thread | Median | p90 | RSS puncak |
+| Configuration | Prediction | Paths | Threads | Median | p90 | Peak RSS |
 | --- | --- | --- | --- | --- | --- | --- |
-| lookback 512 | 1 jam | 1 | 4 | 48 ms | 75 ms | 677 MB |
-| lookback 512 | 1 jam | 4 | 4 | 185 ms | 223 ms | 704 MB |
-| lookback 512 | 1 jam | 8 | 4 | 342 ms | 411 ms | 765 MB |
-| lookback 512 | 1 jam | 16 | 4 | 718 ms | 804 ms | 851 MB |
-| lookback 512 | 1 jam | 32 | 4 | 1.448 ms | 1.555 ms | 1.068 MB (naik dari 677 MB) |
-| lookback 512 | 1 jam | 8 | 1 | 903 ms | 965 ms | 751 MB |
-| lookback 512 | 1 jam | 8 | 2 | 517 ms | 545 ms | 758 MB |
-| lookback 512 | 1 jam | 8 | 8 | 649 ms | 696 ms | 773 MB |
-| lookback 512 | 24 jam | 8 | 4 | 4.000 ms | 4.439 ms | 786 MB |
-| lookback 2048 | 1 jam | 8 | 4 | 1.684 ms | 1.703 ms | 1.065 MB |
+| lookback 512 | 1 hour | 1 | 4 | 48 ms | 75 ms | 677 MB |
+| lookback 512 | 1 hour | 4 | 4 | 185 ms | 223 ms | 704 MB |
+| lookback 512 | 1 hour | 8 | 4 | 342 ms | 411 ms | 765 MB |
+| lookback 512 | 1 hour | 16 | 4 | 718 ms | 804 ms | 851 MB |
+| lookback 512 | 1 hour | 32 | 4 | 1,448 ms | 1,555 ms | 1,068 MB (up from 677 MB) |
+| lookback 512 | 1 hour | 8 | 1 | 903 ms | 965 ms | 751 MB |
+| lookback 512 | 1 hour | 8 | 2 | 517 ms | 545 ms | 758 MB |
+| lookback 512 | 1 hour | 8 | 8 | 649 ms | 696 ms | 773 MB |
+| lookback 512 | 24 hours | 8 | 4 | 4,000 ms | 4,439 ms | 786 MB |
+| lookback 2048 | 1 hour | 8 | 4 | 1,684 ms | 1,703 ms | 1,065 MB |
 
-Bacaan angka:
+Reading the numbers:
 
-- Biaya naik hampir linear terhadap `sample_count` dan terhadap panjang prediksi; 24 langkah 1 jam (sekitar 3-4 detik) sudah di batas praktis untuk voter bayangan tiap jam di CPU ini.
-- 8 thread lebih lambat dari 4 thread karena job berjalan di bawah kuota 400% CPU; angka thread 4 adalah yang relevan untuk kotak ini.
-- Memori dasar sekitar 680 MB (impor torch ikut terhitung) dan naik sekitar 12 MB per jalur tambahan pada 32 jalur.
-- Waktu muat bobot 1,1-1,3 detik setelah cache Hugging Face terisi (7,4 detik pada unduhan pertama).
+- Cost rises almost linearly with `sample_count` and with prediction length; 24 steps of 1 hour (around 3-4 seconds) is already at the practical limit for an hourly shadow voter on this CPU.
+- 8 threads is slower than 4 threads because the job runs under the 400% CPU quota; the 4-thread figure is the relevant one for this box.
+- Baseline memory is around 680 MB (the torch import is included) and rises around 12 MB per additional path at 32 paths.
+- Weight load time is 1.1-1.3 seconds once the Hugging Face cache is populated (7.4 seconds on the first download).
 
-### Median antar jalur
+### Median across paths
 
-Fungsi `auto_regressive_inference` di vendor merata-ratakan semua jalur (`np.mean(preds, axis=1)`) sebelum mengembalikan hasil, jadi `predict()` tidak pernah memperlihatkan jalur individual. Median antar jalur tetap mungkin tanpa menyentuh vendor: `swarm/bench/bench_kronos.py` mengganti nama `np` di dalam modul vendor dengan proksi yang menangkap array 4 dimensi tepat sebelum perataan, lalu memulihkannya ke skala harga asli. Verifikasi: rata-rata jalur yang ditangkap sama dengan keluaran `predict()` (`rtol=1e-4`, cocok pada 10 dari 10 konfigurasi), jadi yang ditangkap memang jalur yang sebenarnya.
+The vendor function `auto_regressive_inference` averages all paths (`np.mean(preds, axis=1)`) before returning the result, so `predict()` never exposes individual paths. A median across paths is still possible without touching the vendor code: `swarm/bench/bench_kronos.py` replaces the name `np` inside the vendor module with a proxy that captures the 4-dimensional array right before the averaging, then restores it to the original price scale. Verification: the mean of the captured paths equals the output of `predict()` (`rtol=1e-4`, matching on 10 of 10 configurations), so what is captured really is the actual paths.
 
-Dengan 8 jalur, sebaran hasil (perubahan harga close pada langkah terakhir, persen, data sintetis):
+With 8 paths, the spread of results (close price change at the last step, percent, synthetic data):
 
 | Horizon | p10 | median | p90 |
 | --- | --- | --- | --- |
-| 1 jam | -0,71% | -0,71% | -0,13% |
-| 24 jam | -2,05% | +0,62% | +2,18% |
+| 1 hour | -0.71% | -0.71% | -0.13% |
+| 24 hours | -2.05% | +0.62% | +2.18% |
 
-Median antar jalur karena itu bisa dibuat dan masuk akal sebagai voter bayangan: untuk horizon 1 jam sebarannya sangat sempit (median praktis sama dengan rata-rata), dan melebar di horizon 24 jam. Ini bukan klaim akurasi; yang diuji hanya waktu, memori, dan kelayakan agregasi.
+The median across paths can therefore be produced and makes sense as a shadow voter: for the 1-hour horizon the spread is very narrow (the median is practically equal to the mean), and it widens at the 24-hour horizon. This is not an accuracy claim; only time, memory, and the feasibility of aggregation were tested.
 
-## Tahap 0c: uji hidup decision dan voter lintas provider (ZHA-3772)
+## Stage 0c: live test of decision and voters across providers
 
-Dijalankan 2026-10-26 dari host dengan `swarm/bench/live_voters.py` dan `swarm/bench/probe_decision_wires.py`. Kunci dibaca dari `NUTARALINE_API_KEY` dan saudaranya di `.env` worktree yang di-gitignore; `~/.omp/agent/models.yml` hanya dibaca untuk daftar provider, base URL, dan tipe API, bukan kunci. Id model diambil dari `GET {base_url}/models` tiap provider, tidak ditebak. Klien memakai httpx dan header `User-Agent: curl/8.5.0` pada probe mentah. Laporan mentah (JSON per sel dan per kasus, termasuk jawaban, token, dan latensi) dilampirkan pada ZHA-3772: `wire_probe.json`, `single_1.json`, `single_2.json`, `cand.json`, `cand2.json`, `quorum_1.json`, `quorum_1.voters.jsonl`, `quorum_2.json`, `quorum_2.voters.jsonl`, `burst_1.json`, `local_host.json`, `local_container_hostnet.json`, `local_container_bridge.json`. Semua tabel di bagian ini dihitung dari berkas itu. Dua puluh kasus yang sama dengan Butir 4 (`CASES`, tiga pertanyaan `choice`, `noul`, `score` per kasus), satu panggilan pemanasan tidak dihitung, jeda 3 detik setelah tiap panggilan.
+Run on 2026-10-26 from the host with `swarm/bench/live_voters.py` and `swarm/bench/probe_decision_wires.py`. Keys were read from `NUTARALINE_API_KEY` and its siblings in the git-ignored worktree `.env`; `~/.omp/agent/models.yml` was only read for the provider list, base URLs, and API types, not keys. Model ids were taken from `GET {base_url}/models` of each provider, not guessed. The client uses httpx and the header `User-Agent: curl/8.5.0` on raw probes. The raw reports (JSON per cell and per case, including answers, tokens, and latency) are kept outside the repository: `wire_probe.json`, `single_1.json`, `single_2.json`, `cand.json`, `cand2.json`, `quorum_1.json`, `quorum_1.voters.jsonl`, `quorum_2.json`, `quorum_2.voters.jsonl`, `burst_1.json`, `local_host.json`, `local_container_hostnet.json`, `local_container_bridge.json`. All tables in this section are computed from those files. The same twenty cases as Item 4 (`CASES`, three questions `choice`, `noul`, `score` per case), one warm-up call not counted, 3-second pause after each call.
 
-### Butir 1: adapter decision Experiential Labs
+### Item 1: Experiential Labs decision adapter
 
-Probe adapter terhadap `https://api.experientiallabs.ai` (`wire_probe.json`, payload dibangun oleh adapter, pertanyaan yang sama untuk setiap model):
+Adapter probe against `https://api.experientiallabs.ai` (`wire_probe.json`, payload built by the adapter, same question for every model):
 
-| Jalur | jev-latest | clef | clef-flash | gpt-6-luna-decisions |
+| Path | jev-latest | clef | clef-flash | gpt-6-luna-decisions |
 | --- | --- | --- | --- | --- |
-| `POST /v1/systemone` (adapter `systemone`) | 200, 0,62 s, jawaban lolos validasi | 200, 1,08 s, lolos | 200, 1,42 s, lolos | 400 `unsupported_capability` |
-| `POST /v1/decisions` (adapter `openai_decisions`) | 400 `unsupported_capability` | 400 `unsupported_capability` | 400 `unsupported_capability` | 200, 0,67 s, lolos |
+| `POST /v1/systemone` (adapter `systemone`) | 200, 0.62 s, answer passes validation | 200, 1.08 s, passes | 200, 1.42 s, passes | 400 `unsupported_capability` |
+| `POST /v1/decisions` (adapter `openai_decisions`) | 400 `unsupported_capability` | 400 `unsupported_capability` | 400 `unsupported_capability` | 200, 0.67 s, passes |
 | `POST /v1/responses/decisions` | 404 | 404 | 404 | 404 |
 
-Satu probe awal mencatat `clef` 6,9 s pada panggilan dingin pertama; probe berikutnya 1,08 s. Tiga model System One tidak melayani `/v1/decisions`, dan `gpt-6-luna-decisions` tidak melayani `/v1/systemone`: pesan galat meminta mengirim ulang ke jalur yang sesuai. `/v1/responses/decisions` tidak ada.
+One earlier probe recorded `clef` at 6.9 s on the first cold call; the next probe 1.08 s. The three System One models do not serve `/v1/decisions`, and `gpt-6-luna-decisions` does not serve `/v1/systemone`: the error message asks to resend to the matching path. `/v1/responses/decisions` does not exist.
 
-**System One (`/v1/systemone`) cocok dengan adapter yang sudah ada.** Permintaan nyata `{model, state, questions: {nama: {type, instructions, criteria}}}` diterima apa adanya. Jawaban nyata:
+**System One (`/v1/systemone`) matches the existing adapter.** The real request `{model, state, questions: {name: {type, instructions, criteria}}}` was accepted as is. Real answer:
 
 ```yaml
 id: decision_cd6f41269b093975f160f63a9c5dcb73
@@ -273,20 +273,20 @@ usage: {input_tokens: 409, output_tokens: 69, cost: 0.0, is_byok: false}
 provider: typesafe
 ```
 
-Beda dengan dokumen yang dikutip di Butir 1: jawaban membawa `id`, `provider`, `usage.cost`, `usage.is_byok`, dan `legend` pada `score`; `noul` tidak membawa `confidence`. Semuanya aman diabaikan oleh `parse_answers`. `clef` dan `clef-flash` mengembalikan probabilitas pecahan (misalnya `0.4576796777173158`) dan `output_tokens: 0`; yang melayani adalah `experiential_cloud`, bukan `typesafe`. Biaya terlapor per panggilan 0,0 untuk `jev-latest`, `clef-flash`, dan `gpt-6-luna-decisions`.
+Unlike the document quoted in Item 1: the answer carries `id`, `provider`, `usage.cost`, `usage.is_byok`, and `legend` on `score`; `noul` does not carry `confidence`. All of it is safe to ignore by `parse_answers`. `clef` and `clef-flash` return fractional probabilities (for example `0.4576796777173158`) and `output_tokens: 0`; the one serving is `experiential_cloud`, not `typesafe`. Reported cost per call is 0.0 for `jev-latest`, `clef-flash`, and `gpt-6-luna-decisions`.
 
-**OpenAI Decisions (`/v1/decisions`) memakai wire yang berbeda, dan adapter lama tidak cocok.** Spesifikasi OpenAPI gateway (`/openapi.json`) hanya menyebut "Relay the OpenAI Decisions API wire" tanpa skema; bentuknya ditemukan dengan probe, dan galat 400 `invalid_parameter` menyebut `predicate`, `choice (with choices)`, `score (with levels)`. Bentuk yang diterima (200) dan yang ditolak (400) pada `gpt-6-luna-decisions`:
+**OpenAI Decisions (`/v1/decisions`) uses a different wire, and the old adapter does not match.** The gateway's OpenAPI spec (`/openapi.json`) only mentions "Relay the OpenAI Decisions API wire" with no schema; the shape was found by probing, and the 400 `invalid_parameter` error mentions `predicate`, `choice (with choices)`, `score (with levels)`. The accepted (200) and rejected (400) shapes on `gpt-6-luna-decisions`:
 
-| Elemen | Diterima | Ditolak |
+| Element | Accepted | Rejected |
 | --- | --- | --- |
-| Badan | `{model, input, questions}` | `state`, `questions` berupa peta nama ke objek |
-| `input` | teks, atau daftar pesan pengguna dengan bagian `input_text` | objek JSON |
-| Pertanyaan `noul` | `{type: predicate, name, instructions}` | `criteria`, `true`, `false` |
-| Pertanyaan `choice` | `{type: choice, name, instructions, choices: [{value, description?}]}` | `choices` berupa daftar string, `{id}`, `{label}`, `{name}`, peta, `criteria` |
-| Pertanyaan `score` | `{type: score, name, instructions, levels: [{label, description?}]}` | `levels` berupa daftar string, `{value}`, `{name}`, `{description}` saja |
-| `name` | opsional, unik | duplikat |
+| Body | `{model, input, questions}` | `state`, `questions` as a map of names to objects |
+| `input` | text, or a list of user messages with an `input_text` part | JSON object |
+| `noul` question | `{type: predicate, name, instructions}` | `criteria`, `true`, `false` |
+| `choice` question | `{type: choice, name, instructions, choices: [{value, description?}]}` | `choices` as a list of strings, `{id}`, `{label}`, `{name}`, a map, `criteria` |
+| `score` question | `{type: score, name, instructions, levels: [{label, description?}]}` | `levels` as a list of strings, `{value}`, `{name}`, `{description}` only |
+| `name` | optional, unique | duplicate |
 
-Jawaban nyata berupa daftar bernama, bukan peta:
+The real answer is a named list, not a map:
 
 ```yaml
 model: gpt-6-luna-decisions
@@ -298,96 +298,96 @@ usage: {input_tokens: 124, input_tokens_details: {cached_tokens: 0, cache_write_
 provider: openai
 ```
 
-Perbaikan: adapter baru `openai_decisions` (`swarm/tb_swarm/providers/openai_decisions.py`, tipe provider `openai-decisions`, `POST {base_url}/v1/decisions`). Pemetaan: `noul` ke `predicate` (kriteria `true`/`false` dipindah ke teks instruksi karena wire tidak menerimanya), `choice.criteria` ke `choices`, `score.criteria` ke `levels[].label`, status keadaan berupa objek diserialisasi ke teks JSON, jawaban daftar dipetakan kembali ke peta nama, probabilitas daftar ke peta, `reasoning_tokens` dibaca dari `output_tokens_details`. Stub (`swarm/tb_swarm/stub_server.py`) dikoreksi sesuai kenyataan: route `/v1/decisions` menolak dengan 400 persis seperti pesan nyata bila bentuk badan menyimpang, dan respons System One kini membawa `id`, `provider`, `usage.cost`, `usage.is_byok`, dan `legend`. Tes baru di `swarm/tests/test_wire_adapters.py` dan `test_config.py` memakai jawaban nyata di atas sebagai fixture. `engine/settings.py` ikut menerima tipe provider `systemone`, `openai-decisions`, dan `openrouter-decisions` supaya `config/config.example.yaml` yang sama divalidasi oleh mesin dan oleh swarm.
+Fix: new adapter `openai_decisions` (`swarm/tb_swarm/providers/openai_decisions.py`, provider type `openai-decisions`, `POST {base_url}/v1/decisions`). Mapping: `noul` to `predicate` (the `true`/`false` criteria are moved into the instruction text because the wire does not accept them), `choice.criteria` to `choices`, `score.criteria` to `levels[].label`, object-shaped state serialized to JSON text, list answers mapped back to a name map, list probabilities to a map, `reasoning_tokens` read from `output_tokens_details`. The stub (`swarm/tb_swarm/stub_server.py`) was corrected to match reality: the `/v1/decisions` route rejects with 400 exactly like the real message when the body shape deviates, and the System One response now carries `id`, `provider`, `usage.cost`, `usage.is_byok`, and `legend`. New tests in `swarm/tests/test_wire_adapters.py` and `test_config.py` use the real answer above as a fixture. `engine/settings.py` also accepts the provider types `systemone`, `openai-decisions`, and `openrouter-decisions` so the same `config/config.example.yaml` is validated by both the engine and the swarm.
 
-Hasil 20 kasus per voter keputusan (baris d1 sampai d3 pada tabel Butir 3): 20/20 valid, tanpa 429, biaya terlapor 0,0 untuk ketiganya.
+Result of 20 cases per decision voter (rows d1 through d3 in the Item 3 table): 20/20 valid, no 429, reported cost 0.0 for all three.
 
-### Butir 2: OpenRouter Decisions
+### Item 2: OpenRouter Decisions
 
-Tidak ada kunci OpenRouter di `models.yml` maupun `.env`, jadi adapter `openrouter_decisions` tetap belum terbukti hidup: skema auth dan path `/api/alpha/decisions` hanya dari dokumentasi. Hanya stub yang menguji bentuk wire dan parsing. Wire OpenRouter (state dan questions berkunci nama) sama dengan System One yang kini terbukti, tetapi itu bukan bukti untuk OpenRouter.
+There is no OpenRouter key in `models.yml` or `.env`, so the `openrouter_decisions` adapter is still not proven live: the auth scheme and the `/api/alpha/decisions` path come only from documentation. Only the stub tests the wire shape and parsing. The OpenRouter wire (state and questions keyed by name) is the same as System One, which is now proven, but that is not evidence for OpenRouter.
 
-### Butir 3: voter `llm_structured` lintas keluarga dan provider
+### Item 3: `llm_structured` voters across families and providers
 
-Tujuh voter, tujuh keluarga model, tujuh provider dengan tujuh kunci berbeda (`config/config.example.yaml`), ditambah tiga voter keputusan dari satu provider (kunci yang sama, dijalankan berurutan). Tiap voter sendirian, 20 kasus, `--interval 3`, tanpa percobaan ulang 429 yang terpakai (`single_1.json`, `single_2.json`):
+Seven voters, seven model families, seven providers with seven different keys (`config/config.example.yaml`), plus three decision voters from one provider (same key, run sequentially). Each voter alone, 20 cases, `--interval 3`, no 429 retries used (`single_1.json`, `single_2.json`):
 
-| Voter | Provider | Model | Valid | Latensi median | p90 | Maks | Token masuk / keluar (median) | Token reasoning (total) | 429 | Error |
+| Voter | Provider | Model | Valid | Median latency | p90 | Max | Tokens in / out (median) | Reasoning tokens (total) | 429 | Error |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| v1 | nutaraline | deepseek-v4.1-flash-1017 | 20/20 | 1,47 s | 1,94 s | 2,19 s | 333 / 36 | 0 | 0 | - |
-| v2 | modelrouter | glm-5.3-flash:mr | 20/20 | 1,69 s | 2,66 s | 5,55 s | 338 / 43 | 238 | 0 | - |
-| v3 | xai-hm | cx/gpt-6-luna | 20/20 | 2,84 s | 3,54 s | 4,31 s | 348 / 105 | 1423 | 0 | - |
-| v4 | sub2api-claude | claude-haiku-5-5 | 20/20 | 2,54 s | 3,77 s | 4,20 s | 972 / 305 | 4966 | 0 | - |
-| v5 | omniroute | agy/gemini-3.8-flash-medium | 20/20 | 6,79 s | 8,36 s | 11,69 s | 401 / 518 | 10487 | 0 | - |
-| d1 | experientiallabs-systemone | jev-latest | 20/20 | 0,43 s | 0,98 s | 1,97 s | 416 / 69 | 0 | 0 | - |
-| d2 | experientiallabs-systemone | clef-flash | 20/20 | 0,81 s | 2,25 s | 5,85 s | 350 / 0 | 0 | 0 | - |
-| d3 | experientiallabs-decisions | gpt-6-luna-decisions | 20/20 | 1,02 s | 2,55 s | 4,48 s | 419 / 0 | 0 | 0 | - |
-| v6 | experientiallabs | llama-4-maverick | 20/20 | 2,21 s | 3,97 s | 5,64 s | 343 / 41 | 0 | 0 | - |
-| v7 | sub2api-agy | gpt-oss-120b-medium | 20/20 | 2,21 s | 4,66 s | 6,49 s | 0 / 0 | 0 | 0 | - |
+| v1 | nutaraline | deepseek-v4.1-flash-1017 | 20/20 | 1.47 s | 1.94 s | 2.19 s | 333 / 36 | 0 | 0 | - |
+| v2 | modelrouter | glm-5.3-flash:mr | 20/20 | 1.69 s | 2.66 s | 5.55 s | 338 / 43 | 238 | 0 | - |
+| v3 | xai-hm | cx/gpt-6-luna | 20/20 | 2.84 s | 3.54 s | 4.31 s | 348 / 105 | 1423 | 0 | - |
+| v4 | sub2api-claude | claude-haiku-5-5 | 20/20 | 2.54 s | 3.77 s | 4.20 s | 972 / 305 | 4966 | 0 | - |
+| v5 | omniroute | agy/gemini-3.8-flash-medium | 20/20 | 6.79 s | 8.36 s | 11.69 s | 401 / 518 | 10487 | 0 | - |
+| d1 | experientiallabs-systemone | jev-latest | 20/20 | 0.43 s | 0.98 s | 1.97 s | 416 / 69 | 0 | 0 | - |
+| d2 | experientiallabs-systemone | clef-flash | 20/20 | 0.81 s | 2.25 s | 5.85 s | 350 / 0 | 0 | 0 | - |
+| d3 | experientiallabs-decisions | gpt-6-luna-decisions | 20/20 | 1.02 s | 2.55 s | 4.48 s | 419 / 0 | 0 | 0 | - |
+| v6 | experientiallabs | llama-4-maverick | 20/20 | 2.21 s | 3.97 s | 5.64 s | 343 / 41 | 0 | 0 | - |
+| v7 | sub2api-agy | gpt-oss-120b-medium | 20/20 | 2.21 s | 4.66 s | 6.49 s | 0 / 0 | 0 | 0 | - |
 
-Keluarga: deepseek (nutaraline), glm (modelrouter), openai gpt-6 (xai-hm, tipe `openai-responses`), anthropic (sub2api-claude, tipe `anthropic-messages`, base URL tanpa `/v1` karena SDK menambahkannya), gemini (omniroute), llama (experientiallabs), gpt-oss (sub2api-agy). Dua provider terakhir adalah host lokal. Baris v7 melaporkan token 0 karena sub2api-agy tidak membawa `usage` untuk model ini; biaya moneter tidak dilaporkan oleh satu pun provider LLM (hanya ketiga voter keputusan yang membawa `usage.cost`).
+Families: deepseek (nutaraline), glm (modelrouter), openai gpt-6 (xai-hm, type `openai-responses`), anthropic (sub2api-claude, type `anthropic-messages`, base URL without `/v1` because the SDK appends it), gemini (omniroute), llama (experientiallabs), gpt-oss (sub2api-agy). The last two providers are local hosts. Row v7 reports 0 tokens because sub2api-agy does not carry `usage` for this model; monetary cost is not reported by any LLM provider (only the three decision voters carry `usage.cost`).
 
-Pilihan model yang gagal diuji dan diganti (`single_1.json` untuk dua baris pertama, `cand.json` dan `cand2.json` untuk sisanya; id voter di berkas itu `c1` sampai `c8`, `e1`, `e2`):
+Model choices that failed testing and were replaced (`single_1.json` for the first two rows, `cand.json` and `cand2.json` for the rest; the voter ids in those files are `c1` through `c8`, `e1`, `e2`):
 
-| Voter | Provider | Model | Valid | Latensi median | p90 | Maks | Token masuk / keluar (median) | Token reasoning (total) | 429 | Error |
+| Voter | Provider | Model | Valid | Median latency | p90 | Max | Tokens in / out (median) | Reasoning tokens (total) | 429 | Error |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| v6 | experientiallabs | kimi-k2.6 | 15/20 | 25,51 s | 27,29 s | 28,37 s | 335 / 1835 | 28683 | 0 | timeout |
+| v6 | experientiallabs | kimi-k2.6 | 15/20 | 25.51 s | 27.29 s | 28.37 s | 335 / 1835 | 28683 | 0 | timeout |
 | v7 | sub2api-mimo | mimo-v2.6-flash | 0/20 | - | - | - | - / - | 0 | 0 | http |
-| c1 | experientiallabs | llama-4-maverick | 3/3 | 1,54 s | 1,54 s | 1,70 s | 365 / 41 | 0 | 0 | - |
-| c2 | experientiallabs | grok-4.20-non-reasoning | 3/3 | 2,86 s | 2,86 s | 3,22 s | 524 / 34 | 0 | 0 | - |
-| c3 | experientiallabs | gpt-oss-120b | 2/3 | 20,67 s | 14,78 s | 26,55 s | 416 / 314 | 565 | 0 | invalid |
-| c8 | experientiallabs | deepseek-v4-flash | 3/3 | 2,21 s | 2,21 s | 3,72 s | 349 / 36 | 0 | 0 | - |
-| c4 | lucif | lucif | 2/3 | 29,87 s | 5,65 s | 54,09 s | 393 / 858 | 0 | 0 | timeout |
+| c1 | experientiallabs | llama-4-maverick | 3/3 | 1.54 s | 1.54 s | 1.70 s | 365 / 41 | 0 | 0 | - |
+| c2 | experientiallabs | grok-4.20-non-reasoning | 3/3 | 2.86 s | 2.86 s | 3.22 s | 524 / 34 | 0 | 0 | - |
+| c3 | experientiallabs | gpt-oss-120b | 2/3 | 20.67 s | 14.78 s | 26.55 s | 416 / 314 | 565 | 0 | invalid |
+| c8 | experientiallabs | deepseek-v4-flash | 3/3 | 2.21 s | 2.21 s | 3.72 s | 349 / 36 | 0 | 0 | - |
+| c4 | lucif | lucif | 2/3 | 29.87 s | 5.65 s | 54.09 s | 393 / 858 | 0 | 0 | timeout |
 | c5 | tiprouter | gemini-3.8-flash | 0/3 | - | - | - | - / - | 0 | 0 | http |
 | c6 | sub2api-mimo | mimo-v2.5 | 0/3 | - | - | - | - / - | 0 | 0 | http |
 | c7 | sub2api-codex | glm-5.2 | 0/3 | - | - | - | - / - | 0 | 12 | rate_limit |
-| e1 | sub2api-agy | gpt-oss-120b-medium | 6/6 | 2,17 s | 2,25 s | 2,40 s | 0 / 0 | 0 | 0 | - |
+| e1 | sub2api-agy | gpt-oss-120b-medium | 6/6 | 2.17 s | 2.25 s | 2.40 s | 0 / 0 | 0 | 0 | - |
 | e2 | sub2api-agy | tab_flash_lite_preview | 0/6 | - | - | - | - / - | 0 | 0 | invalid |
 
-Alasan penggantian: `kimi-k2.6` adalah model reasoning (28.683 token reasoning, median 25,5 s, 5 dari 20 melewati `timeout_s: 30`); `mimo-v2.6-flash` dan `mimo-v2.5` di sub2api-mimo menjawab 502 "Upstream authentication failed" lalu 503; tiprouter 503 `platform_unavailable` (juga `GET /models`); sub2api-codex 429 "Upstream rate limit exceeded" pada `glm-5.2` (12 kejadian 429 termasuk percobaan ulang, tidak pernah berhasil); lucif satu dari tiga panggilan timeout (54 s); `gpt-oss-120b` di experientiallabs lambat dan sekali mengembalikan `noul` bukan angka; `tab_flash_lite_preview` tidak menghasilkan JSON. Pada baris ini kasus cuma 3 atau 6, jadi hanya menunjukkan layak atau tidak layak, bukan tingkat validitas.
+Reasons for replacement: `kimi-k2.6` is a reasoning model (28,683 reasoning tokens, median 25.5 s, 5 of 20 exceeded `timeout_s: 30`); `mimo-v2.6-flash` and `mimo-v2.5` on sub2api-mimo answered 502 "Upstream authentication failed" then 503; tiprouter 503 `platform_unavailable` (also `GET /models`); sub2api-codex 429 "Upstream rate limit exceeded" on `glm-5.2` (12 occurrences of 429 including retries, never succeeded); lucif had one of three calls time out (54 s); `gpt-oss-120b` on experientiallabs is slow and once returned `noul` instead of a number; `tab_flash_lite_preview` does not produce JSON. On these rows there are only 3 or 6 cases, so they only show viable or not viable, not a validity rate.
 
-### Butir 4: kuorum nyata
+### Item 4: real quorum
 
-Agregator nyata (`SwarmRunner`, median berbobot, sebaran kuartil, kuorum 5 dari 7, urutan opsi diacak) dengan voter nyata, 20 keputusan, jeda 3 detik antar keputusan, semua voter aktif dijalankan serentak dan tiap voter ada pada kuncinya sendiri (`quorum_1.json`, `quorum_2.json`, log per voter `*.voters.jsonl`).
+Real aggregator (`SwarmRunner`, weighted median, quartile spread, quorum 5 of 7, option order shuffled) with real voters, 20 decisions, 3-second interval between decisions, all active voters run concurrently and each voter is on its own key (`quorum_1.json`, `quorum_2.json`, per-voter logs `*.voters.jsonl`).
 
-| Putaran | Voter | Keputusan lolos | Voter dibuang | Latensi keputusan (median / p90) |
+| Round | Voters | Decisions passed | Voters dropped | Decision latency (median / p90) |
 | --- | --- | --- | --- | --- |
-| 1: tujuh voter `llm_structured` dari tujuh provider | v1 sampai v7 | 18 dari 20 | 1 jawaban (v3 pada kasus `api-outage`: "model output is not valid JSON"); keputusan itu tetap lolos dengan 6 dari 7 | 6,91 s / 9,21 s |
-| 2: tiga voter keputusan + empat `llm_structured` | d1, d2, d3, v1, v2, v4, v5 | 20 dari 20 | 0 | 6,69 s / 10,13 s |
+| 1: seven `llm_structured` voters from seven providers | v1 through v7 | 18 of 20 | 1 answer (v3 on case `api-outage`: "model output is not valid JSON"); that decision still passed with 6 of 7 | 6.91 s / 9.21 s |
+| 2: three decision voters + four `llm_structured` | d1, d2, d3, v1, v2, v4, v5 | 20 of 20 | 0 | 6.69 s / 10.13 s |
 
-Dua keputusan pada putaran 1 berstatus `skip` dengan alasan `choice_tie:direction` (kasus `funding-flip` dan `week-open`): ketujuh voter menjawab, tetapi suara terpecah 3/2/2 dan median surat suara satu-panas tidak menghasilkan satu pemenang. Itu perilaku agregator yang dirancang pada Butir 2 (fail-closed), bukan kegagalan voter. Pada putaran 2 tidak ada seri karena voter keputusan mengirim probabilitas, sehingga median per opsi berbeda. Latensi keputusan ditentukan voter paling lambat: v5 (gemini lewat omniroute, median 6,7 s sampai 6,8 s).
+Two decisions in round 1 had status `skip` with reason `choice_tie:direction` (cases `funding-flip` and `week-open`): all seven voters answered, but the votes split 3/2/2 and the median of the one-hot ballots does not yield a single winner. That is the aggregator behavior designed in Item 2 (fail-closed), not a voter failure. In round 2 there were no ties because the decision voters send probabilities, so the per-option medians differ. Decision latency is determined by the slowest voter: v5 (gemini via omniroute, median 6.7 s to 6.8 s).
 
-### Jeda dan batas laju yang terukur
+### Measured intervals and rate limits
 
-- Satu voter per kunci dengan jeda 3 detik setelah tiap panggilan: 0 kejadian 429 pada 7 voter dan 3 voter keputusan, 20 kasus masing-masing (satu-satunya 429 di seluruh uji datang dari sub2api-codex `glm-5.2` yang memang ditolak hulu).
-- Tujuh voter dari tujuh kunci serentak tiap 3 detik selama 20 keputusan: 0 kejadian 429 (`quorum_1.json`, `quorum_2.json`).
-- Uji beban tujuh panggilan paralel pada satu kunci, tiga putaran, jeda 5 detik antar putaran (`burst_1.json`):
+- One voter per key with a 3-second interval after each call: 0 occurrences of 429 across 7 voters and 3 decision voters, 20 cases each (the only 429 in the whole test came from sub2api-codex `glm-5.2`, which was rejected upstream anyway).
+- Seven voters from seven keys concurrently every 3 seconds for 20 decisions: 0 occurrences of 429 (`quorum_1.json`, `quorum_2.json`).
+- Load test of seven parallel calls on one key, three rounds, 5-second interval between rounds (`burst_1.json`):
 
-| Voter | Provider | Putaran 1 | Putaran 2 | Putaran 3 |
+| Voter | Provider | Round 1 | Round 2 | Round 3 |
 | --- | --- | --- | --- | --- |
-| d1 | experientiallabs-systemone | 7 ok, 3,64 s | 7 ok, 1,77 s | 7 ok, 1,05 s |
-| d3 | experientiallabs-decisions | 7 ok, 1,54 s | 7 ok, 2,73 s | 7 ok, 1,54 s |
-| v6 | experientiallabs (`llama-4-maverick`) | 7 ok, 3,47 s | 6 ok 1 invalid, 4,59 s | 7 ok, 2,79 s |
-| v2 | modelrouter | 7 ok, 3,66 s | 7 ok, 3,81 s | 7 ok, 3,40 s |
-| v1 | nutaraline | 7 ok, 7,00 s | 7 ok, 3,05 s | 4 ok 3 `rate_limit`, 4,00 s |
+| d1 | experientiallabs-systemone | 7 ok, 3.64 s | 7 ok, 1.77 s | 7 ok, 1.05 s |
+| d3 | experientiallabs-decisions | 7 ok, 1.54 s | 7 ok, 2.73 s | 7 ok, 1.54 s |
+| v6 | experientiallabs (`llama-4-maverick`) | 7 ok, 3.47 s | 6 ok 1 invalid, 4.59 s | 7 ok, 2.79 s |
+| v2 | modelrouter | 7 ok, 3.66 s | 7 ok, 3.81 s | 7 ok, 3.40 s |
+| v1 | nutaraline | 7 ok, 7.00 s | 7 ok, 3.05 s | 4 ok 3 `rate_limit`, 4.00 s |
 
-Hanya nutaraline membalas 429, pada putaran ke-3 setelah 14 permintaan selesai dalam sekitar 20 detik. Ambang pastinya belum ditentukan; dua putaran tujuh paralel diterima. Kesimpulan operasional: jangan menjalankan lebih dari satu voter pada kunci nutaraline per keputusan, dan bila perlu beberapa voter per kunci pakai provider selain nutaraline atau jeda 3 detik. Satu jawaban llama tidak valid pada putaran 2 uji beban v6 (alasannya tidak disimpan di laporan beban).
+Only nutaraline returned 429, in round 3 after 14 requests had completed in about 20 seconds. The exact threshold has not been determined; two rounds of seven parallel requests were accepted. Operational conclusion: do not run more than one voter on a nutaraline key per decision, and if several voters per key are needed, use a provider other than nutaraline or a 3-second delay. One llama answer was invalid in round 2 of the v6 load test (the reason was not stored in the load report).
 
-### Butir 5: provider localhost dari host dan dari kontainer
+### Item 5: localhost providers from the host and from a container
 
-`GET /v1/models` lima kali dan satu panggilan kecil (`max_tokens: 16`) lima kali per provider dengan urllib (`local_host.json`, `local_container_hostnet.json`, `local_container_bridge.json`); kontainer memakai image `trading-bot/engine:dev` dengan batas memori 512 MB:
+`GET /v1/models` five times and one small call (`max_tokens: 16`) five times per provider with urllib (`local_host.json`, `local_container_hostnet.json`, `local_container_bridge.json`); the container uses the image `trading-bot/engine:dev` with a 512 MB memory limit:
 
-| Provider | Dari host (median POST) | Kontainer `--network host`, 127.0.0.1 | Kontainer bridge, `host.docker.internal` (host-gateway) |
+| Provider | From host (median POST) | Container `--network host`, 127.0.0.1 | Container bridge, `host.docker.internal` (host-gateway) |
 | --- | --- | --- | --- |
-| sub2api-claude :62173 | 5/5 ok, 1,49 s | 5/5 ok, 1,61 s | 0/5, URLError |
-| sub2api-agy :62173 | 5/5 ok, 0,90 s | 5/5 ok, 0,48 s | 0/5, URLError |
-| omniroute :20128 | 5/5 ok, 2,26 s | 5/5 ok, 2,54 s | 0/5, URLError |
+| sub2api-claude :62173 | 5/5 ok, 1.49 s | 5/5 ok, 1.61 s | 0/5, URLError |
+| sub2api-agy :62173 | 5/5 ok, 0.90 s | 5/5 ok, 0.48 s | 0/5, URLError |
+| omniroute :20128 | 5/5 ok, 2.26 s | 5/5 ok, 2.54 s | 0/5, URLError |
 
-Selisih host dan kontainer `--network host` ada dalam rentang variasi hulu (satu panggilan pertama tiap provider lebih lambat, misalnya 4,76 s pada sub2api-agy dari kontainer). Jalur bridge dengan `host.docker.internal` tidak menjangkau layanan yang hanya listen di 127.0.0.1 host, sama dengan catatan README; jadi bot di Docker memakai `network_mode: host`. Jalur Docker Desktop di Windows tetap belum diuji.
+The difference between host and container `--network host` is within the range of upstream variation (the first call per provider is slower, for example 4.76 s on sub2api-agy from the container). The bridge path with `host.docker.internal` does not reach services that only listen on the host's 127.0.0.1, same as the README note; so the bot in Docker uses `network_mode: host`. The Docker Desktop path on Windows remains untested.
 
-### Konfigurasi contoh
+### Example configuration
 
-`config/config.example.yaml` sekarang berisi sembilan provider dan sepuluh voter: tujuh voter `llm_structured` aktif (v1 sampai v7, tujuh provider dan tujuh keluarga model, kuorum 5 dari 7) dan tiga voter keputusan nonaktif (d1 `jev-latest`, d2 `clef-flash`, d3 `gpt-6-luna-decisions`) yang bisa dipilih lewat `enabled: true` atau `--voters`. Base URL ditulis langsung (bukan lagi `from_import`) karena semuanya sudah terukur; `timeout_s: 30` cukup untuk seluruh voter aktif (maksimum terukur 11,7 s, v5). Model reasoning seperti `kimi-k2.6` butuh `timeout_s` jauh lebih besar dan tidak dipakai.
+`config/config.example.yaml` now contains nine providers and ten voters: seven active `llm_structured` voters (v1 to v7, seven providers and seven model families, quorum 5 of 7) and three inactive decision voters (d1 `jev-latest`, d2 `clef-flash`, d3 `gpt-6-luna-decisions`) that can be selected via `enabled: true` or `--voters`. Base URLs are written directly (no longer `from_import`) because all of them have been measured; `timeout_s: 30` is sufficient for all active voters (measured maximum 11.7 s, v5). Reasoning models such as `kimi-k2.6` need a much larger `timeout_s` and are not used.
 
-### Cara menjalankan ulang Tahap 0c
+### How to re-run Stage 0c
 
 ```sh
 cd swarm
@@ -398,18 +398,18 @@ cd swarm
 .venv/bin/python bench/live_voters.py burst --voters d1,d3,v1,v2,v6 --parallel 7 --rounds 3 --interval 5 --out /tmp/burst.json
 ```
 
-`.env` di akar repo dibaca otomatis; skrip tidak mencetak kunci.
+`.env` at the repo root is read automatically; the script does not print keys.
 
-## Yang belum terbukti
+## Not yet proven
 
-1. Bahwa `json_object` dan `json_schema` ditegakkan di sisi server: pada 20 contoh mode `prompt` juga 20/20 valid, jadi tidak ada selisih yang bisa dikaitkan dengan penegakan.
-2. Ambang pasti batas laju per kunci pada gateway nutaraline. Tahap 0c mengukur bahwa tujuh panggilan paralel pada satu kunci nutaraline diterima dua putaran lalu menghasilkan 3 dari 7 respons 429 pada putaran ketiga; angka ambangnya (permintaan per detik atau per menit) tetap belum diketahui.
-3. Kualitas keputusan model: 20/20 valid berarti bentuk jawaban benar, bukan bahwa jawabannya tepat. Tidak ada label kebenaran.
-4. Skema autentikasi dan path OpenRouter Decisions: baru dari dokumentasi, belum diuji hidup (tidak ada kunci OpenRouter). System One dan OpenAI Decisions sudah terbukti hidup di Experiential Labs pada Tahap 0c (Bearer, `/v1/systemone`, `/v1/decisions`); keduanya belum diuji ke TypeSafe langsung.
-5. Akurasi Kronos: sengaja tidak disimpulkan, dan datanya sintetis.
-6. Biaya harian swarm: respons nutaraline tidak membawa `usage.cost`, jadi belum ada angka moneter.
+1. That `json_object` and `json_schema` are enforced on the server side: on 20 samples the `prompt` mode was also 20/20 valid, so no difference can be attributed to enforcement.
+2. The exact per-key rate limit threshold on the nutaraline gateway. Stage 0c measured that seven parallel calls on one nutaraline key were accepted for two rounds and then produced 3 of 7 responses with 429 in the third round; the threshold figure (requests per second or per minute) remains unknown.
+3. Decision quality of the model: 20/20 valid means the answer shape is correct, not that the answer is right. There are no ground-truth labels.
+4. The authentication scheme and path of OpenRouter Decisions: only from documentation, not tested live (no OpenRouter key). System One and OpenAI Decisions are proven live on Experiential Labs in Stage 0c (Bearer, `/v1/systemone`, `/v1/decisions`); neither has been tested directly against TypeSafe.
+5. Kronos accuracy: deliberately not concluded, and the data is synthetic.
+6. Daily swarm cost: nutaraline responses do not carry `usage.cost`, so there is no monetary figure yet.
 
-## Cara menjalankan ulang
+## How to re-run
 
 ```sh
 cd swarm

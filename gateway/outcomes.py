@@ -6,13 +6,13 @@ from datetime import UTC, datetime
 from typing import Any
 
 ACTIONS = {
-    "izinkan": "masuk dengan ukuran penuh",
-    "kecilkan": "masuk dengan setengah ukuran",
-    "lewati": "tidak masuk",
+    "allow": "enter at full size",
+    "reduce": "enter at half size",
+    "skip": "stay out",
 }
 EFFECTS = {
-    "lewati": {-1: "avoided_loss", 1: "missed_gain", 0: "flat"},
-    "kecilkan": {-1: "reduced_loss", 1: "reduced_gain", 0: "flat"},
+    "skip": {-1: "avoided_loss", 1: "missed_gain", 0: "flat"},
+    "reduce": {-1: "reduced_loss", 1: "reduced_gain", 0: "flat"},
 }
 PENDING = "pending"
 MISSING = "insufficient_data"
@@ -123,7 +123,7 @@ def forward(
 
 def effect(verdict: str, state: str, value: float | None) -> str:
     """What following the verdict would have changed, from the settled trade profit or the price return after costs."""
-    if verdict == "izinkan":
+    if verdict == "allow":
         return "same_as_rules"
     if state != SETTLED or value is None:
         return state

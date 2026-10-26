@@ -9,16 +9,17 @@ models_yml: ~/.omp/agent/models.yml
 heartbeat_lost_s: 180
 exchange_probe_url: https://indodax.com/api/server_time
 analysis_url: http://127.0.0.1:8092
+push_contact: mailto:you@example.com
 bots:
   - id: A
     label: Bot A
-    strategy: aturan saja
+    strategy: rules only
     api_url: http://127.0.0.1:8080
     config: /opt/trading-bot/run/config/bot-a.yaml
     userdir: /opt/trading-bot/run/bot-a
   - id: B
     label: Bot B
-    strategy: aturan + swarm bayangan
+    strategy: rules + shadow swarm
     api_url: http://127.0.0.1:8081
     config: /opt/trading-bot/run/config/bot-b.yaml
     userdir: /opt/trading-bot/run/bot-b

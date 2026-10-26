@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from tb_swarm.agents import DEFAULT_TIMEZONE, build_analyst
 from tb_swarm.config import ProviderSpec
 from tb_swarm.errors import ConfigError, ProviderError
+from tb_swarm.languages import DEFAULT_LANGUAGE, LANGUAGES, language_name
 from tb_swarm.models import Usage
 from tb_swarm.providers.llm_structured import (
     build_chat_model,
@@ -27,9 +28,8 @@ from tb_swarm.providers.llm_structured import (
 )
 from tb_swarm.redact import redact
 
-Language = Literal["id", "en"]
+Language = Literal[*LANGUAGES]
 
-LANGUAGE_NAMES = {"id": "Indonesian", "en": "English"}
 DAY_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 MAX_QUESTION_CHARS = 2_000
 MAX_HISTORY_TURNS = 20
@@ -190,7 +190,7 @@ class AnalystRunner:
         *,
         model_id: str,
         timezone: str = DEFAULT_TIMEZONE,
-        language: Language = "id",
+        language: Language = DEFAULT_LANGUAGE,
         secrets: Sequence[str] = (),
         timeout_s: float = 300.0,
     ) -> None:
@@ -199,6 +199,7 @@ class AnalystRunner:
         self._zone = ZoneInfo(timezone)
         self._timezone = timezone
         self._language = language
+        self._language_name = language_name(language)
         self._secrets = tuple(secrets)
         self._timeout_s = timeout_s
         self._slots = asyncio.Semaphore(CONCURRENT_RUNS)
@@ -223,7 +224,7 @@ class AnalystRunner:
 
     async def daily_report(self, day: str, timeout_s: float | None = None) -> DailyReport:
         check_day(day)
-        prompt = REPORT_PROMPT.format(day=day, timezone=self._timezone, language=LANGUAGE_NAMES[self._language])
+        prompt = REPORT_PROMPT.format(day=day, timezone=self._timezone, language=self._language_name)
         deadline = self._deadline(timeout_s)
         run = await self._invoke([HumanMessage(prompt)], deadline)
         parsed, problem = _parse_report(run.final)
@@ -259,7 +260,7 @@ class AnalystRunner:
         context = CHAT_CONTEXT.format(
             now=datetime.now(self._zone).isoformat(timespec="minutes"),
             timezone=self._timezone,
-            language=LANGUAGE_NAMES[self._language],
+            language=self._language_name,
         )
         messages: list[BaseMessage] = [
             HumanMessage(turn.content) if turn.role == "user" else AIMessage(turn.content) for turn in history
@@ -357,7 +358,7 @@ def build_runner(
     env: Mapping[str, str],
     data_dir: str | os.PathLike[str],
     *,
-    language: Language = "id",
+    language: Language = DEFAULT_LANGUAGE,
     timeout_s: float = 300.0,
     model: BaseChatModel | None = None,
 ) -> AnalystRunner:

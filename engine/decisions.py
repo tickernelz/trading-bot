@@ -18,6 +18,8 @@ COLUMNS = (
     " CASE WHEN json_valid(request) THEN json_extract(request, '$.state.entry_tag') END AS entry_tag"
 )
 PUBLIC_VOTER_FIELDS = ("voter_id", "provider", "model", "status", "latency_s", "error_kind", "answers")
+SCHEMA_VERSION = 1
+LEGACY_OPTIONS = (("izinkan", "allow"), ("kecilkan", "reduce"), ("lewati", "skip"))
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS decisions (
@@ -50,6 +52,51 @@ CREATE INDEX IF NOT EXISTS decisions_candle_seq ON decisions(candle, settle_seq)
 """
 
 
+def _renamed(column: str) -> str:
+    expression = column
+    for old, new in LEGACY_OPTIONS:
+        expression = f"replace({expression}, '\"{old}\"', '\"{new}\"')"
+    return expression
+
+
+def _verdict_cases() -> str:
+    cases = " ".join(f"WHEN '{old}' THEN '{new}'" for old, new in LEGACY_OPTIONS)
+    return f"CASE verdict {cases} ELSE verdict END"
+
+
+def migrate(db: sqlite3.Connection) -> None:
+    """Rewrite rows stored with the Indonesian verdict names to allow, reduce and skip; a no-op once done."""
+    if db.execute("PRAGMA user_version").fetchone()[0] >= SCHEMA_VERSION:
+        return
+    legacy = ", ".join(f"'{old}'" for old, _ in LEGACY_OPTIONS)
+    db.execute("BEGIN IMMEDIATE")
+    try:
+        if db.execute("PRAGMA user_version").fetchone()[0] < SCHEMA_VERSION:
+            db.execute(
+                f"UPDATE decisions SET verdict = {_verdict_cases()}, request = {_renamed('request')},"
+                f" aggregate = {_renamed('aggregate')}, voters = {_renamed('voters')}"
+                f" WHERE verdict IN ({legacy}) OR verdict IS NULL"
+            )
+            db.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+        db.execute("COMMIT")
+    except BaseException:
+        db.execute("ROLLBACK")
+        raise
+
+
+def upgrade_file(path: Path) -> None:
+    """Migrate a decision database in place through a short writer connection."""
+    writer = sqlite3.connect(path, isolation_level=None)
+    try:
+        migrate(writer)
+    except sqlite3.OperationalError as exc:
+        raise sqlite3.OperationalError(
+            f"{path} stores legacy verdict names and cannot be migrated from a read-only open: {exc}"
+        ) from exc
+    finally:
+        writer.close()
+
+
 @dataclass(frozen=True)
 class Outcome:
     decision_id: str
@@ -71,11 +118,15 @@ class DecisionStore:
         self.path = Path(path)
         if readonly:
             self._db = sqlite3.connect(f"file:{self.path}?mode=ro", uri=True, check_same_thread=False)
+            if self._db.execute("PRAGMA user_version").fetchone()[0] < SCHEMA_VERSION:
+                upgrade_file(self.path)
         else:
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            self._db = sqlite3.connect(self.path, check_same_thread=False)
+            self._db = sqlite3.connect(self.path, check_same_thread=False, isolation_level=None)
             self._db.execute("PRAGMA journal_mode=WAL")
             self._db.executescript(SCHEMA)
+            migrate(self._db)
+            self._db.isolation_level = ""
         self._db.row_factory = sqlite3.Row
 
     def close(self) -> None:
@@ -155,7 +206,7 @@ class DecisionStore:
         ]
         for decision_id in pending:
             self.settle(
-                decision_id, status="skip", reason=reason, answered=0, verdict="lewati", aggregate=None, voters=[]
+                decision_id, status="skip", reason=reason, answered=0, verdict="skip", aggregate=None, voters=[]
             )
         return len(pending)
 

@@ -11,18 +11,18 @@ from tb_swarm.outcome import DecisionOutcome, settle
 
 from analytics.source import RecordedDecision
 
-VERDICTS = ("izinkan", "kecilkan", "lewati")
-TAKE = ("izinkan", "kecilkan")
+VERDICTS = ("allow", "reduce", "skip")
+TAKE = ("allow", "reduce")
 CHANGED_LIMIT = 50
 
 
 def verdict_of(outcome: DecisionOutcome) -> str:
-    """Name the swarm verdict: the winning option, or lewati when the outcome is a skip."""
+    """Name the swarm verdict: the winning option, or skip when the outcome is a skip."""
     if not outcome.proceed or outcome.aggregate is None:
-        return "lewati"
+        return "skip"
     result = outcome.aggregate.questions.get("verdict")
     if not isinstance(result, ChoiceResult):
-        return "lewati"
+        return "skip"
     return result.winner
 
 
@@ -67,7 +67,7 @@ def whatif_replay(
             continue
         unknown_voters.update(record.voter_id for record in decision.voters if record.voter_id not in weights)
         outcome = replay_decision(decision, weights, required, max_spread, exclude)
-        before = decision.verdict or "lewati"
+        before = decision.verdict or "skip"
         after = verdict_of(outcome)
         recorded[before] += 1
         replayed[after] += 1
@@ -104,5 +104,5 @@ def whatif_replay(
             "max_spread": max_spread,
             "exclude_voters": sorted(exclude),
         },
-        "note": "Angka trade_groups adalah data trade yang sudah tertutup, bukan kesimpulan untung atau rugi.",
+        "note": "The trade_groups figures are data from closed trades, not a conclusion about profit or loss.",
     }

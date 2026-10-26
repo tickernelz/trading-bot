@@ -116,7 +116,7 @@ def signals_view(history: dict[str, Any]) -> dict[str, Any]:
         "signals": signals,
         "enter_signals": history.get("enter_long_signals"),
         "exit_signals": history.get("exit_long_signals"),
-        "note": "Sinyal strategi pada data historis, bukan order yang dijalankan bot.",
+        "note": "Strategy signals on historical data, not orders the bot placed.",
     }
 
 

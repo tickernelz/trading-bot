@@ -30,9 +30,9 @@ from engine.shadow_client import TOKEN_HEADER
 logger = logging.getLogger("trading_bot.shadow")
 
 VERDICTS = {
-    "izinkan": "Take the entry at the full risk-based size.",
-    "kecilkan": "Take the entry at half of the risk-based size.",
-    "lewati": "Skip this entry.",
+    "allow": "Take the entry at the full risk-based size.",
+    "reduce": "Take the entry at half of the risk-based size.",
+    "skip": "Skip this entry.",
 }
 INSTRUCTIONS = (
     "A rule-based 1h swing strategy on a spot exchange wants to open a long position on the pair in state now."
@@ -73,7 +73,7 @@ def decision_request(candidate: Candidate) -> DecisionRequest:
 
 def verdict_of(outcome: DecisionOutcome) -> str:
     if not outcome.proceed or outcome.aggregate is None:
-        return "lewati"
+        return "skip"
     return outcome.aggregate.questions["verdict"].winner
 
 
@@ -129,7 +129,7 @@ class ShadowService:
                 status="skip",
                 reason="internal_error",
                 answered=0,
-                verdict="lewati",
+                verdict="skip",
                 aggregate=None,
                 voters=[],
             )

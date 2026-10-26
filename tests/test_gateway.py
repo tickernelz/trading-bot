@@ -163,7 +163,7 @@ def setup(tmp_path):
             {
                 "id": "A",
                 "label": "Bot A",
-                "strategy": "aturan saja",
+                "strategy": "rules only",
                 "api_url": "http://127.0.0.1:8080",
                 "config": str(config),
                 "userdir": str(tmp_path / "bot-a"),

@@ -23,7 +23,7 @@ def _voter(index: int, skipped: bool, rng: random.Random) -> dict[str, Any]:
             "answers": None,
         }
     lean = rng.random()
-    options = {"izinkan": round(lean, 3), "kecilkan": round((1 - lean) / 3, 3), "lewati": round(2 * (1 - lean) / 3, 3)}
+    options = {"allow": round(lean, 3), "reduce": round((1 - lean) / 3, 3), "skip": round(2 * (1 - lean) / 3, 3)}
     return {
         "voter_id": f"v{index}",
         "provider": "nutaraline" if index % 2 else "experientiallabs",
@@ -50,7 +50,7 @@ def synthetic_decisions(
                 skipped = rng.random() < skip_rate
                 voters = [_voter(index, skipped, rng) for index in range(1, VOTERS + 1)]
                 answered = sum(1 for voter in voters if voter["status"] == "ok")
-                verdict = "lewati" if skipped else rng.choice(("izinkan", "izinkan", "kecilkan", "lewati"))
+                verdict = "skip" if skipped else rng.choice(("allow", "allow", "reduce", "skip"))
                 rows.append(
                     {
                         "decision_id": f"dec_{day:%m%d}_{hour:02d}_{pair[:3].lower()}",

@@ -1,50 +1,50 @@
-# Temuan Tahap 2e: backtest strategi aturan 3 tahun
+# Stage 2e findings: 3-year rule-based strategy backtest
 
-Dokumen ini mencatat backtest strategi aturan bot A (`SwingEmaRsi`, candle 1 jam) pada data publik Indodax, dengan fee dan pajak. Sumber kebenaran tetap `docs/plan.md` revisi 11 pada ZHA-3760 (bagian 1 dan 8). Semua angka di bawah disalin dari laporan mentah `report.json` dan `report.md` yang dilampirkan pada ZHA-3778; tidak ada angka yang diketik tangan. Dokumen ini tidak menyimpulkan untung atau rugi di masa depan.
+This document records the backtest of bot A's rule-based strategy (`SwingEmaRsi`, 1-hour candles) on public Indodax data, with fees and tax. The source of truth remains `docs/plan.md` revision 11 (sections 1 and 8). All numbers below are copied from the raw reports `report.json` and `report.md` kept outside the repository; no number was typed by hand. This document does not conclude anything about future profit or loss.
 
-## Ringkasan
+## Summary
 
-| Butir | Status | Bukti |
+| Item | Status | Evidence |
 | --- | --- | --- |
-| Riwayat 1h 3 tahun dari Indodax lewat CCXT | Terbukti | `history.json`: 26.904 candle per pair, 2023-10-01 00:00 sampai 2026-10-25 23:00 UTC, 0 candle hilang |
-| Fee 0,2% dan pajak 0,21% per sisi | Diterapkan | `--fee 0.0041` di Freqtrade, tercatat di log dan di tiap trade (`fee_open`, `fee_close`) |
-| Ekspektasi per trade, jumlah trade, drawdown, sebaran, in-sample dan out-of-sample terpisah | Terukur | Tabel di bawah |
-| Syarat lolos tahap 2 plan bagian 8 (ekspektasi positif setelah fee dan pajak pada out-of-sample) | Tidak terpenuhi | Out-of-sample -0,832% per trade (limits_off) dan -1,388% (as_configured), CI 95% seluruhnya di bawah nol |
-| Parameter disetel | Tidak | 1 set parameter strategi, matriks dikunci di commit `3d7a371` sebelum hasil pertama ada |
+| 3 years of 1h history from Indodax via CCXT | Proven | `history.json`: 26,904 candles per pair, 2023-10-01 00:00 to 2026-10-25 23:00 UTC, 0 missing candles |
+| Fee 0.2% and tax 0.21% per side | Applied | `--fee 0.0041` in Freqtrade, recorded in the log and in every trade (`fee_open`, `fee_close`) |
+| Expectancy per trade, trade count, drawdown, distribution, in-sample and out-of-sample separated | Measured | Tables below |
+| Stage 2 pass condition in plan section 8 (positive expectancy after fee and tax on out-of-sample) | Not met | Out-of-sample -0.832% per trade (limits_off) and -1.388% (as_configured), 95% CI entirely below zero |
+| Parameters tuned | No | 1 strategy parameter set, matrix locked in commit `3d7a371` before the first result existed |
 
-## Riwayat Indodax: koreksi temuan tahap 0a
+## Indodax history: correction to the stage 0a finding
 
-Tahap 0a mencatat riwayat 1h Indodax hanya sekitar 649 candle (27 hari). Itu batas satu permintaan, bukan batas riwayat. Indodax (`tradingview/history_v2`) mengembalikan candle terbaru saja bila rentang `from`-`to` panjang, dan ccxt 4.5.84 mengisi `to` dengan waktu sekarang bila `params.until` tidak diberikan, sehingga `since` lama tetap menghasilkan 27 hari terakhir. ccxt untuk Indodax membaca `params.until` dalam detik (bukan milidetik seperti konvensi ccxt).
+Stage 0a recorded that Indodax 1h history was only about 649 candles (27 days). That was the limit of a single request, not the limit of the history. Indodax (`tradingview/history_v2`) returns only the most recent candles when the `from`-`to` range is long, and ccxt 4.5.84 fills `to` with the current time when `params.until` is not given, so an old `since` still yields the last 27 days. ccxt for Indodax reads `params.until` in seconds (not milliseconds as the ccxt convention has it).
 
-`engine/history.py` mengambil riwayat dalam jendela 500 candle (`since` dan `until` per jendela) lalu menyimpannya sebagai data feather Freqtrade. Hasil (`history.json`):
+`engine/history.py` fetches the history in windows of 500 candles (`since` and `until` per window) and then stores it as Freqtrade feather data. Result (`history.json`):
 
-| Pair | Candle | Pertama (UTC) | Terakhir (UTC) | Hilang sebelum / di dalam / sesudah | Candle volume 0 | Permintaan |
+| Pair | Candles | First (UTC) | Last (UTC) | Missing before / inside / after | Zero-volume candles | Requests |
 | --- | --- | --- | --- | --- | --- | --- |
 | BTC/IDR | 26904 | 2023-10-01 00:00 | 2026-10-25 23:00 | 0 / 0 / 0 | 92 | 54 |
 | ETH/IDR | 26904 | 2023-10-01 00:00 | 2026-10-25 23:00 | 0 / 0 / 0 | 99 | 54 |
 | SOL/IDR | 26904 | 2023-10-01 00:00 | 2026-10-25 23:00 | 0 / 0 / 0 | 102 | 54 |
 
-"Sebelum" dan "sesudah" dihitung terhadap rentang yang diminta (`requested_since`, `requested_until`), "di dalam" di antara candle pertama dan terakhir; ketiganya dari `history.json` lari ulang di commit perbaikan review.
+"Before" and "after" are counted against the requested range (`requested_since`, `requested_until`), "inside" between the first and last candle; all three come from `history.json` re-run at the review fix commit.
 
-Riwayat lebih tua dari 2023-10-01 tidak diminta. Probe terpisah dengan jendela 500 candle mengembalikan 1h BTC/IDR penuh untuk 2023-10-22 dan 2024-08-17, sedangkan tanpa `until` setiap `since` (30 sampai 2000 hari) menghasilkan 649 candle yang sama.
+History older than 2023-10-01 was not requested. A separate probe with a 500-candle window returned full 1h BTC/IDR for 2023-10-22 and 2024-08-17, whereas without `until` every `since` (30 to 2000 days) yields the same 649 candles.
 
-## Rancangan (dikunci sebelum lari)
+## Design (locked before the run)
 
-- Strategi: `engine/strategies/swing_ema_rsi.py` apa adanya di main, termasuk lapisan risiko (ukuran posisi 0,5% risiko per trade, batas rugi harian 1%, batas drawdown total 10%, maksimal 3 posisi). Konfigurasi `config/config.example.yaml`: modal Rp 2.000.000, compounding aktif, BTC/IDR, ETH/IDR, SOL/IDR.
-- Parameter strategi: 13 (EMA 20 dan 50, RSI 14, RSI masuk 45-70, RSI keluar 78, stoploss -3%, tabel ROI tiga langkah 0 menit 5%, 480 menit 2,5%, 1440 menit 1,2%). Parameter risiko: 4 (0,5%, 1%, 10%, 3 posisi). Semuanya dipilih di tahap 0a sebelum data ini diunduh; tidak ada yang diubah di tahap ini.
-- Variasi yang dicoba: 1 set parameter strategi. Matriks: 2 periode × (as_configured dengan fee dan pajak, limits_off dengan tiga tingkat biaya) = 8 backtest. Matriks, periode, dan seed bootstrap ada di `engine/backtest_suite.py` pada commit `3d7a371`, sebelum backtest pertama.
-- Periode: in-sample 2023-10-26 sampai 2025-10-26 (2 tahun), out-of-sample 2025-10-26 sampai 2026-10-26 (1 tahun). Karena tidak ada penyetelan, in-sample di sini adalah bagian yang boleh dipakai bila kelak ada penyetelan; out-of-sample tidak boleh disentuh untuk itu.
-- Biaya per sisi: fee_and_tax 0,41% (fee 0,2% dari API publik ditambah pajak 0,21% dari sumber sekunder, belum diverifikasi dari dokumen resmi), fee_only 0,2%, no_cost 0% (pembanding kotor).
-- Mode risiko: as_configured memakai batas apa adanya; begitu drawdown total menembus 10%, entry baru berhenti sampai akhir periode (on_breach: stop_new_entries). limits_off menaikkan batas rugi harian dan drawdown total ke 100% (ukuran posisi tetap 0,5% risiko), supaya ekspektasi aturan diukur pada seluruh periode, bukan hanya sampai kill switch.
-- Sebaran: kuantil per trade dan interval bootstrap persentil 95% untuk rata-rata (10.000 sampel ulang, seed 3778).
+- Strategy: `engine/strategies/swing_ema_rsi.py` as is on main, including the risk layer (position size 0.5% risk per trade, daily loss limit 1%, total drawdown limit 10%, maximum 3 positions). Configuration `config/config.example.yaml`: capital Rp 2,000,000, compounding on, BTC/IDR, ETH/IDR, SOL/IDR.
+- Strategy parameters: 13 (EMA 20 and 50, RSI 14, RSI entry 45-70, RSI exit 78, stoploss -3%, three-step ROI table 0 minutes 5%, 480 minutes 2.5%, 1440 minutes 1.2%). Risk parameters: 4 (0.5%, 1%, 10%, 3 positions). All were chosen in stage 0a before this data was downloaded; none was changed in this stage.
+- Variations tried: 1 strategy parameter set. Matrix: 2 periods × (as_configured with fee and tax, limits_off with three cost levels) = 8 backtests. The matrix, periods, and bootstrap seed are in `engine/backtest_suite.py` at commit `3d7a371`, before the first backtest.
+- Periods: in-sample 2023-10-26 to 2025-10-26 (2 years), out-of-sample 2025-10-26 to 2026-10-26 (1 year). Since there is no tuning, the in-sample here is the part that may be used if tuning ever happens; out-of-sample must not be touched for that.
+- Cost per side: fee_and_tax 0.41% (fee 0.2% from the public API plus tax 0.21% from a secondary source, not yet verified against an official document), fee_only 0.2%, no_cost 0% (gross comparison).
+- Risk mode: as_configured uses the limits as they are; once total drawdown breaches 10%, new entries stop until the end of the period (on_breach: stop_new_entries). limits_off raises the daily loss and total drawdown limits to 100% (position size stays at 0.5% risk), so that the expectancy of the rules is measured over the whole period, not only up to the kill switch.
+- Distribution: per-trade quantiles and a 95% percentile bootstrap interval for the mean (10,000 resamples, seed 3778).
 
-Empat percobaan lari terjadi: tiga pertama berhenti karena cacat skrip (direktori data belum dibuat, kontainer tanpa jaringan sehingga Freqtrade tidak bisa memuat metadata pasar, tanggal `backtest_end` tanpa zona waktu). Lari ketiga sempat menyelesaikan in_sample-as_configured-fee_and_tax (104 trade, -7,85%, sama dengan lari keempat) sebelum gagal di peringkasan. Tidak ada parameter strategi, matriks, atau periode yang berubah di antaranya; hasil di bawah dari lari keempat.
+Four trial runs occurred: the first three stopped because of script defects (data directory not yet created, container without network so Freqtrade could not load market metadata, `backtest_end` date without a time zone). The third run did manage to finish in_sample-as_configured-fee_and_tax (104 trades, -7.85%, same as the fourth run) before failing at summarisation. No strategy parameter, matrix, or period changed in between; the results below are from the fourth run.
 
-## Hasil
+## Results
 
-Ekspektasi per trade adalah rata-rata `profit_ratio` Freqtrade, yang sudah dikurangi biaya kedua sisi pada tingkat biaya run tersebut. Drawdown maks dihitung dari saldo setelah tiap trade tertutup dan sama dengan `max_drawdown_account` Freqtrade di kedelapan run. "Hari tanpa entry di akhir" adalah jarak entry terakhir ke akhir periode.
+Expectancy per trade is the mean Freqtrade `profit_ratio`, which already has the costs of both sides deducted at that run's cost level. Max drawdown is computed from the balance after each closed trade and equals Freqtrade's `max_drawdown_account` in all eight runs. "Days without entry at the end" is the distance from the last entry to the end of the period.
 
-| Run | Periode | Biaya per sisi | Mode risiko | Trade | Ekspektasi per trade | CI 95% | Median | Win rate | Drawdown maks | Hasil total | Hari tanpa entry di akhir |
+| Run | Period | Cost per side | Risk mode | Trades | Expectancy per trade | 95% CI | Median | Win rate | Max drawdown | Total result | Days without entry at the end |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | in_sample-as_configured-fee_and_tax | in_sample | 0.41% | as_configured | 104 | -0.590% | -1.092% .. -0.092% | -1.447% | 44.2% | 10.06% | -7.85% | 545.6 |
 | in_sample-limits_off-fee_and_tax | in_sample | 0.41% | limits_off | 447 | -0.818% | -1.044% .. -0.594% | -1.524% | 38.3% | 40.06% | -38.48% | 1.8 |
@@ -55,7 +55,7 @@ Ekspektasi per trade adalah rata-rata `profit_ratio` Freqtrade, yang sudah dikur
 | out_of_sample-limits_off-fee_only | out_of_sample | 0.20% | limits_off | 221 | -0.451% | -0.707% .. -0.194% | -1.097% | 37.1% | 14.55% | -13.81% | 5.3 |
 | out_of_sample-limits_off-no_cost | out_of_sample | 0.00% | limits_off | 221 | -0.077% | -0.317% .. +0.171% | -0.675% | 38.9% | 6.89% | -2.95% | 5.3 |
 
-| Run | p05 | p25 | p75 | p95 | Simpangan baku | Min | Maks | Median lama pegang (jam) | Penolakan gerbang risiko |
+| Run | p05 | p25 | p75 | p95 | Standard deviation | Min | Max | Median holding time (hours) | Risk gate rejections |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | in_sample-as_configured-fee_and_tax | -3.792% | -3.299% | +1.744% | +2.573% | 2.649% | -3.792% | +5.000% | 13.0 | daily_loss 2, total_drawdown 341 |
 | in_sample-limits_off-fee_and_tax | -3.792% | -2.776% | +1.200% | +2.500% | 2.395% | -3.792% | +5.000% | 15.0 | 0 |
@@ -66,7 +66,7 @@ Ekspektasi per trade adalah rata-rata `profit_ratio` Freqtrade, yang sudah dikur
 | out_of_sample-limits_off-fee_only | -3.387% | -1.837% | +1.200% | +2.500% | 1.953% | -3.387% | +5.000% | 17.0 | 0 |
 | out_of_sample-limits_off-no_cost | -3.000% | -1.417% | +1.200% | +2.500% | 1.866% | -3.000% | +5.000% | 16.0 | 0 |
 
-| Run | Pair | Trade | Ekspektasi per trade |
+| Run | Pair | Trades | Expectancy per trade |
 | --- | --- | --- | --- |
 | in_sample-as_configured-fee_and_tax | BTC/IDR | 33 | -1.103% |
 | in_sample-as_configured-fee_and_tax | ETH/IDR | 34 | -0.526% |
@@ -93,7 +93,7 @@ Ekspektasi per trade adalah rata-rata `profit_ratio` Freqtrade, yang sudah dikur
 | out_of_sample-limits_off-no_cost | ETH/IDR | 75 | +0.034% |
 | out_of_sample-limits_off-no_cost | SOL/IDR | 75 | -0.215% |
 
-| Run | Alasan exit |
+| Run | Exit reason |
 | --- | --- |
 | in_sample-as_configured-fee_and_tax | ema_cross_down_or_rsi 47, roi 33, stop_loss 24 |
 | in_sample-limits_off-fee_and_tax | ema_cross_down_or_rsi 218, force_exit 1, roi 147, stop_loss 81 |
@@ -104,27 +104,27 @@ Ekspektasi per trade adalah rata-rata `profit_ratio` Freqtrade, yang sudah dikur
 | out_of_sample-limits_off-fee_only | ema_cross_down_or_rsi 129, roi 70, stop_loss 22 |
 | out_of_sample-limits_off-no_cost | ema_cross_down_or_rsi 126, roi 75, stop_loss 20 |
 
-## Bacaan
+## Reading
 
-- Setelah fee dan pajak, ekspektasi per trade negatif di kedua periode: in-sample -0,818% (447 trade) dan out-of-sample -0,832% (221 trade) pada limits_off; batas atas CI 95% masing-masing -0,594% dan -0,561%.
-- Tanpa biaya (no_cost) ekspektasi -0,058% in-sample dan -0,077% out-of-sample dengan CI 95% yang memuat nol: data ini tidak menunjukkan keunggulan aturan sebelum biaya. Biaya 0,41% per sisi menurunkan ekspektasi sekitar 0,76 poin persen per trade (in-sample -0,818 lawan -0,058; out-of-sample -0,832 lawan -0,077); median lama pegang 13 sampai 18 jam.
-- Dengan konfigurasi apa adanya, batas drawdown total 10% tercapai dan menghentikan entry: entry terakhir 2024-04-28 di in-sample (545,6 hari tanpa entry, 341 penolakan total_drawdown) dan 2026-02-17 di out-of-sample (250,8 hari, 162 penolakan). Gerbang risiko bekerja sesuai rancangan dan membatasi rugi ke sekitar 10%, tetapi juga berarti bot A dengan strategi ini berhenti membuka posisi dalam beberapa bulan.
-- Syarat lolos tahap 2 di plan bagian 8 tidak terpenuhi oleh strategi ini. Tidak ada penyetelan yang dilakukan untuk mengubahnya.
+- After fees and tax, expectancy per trade is negative in both periods: in-sample -0.818% (447 trades) and out-of-sample -0.832% (221 trades) under limits_off; the 95% CI upper bounds are -0.594% and -0.561% respectively.
+- Without costs (no_cost) expectancy is -0.058% in-sample and -0.077% out-of-sample, with 95% CIs that include zero: this data shows no edge in the rules before costs. The 0.41% per-side cost lowers expectancy by about 0.76 percentage points per trade (in-sample -0.818 versus -0.058; out-of-sample -0.832 versus -0.077); median holding time is 13 to 18 hours.
+- With the configuration as is, the 10% total drawdown limit is reached and halts entries: last entry 2024-04-28 in-sample (545.6 days without entries, 341 total_drawdown rejections) and 2026-02-17 out-of-sample (250.8 days, 162 rejections). The risk gate works as designed and caps losses at around 10%, but it also means bot A with this strategy stops opening positions for several months.
+- The stage 2 pass criteria in plan section 8 are not met by this strategy. No tuning was done to change that.
 
-## Belum terbukti dan batasan
+## Not proven and limitations
 
-- Pajak 0,21% per sisi berasal dari sumber sekunder (plan bagian 1). Plan menyebut satu siklus 0,61-0,82%; backtest memakai batas atas 0,82%. Skenario 0,61% (pajak hanya satu sisi) tidak dijalankan; fee_only (0,4% per siklus) adalah batas bawahnya.
-- Model pengisian Freqtrade: order terisi di harga buka candle berikutnya atau di harga stoploss/ROI, tanpa spread, slippage, kedalaman buku order, atau order limit yang tidak terisi. Spread Indodax belum diukur.
-- Metadata pasar (presisi, minimal order) diambil dari Indodax saat lari (2026-10-26) dan diberlakukan ke seluruh riwayat.
-- Interval bootstrap menganggap trade saling bebas. Trade pada tiga pair sering bersamaan dan berkorelasi, jadi interval sebenarnya kemungkinan lebih lebar.
-- Satu jalur sejarah dan satu set parameter; tidak ada walk-forward. Strategi dengan timeframe 4 jam atau parameter lain tidak diuji (setiap variasi tambahan menaikkan risiko overfit dan harus dicatat).
-- Data dari endpoint TradingView Indodax yang tidak terdokumentasi resmi; kelengkapan diperiksa (0 candle hilang), kebenaran harga tidak dibandingkan dengan sumber kedua.
-- Swarm, sinyal berita, dan bot B tidak termasuk; plan menetapkan evaluasinya lewat forward test.
+- The 0.21% per-side tax comes from a secondary source (plan section 1). The plan states one cycle at 0.61-0.82%; the backtest uses the 0.82% upper bound. The 0.61% scenario (tax on one side only) was not run; fee_only (0.4% per cycle) is its lower bound.
+- Freqtrade fill model: orders fill at the next candle's open price or at the stoploss/ROI price, with no spread, slippage, order book depth, or unfilled limit orders. Indodax spread has not been measured.
+- Market metadata (precision, minimum order) was fetched from Indodax at run time (2026-10-26) and applied to the entire history.
+- The bootstrap interval assumes trades are independent. Trades across the three pairs often overlap and are correlated, so the true interval is likely wider.
+- One historical path and one parameter set; no walk-forward. A 4-hour timeframe strategy or other parameters were not tested (every additional variation raises overfit risk and must be recorded).
+- Data comes from the Indodax TradingView endpoint, which is not officially documented; completeness was checked (0 missing candles), price correctness was not compared against a second source.
+- The swarm, news signals, and bot B are not included; the plan specifies evaluating them through a forward test.
 
-## Menjalankan ulang
+## Re-running
 
     docker compose --profile build build freqtrade-base
     docker build -f docker/Dockerfile --target engine --build-context freqtrade-base=docker-image://trading-bot/freqtrade:2026.9 -t trading-bot/engine:stage2 .
     IMAGE=trading-bot/engine:stage2 scripts/stage2_backtest.sh user_data/stage2
 
-Skrip mengunduh riwayat bila `history.json` belum ada, lalu menjalankan delapan backtest dan menulis `plan.json`, `report.json`, `report.md`, serta hasil Freqtrade per run di `runs/<run>/`. Delapan backtest memakan 54 detik (termasuk start kontainer) di PC Zhafron. Pengunduhan memakai jaringan; backtest juga memakai jaringan untuk metadata pasar, tanpa key.
+The script downloads the history if `history.json` does not exist yet, then runs the eight backtests and writes `plan.json`, `report.json`, `report.md`, and the Freqtrade results per run in `runs/<run>/`. The eight backtests take 54 seconds (including container start) on the owner's PC. The download uses the network; the backtests also use the network for market metadata, without a key.

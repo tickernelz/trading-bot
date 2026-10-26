@@ -191,7 +191,7 @@ class TestExport:
     def test_the_summary_states_its_basis_and_what_is_unverified(self):
         basis = tax_summary([], 0.21)["basis"]
         assert "PMK 50/2025" in basis["regulation"]
-        assert "bukan nasihat pajak" in basis["disclaimer"]
+        assert "not tax advice" in basis["disclaimer"]
         assert any("PAKD" in item for item in basis["not_verified"])
 
     def test_closed_trades_without_a_close_rate_are_counted_as_skipped(self):

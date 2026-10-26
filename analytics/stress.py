@@ -56,9 +56,9 @@ def stress(risk: RiskSettings, inputs: RiskInputs, drop_pct: float) -> dict[str,
         "stop_fills": state_view(risk, inputs, sum(row["pnl_stop_fills"] for row in rows)),
         "stop_missed": state_view(risk, inputs, sum(row["pnl_stop_missed"] for row in rows)),
         "assumptions": [
-            "semua posisi terbuka turun sebesar drop_pct dari harga sekarang secara bersamaan",
-            "stop_fills: stop terisi di harga stop bila harga jatuh melewatinya",
-            "stop_missed: stop tidak terisi (celah harga), posisi dinilai di harga jatuh",
-            "tidak ada entry baru dan tidak ada exit lain; biaya tutup memakai fee_close trade",
+            "all open positions fall by drop_pct from the current price at the same time",
+            "stop_fills: the stop fills at the stop price when the price falls through it",
+            "stop_missed: the stop does not fill (price gap) and the position is valued at the dropped price",
+            "no new entries and no other exits; closing costs use the trade fee_close",
         ],
     }

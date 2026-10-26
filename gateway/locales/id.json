@@ -1,0 +1,38 @@
+{
+  "number": {
+    "group": ".",
+    "decimal": ","
+  },
+  "words": {
+    "buy": "Beli",
+    "sell": "Jual",
+    "daily_loss": "Rugi harian",
+    "total_drawdown": "Drawdown"
+  },
+  "kinds": {
+    "fill": {
+      "title": "{side} {pair} terisi",
+      "body": "Dry-run: Rp {amount} di {rate}."
+    },
+    "risk_breach": {
+      "title": "{metric}: batas terlewati",
+      "body": "{metric} {value}% dari batas {limit}%. Entry baru ditahan."
+    },
+    "kill_switch": {
+      "title": "Kill switch aktif",
+      "body": "{bot} berhenti membuka posisi baru. Posisi terbuka tetap dijaga stop loss."
+    },
+    "heartbeat_lost": {
+      "title": "Heartbeat bot hilang",
+      "body": "Tidak ada kabar dari {bot} selama {minutes} menit. Periksa PC."
+    },
+    "quorum_failed": {
+      "title": "Kuorum swarm gagal",
+      "body": "{pair}: {answered} dari {required} voter menjawab. Entry dilewati."
+    },
+    "daily_summary": {
+      "title": "Ringkasan harian",
+      "body": "{bot}: {pnl_pct}% kemarin, trade ditutup: {closed}."
+    }
+  }
+}

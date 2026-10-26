@@ -54,7 +54,7 @@ def demote(text):
 
 plan = read(os.path.join(DOCS, "plan.md"))
 research = read(os.path.join(DOCS, "research-swarm-pwa.md"))
-assert "(revisi 10)" in plan.split("\n")[0]
+assert "(revision 10)" in plan.split("\n")[0]
 
 top = r"^## "
 p1 = section(plan, r"^## 1\. ", top)
@@ -74,7 +74,7 @@ p9 = section(plan, r"^## 9\. ", top)
 p10 = section(plan, r"^## 10\. ", top)
 p11 = section(plan, r"^## 11\. ", top)
 p12 = section(plan, r"^## 12\. ", top)
-p13 = section(plan, r"^## 13\. ", r"^## Sumber")
+p13 = section(plan, r"^## 13\. ", r"^## Sources")
 r5 = section(research, r"^## 5\. ", top)
 r6 = section(research, r"^## 6\. ", top)
 r7 = section(research, r"^## 7\. ")
@@ -83,46 +83,46 @@ pieces = p42.split(FENCE)
 assert len(pieces) == 3
 yaml_block = FENCE + pieces[1].rstrip("\n") + "\n" + FENCE
 change_rules = pieces[2].strip("\n")
-safety_note = one_line(p41, "Catatan keamanan")
-p41_main = "\n".join(l for l in p41.split("\n") if not l.startswith("Catatan keamanan")).strip("\n")
-adoption = one_line(p8, "Kriteria adopsi")
-registry_line = one_line(p43, "7. Registri voter")
-p43_main = "\n".join(l for l in p43.split("\n") if not l.startswith("7. Registri voter")).strip("\n")
-test_model_note = one_line(p8, "Selama testing semua voter")
-p8_main = "\n".join(l for l in p8.split("\n") if not l.startswith("Kriteria adopsi")).strip("\n")
+safety_note = one_line(p41, "Security note")
+p41_main = "\n".join(l for l in p41.split("\n") if not l.startswith("Security note")).strip("\n")
+adoption = one_line(p8, "Swarm adoption criteria")
+registry_line = one_line(p43, "7. The voter registry")
+p43_main = "\n".join(l for l in p43.split("\n") if not l.startswith("7. The voter registry")).strip("\n")
+test_model_note = one_line(p8, "During testing all voters")
+p8_main = "\n".join(l for l in p8.split("\n") if not l.startswith("Swarm adoption criteria")).strip("\n")
 
 doc = [
     part("s00.md"),
-    "# 2. Angka untuk modal Rp 2 juta dan biaya\n\n## 2.1 Pernyataan jujur tentang hasil (plan bagian 1)\n\n" + p1,
+    "# 2. Figures for Rp 2 million capital and costs\n\n## 2.1 Honest statement about results (plan section 1)\n\n" + p1,
     part("s02.md"),
-    "# 3. Arsitektur\n\n@@MOCKarch@@\n\n" + p2 + "\n\n## 3.1 Sumber data (plan bagian 5)\n\n" + p5,
-    "# 4. Swarm dan median\n\n" + part("s04a.md")
-    + "\n\n## 4.2 Dua kelompok voter dan agregasi (plan bagian 3)\n\n" + escape_list_letters(p3)
-    + "\n\n## 4.3 Kriteria adopsi swarm sebagai gerbang (plan bagian 8)\n\n" + adoption
+    "# 3. Architecture\n\n@@MOCKarch@@\n\n" + p2 + "\n\n## 3.1 Data sources (plan section 5)\n\n" + p5,
+    "# 4. Swarm and median\n\n" + part("s04a.md")
+    + "\n\n## 4.2 Two voter groups and aggregation (plan section 3)\n\n" + escape_list_letters(p3)
+    + "\n\n## 4.3 Swarm adoption criteria as a gate (plan section 8)\n\n" + adoption
     + "\n\n" + test_model_note + "\n\n" + part("s04b.md"),
-    "# 5. Decision model multi-vendor dan DecisionProvider\n\n## 5.1 Adapter DecisionProvider (plan bagian 4)\n\n"
+    "# 5. Multi-vendor decision model and DecisionProvider\n\n## 5.1 DecisionProvider adapter (plan section 4)\n\n"
     + p4 + "\n\n" + part("s05a.md")
-    + "\n\n## 5.2 Backend LLM: deepagents dan perannya (plan bagian 4.1)\n\n" + p41_main
-    + "\n\n## 5.3 Provider AI milik Zhafron (plan bagian 4.3, dari omp models.yml)\n\n" + p43_main + "\n\n" + part("s05b.md")
-    + "\n\n## 5.4 Model uji (plan bagian 4.4)\n\n" + p44
-    + "\n\n## 5.5 Setup provider dan key (UI) dan penyimpanan (plan bagian 4.5)\n\n" + p45,
-    "# 6. Konfigurasi\n\n" + part("s06a.md")
-    + "\n\n## 6.2 Aturan perubahan konfigurasi (plan bagian 4.2)\n\n" + change_rules
-    + "\n\n## 6.3 Berkas YAML default (plan bagian 4.2)\n\n" + yaml_block,
-    "# 7. Keamanan dan PWA\n\n## 7.1 Keamanan\n\n- " + safety_note + "\n- " + registry_line[3:]
-    + "\n- API key tidak masuk repo (config/config.yaml dan .env ada di .gitignore), tidak di grup, dan tidak di dokumen ini; key di config.yaml tersimpan sebagai teks biasa di disk PC, konsekuensi yang diterima Zhafron (bab 5.5)."
-    + "\n- Kegagalan menutup entry baru, bukan membukanya (kuorum fail-closed, bab 4)."
-    + "\n\n## 7.2 PC, semua OS, dan mobile (PWA) (plan bagian 6)\n\n" + p6
-    + "\n\n## 7.3 Batasan platform PWA (dokumen riset, bagian 5)\n\n" + r5,
-    "# 8. Tahap, syarat lolos, dan biaya compute\n\n## 8.1 Tahap dan syarat lolos (plan bagian 8)\n\n"
+    + "\n\n## 5.2 LLM backend: deepagents and its role (plan section 4.1)\n\n" + p41_main
+    + "\n\n## 5.3 AI providers owned by the owner (plan section 4.3, from omp models.yml)\n\n" + p43_main + "\n\n" + part("s05b.md")
+    + "\n\n## 5.4 Test model (plan section 4.4)\n\n" + p44
+    + "\n\n## 5.5 Provider and key setup (UI) and storage (plan section 4.5)\n\n" + p45,
+    "# 6. Configuration\n\n" + part("s06a.md")
+    + "\n\n## 6.2 Configuration change rules (plan section 4.2)\n\n" + change_rules
+    + "\n\n## 6.3 Default YAML file (plan section 4.2)\n\n" + yaml_block,
+    "# 7. Security and PWA\n\n## 7.1 Security\n\n- " + safety_note + "\n- " + registry_line[3:]
+    + "\n- API keys do not go into the repo (config/config.yaml and .env are in .gitignore), not in the group, and not in this document; keys in config.yaml are stored as plain text on the PC disk, a consequence accepted by the owner (chapter 5.5)."
+    + "\n- Failure closes new entries, it does not open them (fail-closed quorum, chapter 4)."
+    + "\n\n## 7.2 PC, all OSes, and mobile (PWA) (plan section 6)\n\n" + p6
+    + "\n\n## 7.3 PWA platform limitations (research document, section 5)\n\n" + r5,
+    "# 8. Stages, pass criteria, and compute cost\n\n## 8.1 Stages and pass criteria (plan section 8)\n\n"
     + p8_main.replace(test_model_note + "\n\n", "")
-    + "\n\n## 8.2 Biaya compute (bukan batasan) (plan bagian 7)\n\n" + p7
-    + "\n\n## 8.3 Yang tidak dipakai dan alasannya (plan bagian 9)\n\n" + p9,
-    "# 9. Yang belum terverifikasi dan keputusan yang ditunggu\n\n## 9.1 Belum terverifikasi (dokumen riset, bagian 6)\n\n"
-    + r6 + "\n\n" + part("s09a.md") + "\n\n## 9.2 Keputusan (plan bagian 10)\n\n" + p10,
-    "# 10. Proyek dan git (plan bagian 11)\n\n" + p11,
-    "# 11. UI/UX unik dengan impeccable (plan bagian 12)\n\n" + p12,
-    "# 12. Fitur lengkap (plan bagian 13)\n\n" + demote(p13),
+    + "\n\n## 8.2 Compute cost (not a limit) (plan section 7)\n\n" + p7
+    + "\n\n## 8.3 What is not used and why (plan section 9)\n\n" + p9,
+    "# 9. What is unverified and decisions pending\n\n## 9.1 Unverified (research document, section 6)\n\n"
+    + r6 + "\n\n" + part("s09a.md") + "\n\n## 9.2 Decisions (plan section 10)\n\n" + p10,
+    "# 10. Project and git (plan section 11)\n\n" + p11,
+    "# 11. Unique UI/UX with impeccable (plan section 12)\n\n" + p12,
+    "# 12. Full features (plan section 13)\n\n" + demote(p13),
 ]
 
 appendix = os.path.join(HERE, "parts", "appendix.md")
@@ -130,12 +130,11 @@ if os.path.exists(appendix):
     doc.append(part("appendix.md"))
 
 doc.append(
-    "# Sumber\n\nBukti dan tautan lengkap ada di dokumen research-swarm-pwa pada issue ZHA-3760. "
-    "Daftar tautan dari dokumen riset (bagian 7):\n\n" + r7
+    "# Sources\n\nFull evidence and links are in the research-swarm-pwa document. "
+    "List of links from the research document (section 7):\n\n" + r7
 )
 
 markdown = "\n" + "\n\n".join(doc) + "\n"
-markdown = markdown.replace("secret tidak perlu", "rahasia tidak perlu")
 md_path = os.path.join(OUT, "doc.md")
 with open(md_path, "w", encoding="utf-8") as fh:
     fh.write(markdown)
@@ -148,7 +147,7 @@ command = [
     "-t", "html5", "--standalone", "--embed-resources",
     "--css", os.path.join(HERE, "style.css"),
     "--css", os.path.join(HERE, "mockups.css"),
-    "--metadata", "lang=id", "--metadata", "pagetitle=Plan bot trading otonom 24 jam",
+    "--metadata", "lang=en", "--metadata", "pagetitle=Plan for a 24-hour autonomous trading bot",
     "--columns=200", "-o", html_path,
 ]
 with open(log_path, "w") as log:

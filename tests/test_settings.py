@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from engine.settings import ConfigError, load_settings
+from tb_swarm.languages import LANGUAGES
 from tests.conftest import EXAMPLE
 
 
@@ -42,8 +43,21 @@ def test_analyst_section_is_optional_and_carries_defaults(example_raw, write_con
         "ANALYST_TOKEN",
         "analyst_data",
         "analyst_reports",
-        "id",
+        "en",
     )
+
+
+@pytest.mark.parametrize("language", sorted(LANGUAGES))
+def test_every_registered_analyst_language_is_accepted(example_raw, write_config, language):
+    example_raw["analyst"] = {"language": language}
+    assert load_settings(write_config(example_raw)).analyst.language == language
+
+
+@pytest.mark.parametrize("language", ["xx", "", "EN", "indonesian"])
+def test_unregistered_analyst_language_is_rejected(example_raw, write_config, language):
+    example_raw["analyst"] = {"language": language}
+    with pytest.raises(ConfigError, match="analyst.language"):
+        load_settings(write_config(example_raw))
     del example_raw["analyst"]
     assert load_settings(write_config(example_raw)).analyst is None
 

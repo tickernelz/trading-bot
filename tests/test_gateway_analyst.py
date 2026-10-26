@@ -64,7 +64,7 @@ class Rig:
             status="skip",
             reason="quorum_not_met",
             answered=2,
-            verdict="lewati",
+            verdict="skip",
             aggregate=None,
             voters=[{"voter_id": "v1", "provider": "p", "model": "m", "status": "timeout", "latency_s": 30.0}],
         )

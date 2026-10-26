@@ -121,8 +121,8 @@ def _interval(bounds: list[float] | None) -> str:
 def markdown(runs: list[dict[str, Any]]) -> str:
     """Render the summary tables that the stage 2 document quotes."""
     lines = [
-        "| Run | Periode | Biaya per sisi | Mode risiko | Trade | Ekspektasi per trade | CI 95% | Median | Win rate "
-        "| Drawdown maks | Hasil total | Hari tanpa entry di akhir |",
+        "| Run | Period | Fee per side | Risk mode | Trades | Expectancy per trade | 95% CI | Median | Win rate "
+        "| Max drawdown | Total return | Days after last entry |",
         "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for run in runs:
@@ -136,7 +136,7 @@ def markdown(runs: list[dict[str, Any]]) -> str:
         )
     lines += [
         "",
-        "| Run | p05 | p25 | p75 | p95 | Simpangan baku | Min | Maks | Median lama pegang (jam) | Penolakan gerbang risiko |",
+        "| Run | p05 | p25 | p75 | p95 | Std dev | Min | Max | Median holding time (h) | Risk gate rejections |",
         "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for run in runs:

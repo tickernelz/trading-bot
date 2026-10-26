@@ -38,8 +38,8 @@ def drifting_book(tmp_path: Path) -> None:
     rows, outcomes = [], {}
     for index in range(40):
         profit = 100.0 if index % 2 == 0 else -100.0
-        voters = [record(f"v{n}", "izinkan", take=0.9 if profit > 0 else 0.1) for n in range(1, 8)]
-        voters[0] = record("v1", "lewati" if profit > 0 else "izinkan", take=0.1 if profit > 0 else 0.9)
+        voters = [record(f"v{n}", "allow", take=0.9 if profit > 0 else 0.1) for n in range(1, 8)]
+        voters[0] = record("v1", "skip" if profit > 0 else "allow", take=0.1 if profit > 0 else 0.9)
         rows.append({"decision_id": f"x{index:02d}", "voters": voters})
         outcomes[f"x{index:02d}"] = (profit, False)
     write_decisions(tmp_path / "decisions.sqlite", rows)
@@ -62,7 +62,7 @@ def build(tmp_path: Path, example_raw: dict, auto_disable: bool):
             {
                 "id": "A",
                 "label": "Bot A",
-                "strategy": "aturan saja",
+                "strategy": "rules only",
                 "api_url": "http://127.0.0.1:8080",
                 "config": str(plain),
                 "userdir": str(tmp_path / "bot-a"),
@@ -70,7 +70,7 @@ def build(tmp_path: Path, example_raw: dict, auto_disable: bool):
             {
                 "id": "B",
                 "label": "Bot B",
-                "strategy": "aturan + swarm bayangan",
+                "strategy": "rules + shadow swarm",
                 "api_url": "http://127.0.0.1:8081",
                 "config": str(config),
                 "userdir": str(tmp_path / "bot-b"),
