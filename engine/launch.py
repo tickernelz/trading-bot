@@ -127,6 +127,15 @@ def build_argv(command: str, extra: list[str], config_path: Path, userdir: str) 
     return argv + extra
 
 
+def run_freqtrade(command: list[str], env: dict[str, str]) -> int:
+    """Run Freqtrade inside this process with the given environment; it exits the process when done."""
+    os.environ.update(env)
+    from freqtrade.main import main as freqtrade_main
+
+    freqtrade_main(command[1:])
+    return 0
+
+
 def main(argv: list[str]) -> int:
     if not argv:
         print("usage: python -m engine.launch <freqtrade-command> [args...]", file=sys.stderr)
@@ -156,7 +165,7 @@ def main(argv: list[str]) -> int:
         config["db_url"] = f"sqlite:///{(Path(userdir) / DRY_RUN_DB).resolve()}"
     rendered.write_text(json.dumps(config, indent=2), encoding="utf-8")
     command = build_argv(argv[0], argv[1:], rendered, userdir)
-    os.execvpe(command[0], command, {**os.environ, **overrides})
+    return run_freqtrade(command, {**os.environ, **overrides})
 
 
 if __name__ == "__main__":

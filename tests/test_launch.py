@@ -22,7 +22,7 @@ SECRETS = {
 @pytest.fixture
 def exec_calls(monkeypatch):
     calls = []
-    monkeypatch.setattr(launch.os, "execvpe", lambda *args: calls.append(args))
+    monkeypatch.setattr(launch, "run_freqtrade", lambda argv, env: calls.append((argv[0], argv, env)) or 0)
     return calls
 
 

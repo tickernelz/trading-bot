@@ -189,6 +189,18 @@ def _get(client: TestClient, path: str, token: str) -> httpx.Response:
     return client.get(path, headers={"Authorization": f"Bearer {token}"})
 
 
+def test_pwa_build_is_served_next_to_the_api(setup, tmp_path):
+    gateway = setup[0]
+    pwa = tmp_path / "pwa"
+    (pwa / "assets").mkdir(parents=True)
+    (pwa / "index.html").write_text("<html>panel</html>", encoding="utf-8")
+    (pwa / "assets" / "app.js").write_text("console.log(1)", encoding="utf-8")
+    client = TestClient(create_app(gateway, pwa_dir=pwa))
+    assert client.get("/").text == "<html>panel</html>"
+    assert client.get("/assets/app.js").text == "console.log(1)"
+    assert client.get("/gw/v1/health").status_code == 401
+
+
 def test_gateway_refuses_short_password(setup):
     gateway = setup[0]
     with pytest.raises(Exception, match="at least 12"):
