@@ -17,6 +17,7 @@ class TestAnalyticsSettings:
         analytics = Settings.model_validate(raw).analytics
         assert analytics.scoreboard.auto_disable is True
         assert analytics.scoreboard.min_samples == 30
+        assert analytics.scoreboard.accuracy_margin == 0.05
         assert analytics.stress.drop_pct == 10.0
         assert analytics.tax.pph22_final_pct == 0.21
         assert analytics.portfolio.max_pair_share_pct == 50.0
@@ -32,6 +33,7 @@ class TestAnalyticsSettings:
             {"scoreboard": {"min_samples": 2}},
             {"scoreboard": {"max_ece": 1.5}},
             {"scoreboard": {"bins": 1}},
+            {"scoreboard": {"accuracy_margin": 0.6}},
             {"scoreboard": {"interval_s": 5}},
             {"stress": {"drop_pct": 0}},
             {"stress": {"drop_pct": 101}},

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import UTC, date, datetime
 from typing import Annotated, Any, Protocol
 
@@ -22,21 +22,24 @@ from analytics.source import load_decisions
 from analytics.stress import stress
 from analytics.trades import risk_inputs
 from engine.launch import STRATEGY
-from engine.settings import Settings
+from engine.settings import ConfigError, Settings
 
 PREFIX = "/gw/v1/analytics"
 MAX_SIGNAL_DAYS = 60
-TRADE_LIMIT = 1000
 
 
 class Context(Protocol):
     def source(self, bot: str | None) -> BotSource: ...
 
-    async def trades(self, bot: str, limit: int) -> list[dict[str, Any]]: ...
+    async def trades(self, bot: str) -> list[dict[str, Any]]: ...
 
     def analysis(self) -> AnalysisClient | None: ...
 
-    def audit(self, action: str, detail: dict[str, Any]) -> None: ...
+    def can_control(self, request: Request) -> bool: ...
+
+    def audit(
+        self, action: str, result: str, *, request: Request | None, targets: list[str], detail: dict[str, Any]
+    ) -> None: ...
 
 
 class ReplayBody(BaseModel):
@@ -86,13 +89,43 @@ def check_timerange(value: str) -> str:
     return value
 
 
+def control(ctx: Context, action: str) -> Callable[[Request], None]:
+    def guard(request: Request) -> None:
+        if not ctx.can_control(request):
+            ctx.audit(action, "forbidden", request=request, targets=[], detail={})
+            raise AnalyticsError(403, "forbidden_local_only", "this action is accepted only on the bot machine itself")
+
+    return guard
+
+
+async def audited(
+    ctx: Context,
+    request: Request,
+    action: str,
+    targets: list[str],
+    detail: dict[str, Any],
+    call: Callable[[], Awaitable[Any]],
+    outcome: Callable[[Any], dict[str, Any]] = lambda _: {},
+) -> Any:
+    try:
+        result = await call()
+    except AnalyticsError as exc:
+        ctx.audit(action, "failed", request=request, targets=targets, detail={**detail, "error": exc.code})
+        raise
+    except ConfigError as exc:
+        ctx.audit(action, "failed", request=request, targets=targets, detail={**detail, "error": "invalid_config"})
+        raise AnalyticsError(409, "invalid_request", str(exc).splitlines()[0][:300]) from exc
+    ctx.audit(action, "ok", request=request, targets=targets, detail={**detail, **outcome(result)})
+    return result
+
+
 def make_router(ctx: Context, reader: Callable[..., Any]) -> APIRouter:
     router = APIRouter(prefix=PREFIX, dependencies=[Depends(reader)])
 
     async def book(bot: str | None) -> tuple[BotSource, Settings, list[dict[str, Any]]]:
         source = ctx.source(bot)
         settings = await asyncio.to_thread(source.settings)
-        return source, settings, await ctx.trades(source.bot_id, TRADE_LIMIT)
+        return source, settings, await ctx.trades(source.bot_id)
 
     @router.get("/limits/whatif")
     async def limits_whatif(
@@ -146,15 +179,22 @@ def make_router(ctx: Context, reader: Callable[..., Any]) -> APIRouter:
 
     @router.get("/scoreboard")
     async def board(bot: str | None = None, limit: Annotated[int, Query(ge=1, le=5000)] = 2000) -> dict[str, Any]:
-        return await asyncio.to_thread(evaluate, ctx.source(bot), limit, False)
+        return await asyncio.to_thread(evaluate, ctx.source(bot), limit, "read")
 
-    @router.post("/scoreboard/apply")
-    async def board_apply(bot: str | None = None, limit: Annotated[int, Query(ge=1, le=5000)] = 2000) -> dict[str, Any]:
+    @router.post("/scoreboard/apply", dependencies=[Depends(control(ctx, "analytics.scoreboard.apply"))])
+    async def board_apply(
+        request: Request, bot: str | None = None, limit: Annotated[int, Query(ge=1, le=5000)] = 2000
+    ) -> dict[str, Any]:
         source = ctx.source(bot)
-        result = await asyncio.to_thread(evaluate, source, limit, True)
-        if result["applied"]:
-            ctx.audit("scoreboard.apply", {"bot": source.bot_id, "voters": result["applied"]})
-        return result
+        return await audited(
+            ctx,
+            request,
+            "analytics.scoreboard.apply",
+            [source.bot_id],
+            {"limit": limit},
+            lambda: asyncio.to_thread(evaluate, source, limit, "manual"),
+            lambda result: {"voters": result["applied"]},
+        )
 
     @router.get("/stress")
     async def stress_view(
@@ -185,13 +225,13 @@ def make_router(ctx: Context, reader: Callable[..., Any]) -> APIRouter:
         bot: str | None = None, year: Annotated[int | None, Query(ge=2025, le=2100)] = None
     ) -> dict[str, Any]:
         _, settings, trades = await book(bot)
-        return tax_summary(trades, settings.analytics.tax.pph22_final_pct, year)
+        return tax_summary(trades, settings.analytics.tax.pph22_final_pct, year, settings.risk.daily_reset_timezone)
 
-    @router.post("/backtest", status_code=202)
-    async def backtest_start(body: BacktestBody) -> dict[str, Any]:
+    @router.post("/backtest", status_code=202, dependencies=[Depends(control(ctx, "analytics.backtest.start"))])
+    async def backtest_start(request: Request, body: BacktestBody) -> dict[str, Any]:
         source = ctx.source(body.bot)
         settings = await asyncio.to_thread(source.settings)
-        request = {
+        payload = {
             "strategy": STRATEGY,
             "timeframe": settings.exchange.timeframe,
             "timerange": check_timerange(body.timerange),
@@ -201,20 +241,26 @@ def make_router(ctx: Context, reader: Callable[..., Any]) -> APIRouter:
             "dry_run_wallet": body.dry_run_wallet or settings.capital.initial_idr,
             "backtest_cache": "none",
         }
-        ctx.audit("backtest.start", {"bot": source.bot_id, "request": request})
-        return backtest_view(await analysis_of(ctx).backtest_start(request), STRATEGY)
+
+        async def start() -> dict[str, Any]:
+            return backtest_view(await analysis_of(ctx).backtest_start(payload), STRATEGY)
+
+        return await audited(ctx, request, "analytics.backtest.start", [source.bot_id], {"request": payload}, start)
 
     @router.get("/backtest")
     async def backtest_status() -> dict[str, Any]:
         return backtest_view(await analysis_of(ctx).backtest_status(), STRATEGY)
 
-    @router.delete("/backtest")
-    async def backtest_stop() -> dict[str, Any]:
-        client = analysis_of(ctx)
-        status = await client.backtest_status()
-        if status.get("running"):
-            await client.backtest_abort()
-        return backtest_view(await client.backtest_reset(), STRATEGY)
+    @router.delete("/backtest", dependencies=[Depends(control(ctx, "analytics.backtest.stop"))])
+    async def backtest_stop(request: Request) -> dict[str, Any]:
+        async def stop() -> dict[str, Any]:
+            client = analysis_of(ctx)
+            status = await client.backtest_status()
+            if status.get("running"):
+                await client.backtest_abort()
+            return backtest_view(await client.backtest_reset(), STRATEGY)
+
+        return await audited(ctx, request, "analytics.backtest.stop", [], {}, stop)
 
     @router.get("/backtest/history")
     async def backtest_history() -> list[dict[str, Any]]:

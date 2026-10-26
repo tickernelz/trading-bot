@@ -137,6 +137,7 @@ class Scoreboard(Strict):
     min_samples: Annotated[int, Field(ge=5)] = 30
     max_ece: Annotated[float, Field(gt=0, lt=1)] = 0.25
     brier_margin: Annotated[float, Field(ge=0, lt=1)] = 0.05
+    accuracy_margin: Annotated[float, Field(ge=0, lt=0.5)] = 0.05
     bins: Annotated[int, Field(ge=2, le=20)] = 5
     interval_s: Annotated[int, Field(ge=60)] = 3600
 

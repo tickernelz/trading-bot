@@ -6,6 +6,7 @@ import csv
 import io
 from collections import defaultdict
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from analytics.trades import closed_trades, number, parse_time, profit_abs
 
@@ -77,14 +78,17 @@ def sell_value(trade: dict[str, Any]) -> float | None:
     return amount * rate
 
 
-def tax_summary(trades: list[dict[str, Any]], rate_pct: float, year: int | None = None) -> dict[str, Any]:
+def tax_summary(
+    trades: list[dict[str, Any]], rate_pct: float, year: int | None = None, timezone: str = "UTC"
+) -> dict[str, Any]:
     """Sum sell value and the configured final tax rate per month over closed trades."""
     months: dict[str, dict[str, float]] = defaultdict(
         lambda: {"trades": 0, "sell_value_idr": 0.0, "pph22_final_idr": 0.0, "realized_profit_idr": 0.0}
     )
     skipped = 0
+    zone = ZoneInfo(timezone)
     for trade in closed_trades(trades):
-        closed_at = parse_time(str(trade["close_date"]))
+        closed_at = parse_time(str(trade["close_date"])).astimezone(zone)
         if year is not None and closed_at.year != year:
             continue
         value = sell_value(trade)
@@ -104,6 +108,7 @@ def tax_summary(trades: list[dict[str, Any]], rate_pct: float, year: int | None 
     return {
         "year": year,
         "rate_pct": rate_pct,
+        "timezone": timezone,
         "months": rows,
         "total": totals,
         "skipped_without_rate": skipped,

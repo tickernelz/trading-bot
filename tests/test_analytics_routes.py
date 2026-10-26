@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 from typing import Any
 
 import httpx
@@ -13,10 +14,11 @@ from analytics.errors import AnalyticsError
 from analytics.freqtrade import AnalysisClient
 from analytics.routes import PREFIX, install, make_router
 from analytics.service import BotSource
-from engine.settings import Settings, load_settings
+from engine.settings import ConfigError, Settings, load_settings
 from tests.analytics_support import closed_trade, open_trade, record, write_decisions, write_trades
 
 AUTH = {"Authorization": "Bearer ok"}
+CONTROL = {**AUTH, "x-scope": "control"}
 EXPECTED_ROUTES = {
     ("GET", f"{PREFIX}/limits/whatif"),
     ("POST", f"{PREFIX}/replay"),
@@ -45,21 +47,27 @@ class FakeContext:
         self.bot = source
         self.book = trades
         self.client = client
-        self.audits: list[tuple[str, dict[str, Any]]] = []
+        self.audits: list[dict[str, Any]] = []
 
     def source(self, bot: str | None) -> BotSource:
         if bot not in (None, self.bot.bot_id):
             raise AnalyticsError(404, "not_found", f"unknown bot {bot}")
         return self.bot
 
-    async def trades(self, bot: str, limit: int) -> list[dict[str, Any]]:
+    async def trades(self, bot: str) -> list[dict[str, Any]]:
         return self.book
 
     def analysis(self) -> AnalysisClient | None:
         return self.client
 
-    def audit(self, action: str, detail: dict[str, Any]) -> None:
-        self.audits.append((action, detail))
+    def can_control(self, request: Request) -> bool:
+        return request.headers.get("x-scope") == "control"
+
+    def audit(
+        self, action: str, result: str, *, request: Request | None, targets: list[str], detail: dict[str, Any]
+    ) -> None:
+        ip = request.client.host if request is not None and request.client else None
+        self.audits.append({"action": action, "result": result, "ip": ip, "targets": targets, "detail": detail})
 
 
 def split_vote():
@@ -106,7 +114,7 @@ def env(tmp_path, example_raw, upstream_calls):
     context = FakeContext(source, trades, client)
     app = FastAPI()
     install(app, context, reader)
-    return TestClient(app, headers=AUTH), context, app, config
+    return TestClient(app, headers=CONTROL), context, app, config
 
 
 class TestAuthentication:
@@ -227,7 +235,8 @@ class TestBacktestRoute:
         assert body["strategy"] == "SwingEmaRsi" and body["timeframe"] == "1h"
         assert body["dry_run_wallet"] == 2_000_000 and body["max_open_trades"] == 3
         assert body["enable_protections"] is False
-        assert context.audits[0][0] == "backtest.start"
+        assert [(row["action"], row["result"]) for row in context.audits] == [("analytics.backtest.start", "ok")]
+        assert context.audits[0]["targets"] == ["B"] and context.audits[0]["ip"] is not None
 
     @pytest.mark.parametrize("value", ["2026-10-01", "20261001", "20261001-20261020; rm", "abc-def"])
     def test_a_malformed_timerange_never_reaches_freqtrade(self, env, upstream_calls, value):
@@ -279,12 +288,14 @@ class TestScoreboardRoutes:
         assert body["applied"] == []
         assert config.read_text(encoding="utf-8") == before
 
-    def test_apply_with_nothing_drifting_changes_nothing_and_writes_no_audit(self, env):
+    def test_apply_with_nothing_drifting_changes_nothing_but_is_still_audited(self, env):
         client, context, _, config = env
         before = config.read_text(encoding="utf-8")
         assert client.post(f"{PREFIX}/scoreboard/apply").json()["applied"] == []
         assert config.read_text(encoding="utf-8") == before
-        assert context.audits == []
+        assert [(row["action"], row["result"], row["detail"]["voters"]) for row in context.audits] == [
+            ("analytics.scoreboard.apply", "ok", [])
+        ]
 
     def test_apply_disables_a_drifting_voter_audits_it_and_keeps_the_config_valid(self, env, tmp_path):
         client, context, _, config = env
@@ -302,6 +313,99 @@ class TestScoreboardRoutes:
         write_trades(tmp_path / "trades.sqlite", outcomes)
         body = client.post(f"{PREFIX}/scoreboard/apply").json()
         assert body["applied"] == ["v1"]
-        assert context.audits == [("scoreboard.apply", {"bot": "B", "voters": ["v1"]})]
+        assert [(row["action"], row["result"], row["detail"]["voters"]) for row in context.audits] == [
+            ("analytics.scoreboard.apply", "ok", ["v1"])
+        ]
         reloaded: Settings = load_settings(config)
         assert {voter.id: voter.enabled for voter in reloaded.swarm.voters}["v1"] is False
+
+
+class TestControlScope:
+    def read_client(self, app):
+        return TestClient(app, headers=AUTH)
+
+    def test_a_read_session_cannot_apply_the_scoreboard_and_the_config_bytes_do_not_change(self, env, tmp_path):
+        _, context, app, config = env
+        rows = []
+        outcomes = {}
+        for index in range(40):
+            profit = 100.0 if index % 2 == 0 else -100.0
+            voters = [record(f"v{n}", "izinkan", take=0.9 if profit > 0 else 0.1) for n in range(1, 6)]
+            voters[0] = record("v1", "lewati" if profit > 0 else "izinkan", take=0.1 if profit > 0 else 0.9)
+            rows.append({"decision_id": f"x{index:02d}", "voters": voters})
+            outcomes[f"x{index:02d}"] = (profit, False)
+        (tmp_path / "decisions.sqlite").unlink()
+        (tmp_path / "trades.sqlite").unlink()
+        write_decisions(tmp_path / "decisions.sqlite", rows)
+        write_trades(tmp_path / "trades.sqlite", outcomes)
+        before = hashlib.sha256(config.read_bytes()).hexdigest()
+        response = self.read_client(app).post(f"{PREFIX}/scoreboard/apply")
+        assert response.status_code == 403
+        assert response.json()["error"]["code"] == "forbidden_local_only"
+        assert hashlib.sha256(config.read_bytes()).hexdigest() == before
+        assert [(row["action"], row["result"]) for row in context.audits] == [
+            ("analytics.scoreboard.apply", "forbidden")
+        ]
+        control = TestClient(app, headers=CONTROL).post(f"{PREFIX}/scoreboard/apply")
+        assert control.status_code == 200 and control.json()["applied"] == ["v1"]
+        assert hashlib.sha256(config.read_bytes()).hexdigest() != before
+
+    def test_a_read_session_cannot_start_or_stop_a_backtest(self, env, upstream_calls):
+        _, context, app, _ = env
+        read = self.read_client(app)
+        assert read.post(f"{PREFIX}/backtest", json={"timerange": "20261001-20261020"}).status_code == 403
+        assert read.delete(f"{PREFIX}/backtest").status_code == 403
+        assert upstream_calls == []
+        assert [(row["action"], row["result"]) for row in context.audits] == [
+            ("analytics.backtest.start", "forbidden"),
+            ("analytics.backtest.stop", "forbidden"),
+        ]
+
+    def test_reads_stay_open_to_a_read_session(self, env):
+        _, _, app, _ = env
+        read = self.read_client(app)
+        for path in ("/limits/whatif", "/stress", "/portfolio", "/scoreboard", "/export/tax", "/backtest"):
+            assert read.get(PREFIX + path).status_code == 200, path
+
+    def test_stopping_a_backtest_is_audited_with_its_result(self, env):
+        client, context, *_ = env
+        assert client.delete(f"{PREFIX}/backtest").status_code == 200
+        assert [(row["action"], row["result"]) for row in context.audits] == [("analytics.backtest.stop", "ok")]
+
+    def test_a_failed_backtest_start_is_audited_as_failed(self, env):
+        client, context, _, _ = env
+        context.client = AnalysisClient(
+            "http://127.0.0.1:8099",
+            "u",
+            "p",
+            transport=httpx.MockTransport(lambda request: httpx.Response(503, json={})),
+        )
+        assert client.post(f"{PREFIX}/backtest", json={"timerange": "20261001-20261020"}).status_code == 503
+        assert [(row["action"], row["result"], row["detail"]["error"]) for row in context.audits] == [
+            ("analytics.backtest.start", "failed", "upstream_unavailable")
+        ]
+
+    def test_a_config_that_changed_under_the_switch_is_a_conflict_not_a_crash_and_is_audited(self, env, monkeypatch):
+        client, context, *_ = env
+
+        def refuse(path, voters):
+            raise ConfigError("changed while the voter switch was being prepared")
+
+        monkeypatch.setattr("analytics.service.apply_disables", refuse)
+        response = client.post(f"{PREFIX}/scoreboard/apply")
+        assert response.status_code == 409
+        assert context.audits[-1]["result"] == "failed"
+
+
+class TestCompleteHistory:
+    def test_more_than_a_thousand_closed_trades_all_reach_the_risk_figures(self, env):
+        client, context, *_ = env
+        context.book = [closed_trade(-10.0, trade_id=index, close_date="2026-10-25 01:00:00") for index in range(1001)]
+        body = client.get(f"{PREFIX}/limits/whatif").json()
+        assert body["equity"] == pytest.approx(2_000_000 - 10_010)
+
+    def test_csv_and_tax_cover_every_trade_handed_over(self, env):
+        client, context, *_ = env
+        context.book = [closed_trade(1.0, trade_id=index, close_date="2026-10-25 01:00:00") for index in range(1001)]
+        assert len(client.get(f"{PREFIX}/export/trades.csv").text.strip().split("\n")) == 1002
+        assert client.get(f"{PREFIX}/export/tax").json()["total"]["trades"] == 1001

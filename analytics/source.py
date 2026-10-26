@@ -6,7 +6,6 @@ import json
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from pydantic import ValidationError
 from tb_swarm.models import DecisionRequest
@@ -102,15 +101,3 @@ def load_decisions(decisions_db: Path, trades_db: Path | None = None, limit: int
         except (ValidationError, ValueError, KeyError, TypeError):
             invalid += 1
     return Loaded(tuple(reversed(decisions)), invalid)
-
-
-def table_columns(db: sqlite3.Connection, table: str) -> list[str]:
-    return [row["name"] for row in db.execute(f"PRAGMA table_info({table})").fetchall()]
-
-
-def describe(decisions_db: Path) -> dict[str, Any]:
-    db = connect(decisions_db)
-    try:
-        return {"columns": table_columns(db, "decisions")}
-    finally:
-        db.close()

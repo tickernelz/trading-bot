@@ -6,11 +6,13 @@ from dataclasses import replace
 
 import pytest
 import yaml
+from tb_swarm.models import ChoiceAnswer
 from tb_swarm.outcome import settle
 
 from analytics.errors import AnalyticsError
 from analytics.replay import replay_decision, verdict_of, whatif_replay
 from analytics.scoreboard import apply_disables, plan_disables, scoreboard
+from analytics.service import BotSource, evaluate
 from analytics.source import RecordedDecision, load_decisions
 from engine.settings import ConfigError, Settings, load_settings
 from tests.analytics_support import record, request, write_decisions, write_trades
@@ -236,7 +238,7 @@ class TestScoreboard:
 
 
 def drifting_row(voter_id, excess):
-    return {"voter_id": voter_id, "status": "drifting", "brier": 0.25 + excess, "brier_baseline": 0.25}
+    return {"voter_id": voter_id, "status": "drifting", "shortfall": excess}
 
 
 class TestAutoDisable:
@@ -250,7 +252,9 @@ class TestAutoDisable:
         plan = plan_disables(self.board(settings, enabled), settings)
         assert len(plan["disable"]) == spare
         assert len(plan["kept_for_quorum"]) == enabled - spare
-        worst = [row["voter_id"] for row in sorted(self.board(settings, enabled)["voters"], key=lambda r: -r["brier"])]
+        worst = [
+            row["voter_id"] for row in sorted(self.board(settings, enabled)["voters"], key=lambda r: -r["shortfall"])
+        ]
         assert plan["disable"] == worst[:spare]
 
     def test_auto_disable_off_recommends_but_disables_nothing(self, example_raw):
@@ -294,3 +298,134 @@ class TestAutoDisable:
         assert apply_disables(path, ["no-such-voter"]) == []
         assert apply_disables(path, []) == []
         assert path.stat().st_mtime_ns == stamp
+
+
+def choice_only(decisions):
+    def strip(voter):
+        answer = voter.answers["verdict"]
+        return voter.model_copy(update={"answers": {"verdict": ChoiceAnswer(type="choice", choice=answer.choice)}})
+
+    return tuple(replace(decision, voters=tuple(strip(voter) for voter in decision.voters)) for decision in decisions)
+
+
+class TestChoiceOnlyVoters:
+    def outcomes(self, n=40):
+        return [100.0 if index % 2 == 0 else -100.0 for index in range(n)]
+
+    def sixty_five_percent_correct(self, n=40):
+        outcomes = self.outcomes(n)
+        right = [index % 20 < 13 for index in range(n)]
+        return outcomes, right
+
+    def test_a_choice_only_voter_that_is_right_65_percent_of_the_time_is_ok_not_drifting(self, settings):
+        outcomes, right = self.sixty_five_percent_correct()
+        decisions = choice_only(
+            scored([(p, 0.9 if (p > 0) == r else 0.1) for p, r in zip(outcomes, right, strict=True)], voter="oh")
+        )
+        row = scoreboard(decisions, settings.analytics.scoreboard)["voters"][0]
+        assert row["kind"] == "choice_only"
+        assert row["accuracy"] == pytest.approx(0.65)
+        assert row["majority_accuracy"] == pytest.approx(0.5)
+        assert row["status"] == "ok"
+        assert row["brier"] is None and row["ece"] is None and row["bins"] is None
+
+    def test_the_same_choices_with_probabilities_are_also_ok(self, settings):
+        outcomes, right = self.sixty_five_percent_correct()
+        decisions = scored(
+            [(p, 0.65 if (p > 0) == r else 0.35) for p, r in zip(outcomes, right, strict=True)], voter="pr"
+        )
+        row = scoreboard(decisions, settings.analytics.scoreboard)["voters"][0]
+        assert row["kind"] == "probabilistic" and row["status"] == "ok"
+
+    def test_a_choice_only_voter_below_the_majority_guesser_is_drifting_with_a_reason(self, settings):
+        outcomes = self.outcomes()
+        decisions = choice_only(scored([(p, 0.1 if p > 0 else 0.9) for p in outcomes], voter="bad"))
+        row = scoreboard(decisions, settings.analytics.scoreboard)["voters"][0]
+        assert row["status"] == "drifting"
+        assert row["accuracy"] == 0.0
+        assert "mayoritas" in row["reasons"][0]
+
+    def test_a_choice_only_voter_is_compared_with_the_majority_class_not_with_one_half(self, settings):
+        outcomes = [100.0] * 30 + [-100.0] * 10
+        always_take = choice_only(scored([(p, 0.9) for p in outcomes], voter="yes"))
+        row = scoreboard(always_take, settings.analytics.scoreboard)["voters"][0]
+        assert row["accuracy"] == pytest.approx(0.75) and row["majority_accuracy"] == pytest.approx(0.75)
+        assert row["status"] == "ok"
+
+    def test_one_choice_only_answer_among_probabilistic_ones_makes_the_voter_choice_only(self, settings):
+        outcomes = self.outcomes()
+        mixed = list(scored([(p, 0.65 if p > 0 else 0.35) for p in outcomes], voter="mix"))
+        mixed[0] = choice_only((mixed[0],))[0]
+        row = scoreboard(tuple(mixed), settings.analytics.scoreboard)["voters"][0]
+        assert row["kind"] == "choice_only" and row["ece"] is None
+
+
+class TestPlanEdges:
+    def test_with_the_swarm_disabled_the_plan_still_keeps_the_quorum(self, example_raw):
+        raw = copy.deepcopy(example_raw)
+        raw["swarm"]["enabled"] = False
+        settings = Settings.model_validate(raw)
+        enabled = [voter.id for voter in settings.swarm.voters if voter.enabled]
+        board = {"voters": [drifting_row(voter_id, 0.5) for voter_id in enabled]}
+        plan = plan_disables(board, settings)
+        assert len(plan["disable"]) == len(enabled) - settings.swarm.min_voters_answered
+
+    def test_a_config_that_changed_after_it_was_read_is_not_overwritten(self, tmp_path, example_raw, monkeypatch):
+        path = tmp_path / "config.yaml"
+        path.write_text(yaml.safe_dump(example_raw, sort_keys=False), encoding="utf-8")
+        from analytics import scoreboard as module
+
+        original = module.Settings.model_validate
+
+        def validate_then_edit(raw):
+            result = original(raw)
+            path.write_text(path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+            return result
+
+        monkeypatch.setattr(module.Settings, "model_validate", validate_then_edit)
+        before = path.read_text(encoding="utf-8")
+        with pytest.raises(ConfigError, match="changed while"):
+            apply_disables(path, [example_raw["swarm"]["voters"][-1]["id"]])
+        assert path.read_text(encoding="utf-8") == before + "\n"
+        assert not list(tmp_path.glob("*.tmp"))
+
+    def test_two_threads_switching_different_voters_both_land(self, tmp_path, example_raw):
+        from concurrent.futures import ThreadPoolExecutor
+
+        path = tmp_path / "config.yaml"
+        path.write_text(yaml.safe_dump(example_raw, sort_keys=False), encoding="utf-8")
+        ids = [voter["id"] for voter in example_raw["swarm"]["voters"]][-2:]
+        with ThreadPoolExecutor(2) as pool:
+            list(pool.map(lambda voter_id: apply_disables(path, [voter_id]), ids))
+        enabled = {voter.id: voter.enabled for voter in load_settings(path).swarm.voters}
+        assert [enabled[voter_id] for voter_id in ids] == [False, False]
+
+
+class TestApplyModes:
+    def drifting_source(self, tmp_path, example_raw, auto_disable):
+        raw = copy.deepcopy(example_raw)
+        raw["analytics"] = {"scoreboard": {"auto_disable": auto_disable}}
+        config = tmp_path / "config.yaml"
+        config.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
+        rows, outcomes = [], {}
+        for index in range(40):
+            profit = 100.0 if index % 2 == 0 else -100.0
+            voters = [record(f"v{n}", "izinkan", take=0.9 if profit > 0 else 0.1) for n in range(1, 8)]
+            voters[0] = record("v1", "lewati" if profit > 0 else "izinkan", take=0.1 if profit > 0 else 0.9)
+            rows.append({"decision_id": f"x{index:02d}", "voters": voters})
+            outcomes[f"x{index:02d}"] = (profit, False)
+        write_decisions(tmp_path / "d.sqlite", rows)
+        write_trades(tmp_path / "t.sqlite", outcomes)
+        return BotSource("B", config, tmp_path / "d.sqlite", tmp_path / "t.sqlite"), config
+
+    def test_manual_apply_switches_off_the_recommended_voter_even_when_auto_disable_is_off(self, tmp_path, example_raw):
+        source, config = self.drifting_source(tmp_path, example_raw, auto_disable=False)
+        assert evaluate(source, 100, "auto")["applied"] == []
+        assert evaluate(source, 100, "read")["plan"]["recommended"] == ["v1"]
+        assert evaluate(source, 100, "manual")["applied"] == ["v1"]
+        assert {voter.id: voter.enabled for voter in load_settings(config).swarm.voters}["v1"] is False
+
+    def test_auto_mode_switches_off_the_same_voter_when_auto_disable_is_on(self, tmp_path, example_raw):
+        source, config = self.drifting_source(tmp_path, example_raw, auto_disable=True)
+        assert evaluate(source, 100, "read")["applied"] == []
+        assert evaluate(source, 100, "auto")["applied"] == ["v1"]

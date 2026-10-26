@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 import tempfile
+import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -21,6 +23,7 @@ class VoterStats:
     voter_id: str
     calls: int = 0
     ok_calls: int = 0
+    choice_only: int = 0
     samples: list[tuple[float, bool]] = field(default_factory=list)
 
 
@@ -43,6 +46,8 @@ def collect(decisions: tuple[RecordedDecision, ...]) -> dict[str, VoterStats]:
             answer = (record.answers or {}).get("verdict")
             if profit is None or not isinstance(answer, ChoiceAnswer):
                 continue
+            if not answer.probabilities:
+                entry.choice_only += 1
             entry.samples.append((take_probability(answer), profit > 0))
     return stats
 
@@ -73,33 +78,45 @@ def voter_row(stats: VoterStats, config: Scoreboard) -> dict[str, Any]:
         "answered": stats.ok_calls,
         "answer_rate": stats.ok_calls / stats.calls if stats.calls else None,
         "samples": n,
+        "kind": "choice_only" if stats.choice_only else "probabilistic",
         "status": "insufficient",
         "reasons": [],
+        "shortfall": None,
+        "accuracy": None,
+        "base_rate": None,
+        "majority_accuracy": None,
+        "brier": None,
+        "brier_baseline": None,
+        "ece": None,
+        "bins": None,
     }
     if n == 0:
         return row
     base = sum(1 for _, y in samples if y) / n
-    brier = sum((p - (1.0 if y else 0.0)) ** 2 for p, y in samples) / n
-    baseline = base * (1 - base)
-    bins = calibration_bins(samples, config.bins)
-    ece = sum(item["n"] / n * abs(item["mean_predicted"] - item["observed"]) for item in bins if item["n"])
-    row.update(
-        {
-            "accuracy": sum(1 for p, y in samples if (p >= 0.5) == y) / n,
-            "base_rate": base,
-            "brier": brier,
-            "brier_baseline": baseline,
-            "ece": ece,
-            "bins": bins,
-        }
-    )
+    accuracy = sum(1 for p, y in samples if (p >= 0.5) == y) / n
+    majority = max(base, 1 - base)
+    row.update({"accuracy": accuracy, "base_rate": base, "majority_accuracy": majority})
+    reasons = []
+    if stats.choice_only:
+        row["shortfall"] = majority - accuracy
+        drifting = accuracy < majority - config.accuracy_margin
+        if drifting:
+            reasons.append(
+                f"akurasi {accuracy:.3f} di bawah penebak kelas mayoritas {majority:.3f} - {config.accuracy_margin}"
+            )
+    else:
+        brier = sum((p - (1.0 if y else 0.0)) ** 2 for p, y in samples) / n
+        baseline = base * (1 - base)
+        bins = calibration_bins(samples, config.bins)
+        ece = sum(item["n"] / n * abs(item["mean_predicted"] - item["observed"]) for item in bins if item["n"])
+        row.update({"brier": brier, "brier_baseline": baseline, "ece": ece, "bins": bins})
+        row["shortfall"] = brier - baseline
+        if ece > config.max_ece:
+            reasons.append(f"ece {ece:.3f} di atas batas {config.max_ece}")
+        if brier > baseline + config.brier_margin:
+            reasons.append(f"brier {brier:.3f} lebih buruk dari penebak konstan {baseline:.3f} + {config.brier_margin}")
     if n < config.min_samples:
         return row
-    reasons = []
-    if ece > config.max_ece:
-        reasons.append(f"ece {ece:.3f} di atas batas {config.max_ece}")
-    if brier > baseline + config.brier_margin:
-        reasons.append(f"brier {brier:.3f} lebih buruk dari penebak konstan {baseline:.3f} + {config.brier_margin}")
     row["status"] = "drifting" if reasons else "ok"
     row["reasons"] = reasons
     return row
@@ -117,8 +134,9 @@ def scoreboard(decisions: tuple[RecordedDecision, ...], config: Scoreboard) -> d
         "definition": {
             "take": list(TAKE),
             "outcome": "trade tertutup dengan profit_abs > 0",
-            "probability": "jumlah probabilitas izinkan dan kecilkan; tanpa probabilitas, 1 bila pilihan itu",
-            "drifting": "n >= min_samples dan (ece > max_ece atau brier > brier penebak konstan + brier_margin)",
+            "probability": "jumlah probabilitas izinkan dan kecilkan; hanya dipakai bila semua jawaban voter membawa probabilitas",
+            "kind": "probabilistic bila semua jawaban berprobabilitas, choice_only bila ada jawaban tanpa probabilitas",
+            "drifting": "n >= min_samples dan: probabilistic: ece > max_ece atau brier > brier penebak konstan + brier_margin; choice_only: akurasi < akurasi penebak kelas mayoritas - accuracy_margin",
         },
         "note": "Papan skor adalah data kalibrasi, bukan kesimpulan untung atau rugi.",
     }
@@ -129,8 +147,8 @@ def plan_disables(board: dict[str, Any], settings: Settings) -> dict[str, Any]:
     config = settings.analytics.scoreboard
     enabled = {voter.id for voter in settings.swarm.voters if voter.enabled}
     drifting = [row for row in board["voters"] if row["status"] == "drifting" and row["voter_id"] in enabled]
-    drifting.sort(key=lambda row: row["brier"] - row["brier_baseline"], reverse=True)
-    spare = len(enabled) - settings.swarm.min_voters_answered if settings.swarm.enabled else len(enabled)
+    drifting.sort(key=lambda row: row["shortfall"], reverse=True)
+    spare = len(enabled) - settings.swarm.min_voters_answered
     chosen = [row["voter_id"] for row in drifting[: max(0, spare)]]
     kept = [row["voter_id"] for row in drifting[max(0, spare) :]]
     return {
@@ -143,30 +161,41 @@ def plan_disables(board: dict[str, Any], settings: Settings) -> dict[str, Any]:
     }
 
 
+CONFIG_LOCK = threading.Lock()
+
+
+def file_digest(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 def apply_disables(config_path: str | os.PathLike[str], voter_ids: list[str]) -> list[str]:
     """Set enabled false for the given voters in the config file; the result must still validate."""
     if not voter_ids:
         return []
     path = Path(config_path)
-    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
-    changed = []
-    for voter in raw["swarm"]["voters"]:
-        if voter["id"] in voter_ids and voter.get("enabled"):
-            voter["enabled"] = False
-            changed.append(voter["id"])
-    if not changed:
-        return []
-    try:
-        Settings.model_validate(raw)
-    except ValueError as exc:
-        raise ConfigError(f"{path}: disabling {changed} gives an invalid config: {exc}") from exc
-    handle, temp = tempfile.mkstemp(dir=path.parent, prefix=path.name, suffix=".tmp")
-    try:
-        with os.fdopen(handle, "w", encoding="utf-8") as stream:
-            yaml.safe_dump(raw, stream, sort_keys=False, allow_unicode=True)
-        os.chmod(temp, path.stat().st_mode & 0o777)
-        os.replace(temp, path)
-    except BaseException:
-        Path(temp).unlink(missing_ok=True)
-        raise
+    with CONFIG_LOCK:
+        before = file_digest(path)
+        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+        changed = []
+        for voter in raw["swarm"]["voters"]:
+            if voter["id"] in voter_ids and voter.get("enabled"):
+                voter["enabled"] = False
+                changed.append(voter["id"])
+        if not changed:
+            return []
+        try:
+            Settings.model_validate(raw)
+        except ValueError as exc:
+            raise ConfigError(f"{path}: disabling {changed} gives an invalid config: {exc}") from exc
+        handle, temp = tempfile.mkstemp(dir=path.parent, prefix=path.name, suffix=".tmp")
+        try:
+            with os.fdopen(handle, "w", encoding="utf-8") as stream:
+                yaml.safe_dump(raw, stream, sort_keys=False, allow_unicode=True)
+            os.chmod(temp, path.stat().st_mode & 0o777)
+            if file_digest(path) != before:
+                raise ConfigError(f"{path}: changed while the voter switch was being prepared; nothing written")
+            os.replace(temp, path)
+        except BaseException:
+            Path(temp).unlink(missing_ok=True)
+            raise
     return changed

@@ -200,3 +200,16 @@ class TestExport:
         summary = tax_summary([trade], 0.21)
         assert summary["skipped_without_rate"] == 1
         assert summary["total"]["trades"] == 0
+
+
+class TestTaxTimezone:
+    def test_a_trade_after_17_utc_on_the_last_day_belongs_to_the_next_month_in_jakarta(self):
+        trades = [closed_trade(1.0, close_date="2026-10-31 18:30:00", close_rate=1_000_000.0, amount=1.0)]
+        assert [row["month"] for row in tax_summary(trades, 0.21, timezone="UTC")["months"]] == ["2026-10"]
+        assert [row["month"] for row in tax_summary(trades, 0.21, timezone="Asia/Jakarta")["months"]] == ["2026-11"]
+
+    def test_the_year_filter_uses_the_same_timezone(self):
+        trades = [closed_trade(1.0, close_date="2026-12-31 18:30:00")]
+        assert tax_summary(trades, 0.21, year=2026, timezone="UTC")["total"]["trades"] == 1
+        assert tax_summary(trades, 0.21, year=2026, timezone="Asia/Jakarta")["total"]["trades"] == 0
+        assert tax_summary(trades, 0.21, year=2027, timezone="Asia/Jakarta")["total"]["trades"] == 1
