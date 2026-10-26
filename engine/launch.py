@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from engine.modectl import LIVE_ENGINE_PROVEN, MODE_FILE, read_mode
+from engine.modectl import LIVE_ENGINE_PROVEN, MODE_FILE, read_mode, write_capabilities
 from engine.settings import ConfigError, Settings, load_settings
 
 STRATEGY = "SwingEmaRsi"
@@ -124,6 +124,7 @@ def main(argv: list[str]) -> int:
             file=sys.stderr,
         )
         return 2
+    write_capabilities(userdir, os.environ)
     rendered = Path(userdir) / "trading-bot.freqtrade.json"
     rendered.parent.mkdir(parents=True, exist_ok=True)
     config = freqtrade_config(settings, serve_api)

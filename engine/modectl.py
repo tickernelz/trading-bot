@@ -16,6 +16,7 @@ Mode = Literal["dry_run", "live"]
 
 LIVE_ENGINE_PROVEN = False
 MODE_FILE = "mode.json"
+CAPABILITIES_FILE = "capabilities.json"
 DEFAULT_KEY_ENVS = ("INDODAX_API_KEY", "INDODAX_API_SECRET")
 CONFIRMATION_TTL_S = 60
 MODES = ("dry_run", "live")
@@ -56,6 +57,38 @@ def _stamp(moment: datetime) -> str:
     return moment.astimezone(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
+def _write_json(path: Path, record: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    handle, name = tempfile.mkstemp(dir=path.parent, prefix=".state-", suffix=".tmp")
+    try:
+        with os.fdopen(handle, "w", encoding="utf-8") as stream:
+            json.dump(record, stream)
+        os.replace(name, path)
+    except BaseException:
+        Path(name).unlink(missing_ok=True)
+        raise
+
+
+def write_capabilities(
+    userdir: str | os.PathLike[str],
+    environ: Mapping[str, str],
+    key_envs: tuple[str, ...] = DEFAULT_KEY_ENVS,
+    clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+) -> None:
+    """Record, without any value, whether this engine process was started with exchange credentials."""
+    configured = all((environ.get(name) or "").strip() for name in key_envs)
+    _write_json(Path(userdir) / CAPABILITIES_FILE, {"exchange_key_configured": configured, "at": _stamp(clock())})
+
+
+def read_exchange_key_configured(userdir: str | os.PathLike[str]) -> bool:
+    """True only when the engine recorded credentials; a missing, unreadable or malformed file reads as False."""
+    try:
+        data = json.loads((Path(userdir) / CAPABILITIES_FILE).read_text(encoding="utf-8"))
+        return data["exchange_key_configured"] is True
+    except (OSError, ValueError, KeyError, TypeError):
+        return False
+
+
 def read_mode(path: str | os.PathLike[str]) -> tuple[Mode, str | None]:
     """The recorded mode and a problem string; anything missing, unreadable or unknown reads as dry_run."""
     file = Path(path)
@@ -76,14 +109,14 @@ class ModeController:
         self,
         state_path: str | os.PathLike[str],
         *,
-        environ: Mapping[str, str],
+        exchange_key_configured: Callable[[], bool],
         key_envs: tuple[str, ...] = DEFAULT_KEY_ENVS,
         live_engine_proven: bool = LIVE_ENGINE_PROVEN,
         ttl_s: float = CONFIRMATION_TTL_S,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         self._path = Path(state_path)
-        self._environ = environ
+        self._key_probe = exchange_key_configured
         self._key_envs = key_envs
         self._proven = live_engine_proven
         self._ttl = timedelta(seconds=ttl_s)
@@ -92,7 +125,7 @@ class ModeController:
 
     def blockers(self) -> tuple[dict[str, str], ...]:
         found = []
-        if not all((self._environ.get(name) or "").strip() for name in self._key_envs):
+        if not self._key_probe():
             message = BLOCKER_MESSAGES["exchange_key_missing"].format(names=" and ".join(self._key_envs))
             found.append({"code": "exchange_key_missing", "message": message})
         if not self._proven:
@@ -149,14 +182,6 @@ class ModeController:
         return self._apply(pending.target, actor)
 
     def _apply(self, mode: str, actor: str) -> dict[str, Any]:
-        self._path.parent.mkdir(parents=True, exist_ok=True)
         record = {"mode": mode, "changed_at": _stamp(self._clock()), "actor": actor}
-        handle, name = tempfile.mkstemp(dir=self._path.parent, prefix=".mode-", suffix=".tmp")
-        try:
-            with os.fdopen(handle, "w", encoding="utf-8") as stream:
-                json.dump(record, stream)
-            os.replace(name, self._path)
-        except BaseException:
-            Path(name).unlink(missing_ok=True)
-            raise
+        _write_json(self._path, record)
         return {**self.status(), "changed_at": record["changed_at"]}

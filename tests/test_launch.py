@@ -168,3 +168,22 @@ def test_dry_run_or_unreadable_mode_state_still_starts_dry_run(monkeypatch, tmp_
     [(_, argv, _)] = exec_calls
     assert argv[1] == "trade"
     assert json.loads((userdir / "trading-bot.freqtrade.json").read_text())["dry_run"] is True
+
+
+@pytest.mark.parametrize(
+    ("keys", "expected"), [({}, False), ({"INDODAX_API_KEY": "k-1", "INDODAX_API_SECRET": "s-1"}, True)]
+)
+def test_launch_records_whether_exchange_keys_exist_without_their_values(
+    monkeypatch, tmp_path, exec_calls, keys, expected
+):
+    userdir = tmp_path / "user_data"
+    for name in ("INDODAX_API_KEY", "INDODAX_API_SECRET"):
+        monkeypatch.delenv(name, raising=False)
+    for name, value in {**SECRETS, **keys}.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.setenv("TRADING_BOT_CONFIG", str(EXAMPLE))
+    monkeypatch.setenv("TRADING_BOT_USERDIR", str(userdir))
+    launch.main(["trade"])
+    recorded = json.loads((userdir / "capabilities.json").read_text())
+    assert recorded["exchange_key_configured"] is expected
+    assert "k-1" not in json.dumps(recorded) and "s-1" not in json.dumps(recorded)
