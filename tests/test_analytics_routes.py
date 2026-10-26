@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import hashlib
+from datetime import datetime
 from typing import Any
 
 import httpx
@@ -10,6 +11,7 @@ import yaml
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.testclient import TestClient
 
+from analytics import routes as analytics_routes
 from analytics.errors import AnalyticsError
 from analytics.freqtrade import AnalysisClient
 from analytics.routes import PREFIX, install, make_router
@@ -130,7 +132,13 @@ class TestAuthentication:
 
 
 class TestLimitsAndStress:
-    def test_limits_whatif_reports_both_scenarios_and_the_delta(self, env):
+    def test_limits_whatif_reports_both_scenarios_and_the_delta(self, env, monkeypatch):
+        class SameDay(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return datetime(2026, 10, 26, 6, 0, tzinfo=tz)
+
+        monkeypatch.setattr(analytics_routes, "datetime", SameDay)
         client, *_ = env
         body = client.get(f"{PREFIX}/limits/whatif", params={"max_daily_loss_pct": 2.0}).json()
         assert body["delta_idr"]["max_daily_loss_idr"] == pytest.approx(20_000)
