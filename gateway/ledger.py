@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS audit (
     result TEXT NOT NULL,
     detail TEXT
 );
+CREATE INDEX IF NOT EXISTS audit_action_ts ON audit(action, ts);
 CREATE TABLE IF NOT EXISTS fills (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     bot TEXT NOT NULL,
@@ -63,6 +64,9 @@ CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON audit
 BEGIN SELECT RAISE(ABORT, 'audit is append-only'); END;
 """
 IDEMPOTENCY_KEEP = timedelta(days=1)
+
+
+ANALYST_USAGE_ACTIONS = {"analyst.report": "reports", "analyst.ask": "asks"}
 
 
 def iso(moment: datetime) -> str:
@@ -187,6 +191,33 @@ class Ledger:
             }
             for row in rows
         ]
+
+    def analyst_usage(self, since: str | None) -> dict[str, dict[str, Any]]:
+        usage = {
+            kind: {"calls": 0, "input_tokens": 0, "output_tokens": 0, "reasoning_tokens": 0, "cost": None}
+            for kind in ANALYST_USAGE_ACTIONS.values()
+        }
+        marks = ",".join("?" for _ in ANALYST_USAGE_ACTIONS)
+        where, params = f"action IN ({marks}) AND result = 'ok'", list(ANALYST_USAGE_ACTIONS)
+        if since:
+            where, params = f"{where} AND ts >= ?", [*params, since]
+        sums = ", ".join(
+            f"COALESCE(SUM(json_extract(detail, '$.tokens.{field}')), 0) AS {field}"
+            for field in ("input_tokens", "output_tokens", "reasoning_tokens")
+        )
+        query = (
+            f"SELECT action, COUNT(*) AS calls, {sums}, SUM(json_extract(detail, '$.tokens.cost')) AS cost"
+            f" FROM audit WHERE {where} GROUP BY action"
+        )
+        for row in self._db.execute(query, params):
+            usage[ANALYST_USAGE_ACTIONS[row["action"]]] = {
+                "calls": row["calls"],
+                "input_tokens": row["input_tokens"],
+                "output_tokens": row["output_tokens"],
+                "reasoning_tokens": row["reasoning_tokens"],
+                "cost": row["cost"],
+            }
+        return usage
 
     def stored_result(self, key: str) -> tuple[str, int, Any] | None:
         row = self._db.execute("SELECT request_hash, status, body FROM idempotency WHERE key = ?", (key,)).fetchone()

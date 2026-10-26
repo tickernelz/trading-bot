@@ -47,7 +47,7 @@ def test_analyst_exposes_exactly_the_read_tools(data_dir):
 
 def test_tools_take_no_path_argument(data_dir):
     for item in tools_by_name(data_dir).values():
-        assert set(item.args) <= {"name", "limit", "decision_id"}
+        assert set(item.args) <= {"name", "limit", "decision_id", "day", "pair"}
 
 
 def test_metrics_tool(data_dir):
@@ -58,10 +58,12 @@ def test_metrics_tool(data_dir):
 
 
 def test_trade_history_is_newest_last_and_capped(data_dir):
-    rows = tools_by_name(data_dir)["get_trade_history"].invoke({"limit": 5}).splitlines()
+    note, *rows = tools_by_name(data_dir)["get_trade_history"].invoke({"limit": 5}).splitlines()
     assert [json.loads(r)["id"] for r in rows] == [295, 296, 297, 298, 299]
-    capped = tools_by_name(data_dir)["get_trade_history"].invoke({"limit": 10_000}).splitlines()
-    assert len(capped) == MAX_ROWS
+    assert "newest 5 of 300" in note
+    note, *capped = tools_by_name(data_dir)["get_trade_history"].invoke({"limit": 10_000}).splitlines()
+    assert len(capped) == MAX_ROWS and f"newest {MAX_ROWS} of 300" in note
+    assert "[showing" not in tools_by_name(data_dir)["get_trade_history"].invoke({"limit": 500, "day": "2020-01-01"})
 
 
 def test_voter_log_filters_by_decision(data_dir):

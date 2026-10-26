@@ -166,6 +166,27 @@ class Shadow(Strict):
         return f"http://{host}:{self.port}"
 
 
+class Analyst(Strict):
+    listen: Literal["127.0.0.1", "::1"] = "127.0.0.1"
+    port: Annotated[int, Field(ge=1024, le=65535)] = 8092
+    token_env: EnvName = "ANALYST_TOKEN"
+    data_dir: Annotated[str, Field(pattern=r"^[A-Za-z0-9_.-]+$")] = "analyst_data"
+    reports_dir: Annotated[str, Field(pattern=r"^[A-Za-z0-9_.-]+$")] = "analyst_reports"
+    language: Literal["id", "en"] = "id"
+    report_at: Annotated[str, Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")] = "00:10"
+
+    @property
+    def url(self) -> str:
+        host = "[::1]" if self.listen == "::1" else self.listen
+        return f"http://{host}:{self.port}"
+
+    @model_validator(mode="after")
+    def _separate_directories(self) -> Analyst:
+        if self.data_dir == self.reports_dir:
+            raise ValueError("analyst.data_dir and analyst.reports_dir must differ")
+        return self
+
+
 class Scoreboard(Strict):
     enabled: bool = True
     auto_disable: bool = True
@@ -210,6 +231,8 @@ class Settings(Strict):
     notify: Notify
     api: Api = Api()
     shadow: Shadow | None = None
+    analyst: Analyst | None = None
+
     analytics: Analytics = Analytics()
 
     @model_validator(mode="after")

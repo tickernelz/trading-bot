@@ -17,6 +17,7 @@ FROM engine AS test
 RUN pip install --user --no-cache-dir pytest==9.1.1
 COPY --chown=ftuser:ftuser pyproject.toml ./
 COPY --chown=ftuser:ftuser config/config.example.yaml config/gateway.example.yaml ./config/
+COPY --chown=ftuser:ftuser scripts/stage1.sh ./scripts/stage1.sh
 COPY --chown=ftuser:ftuser tests ./tests
 ENTRYPOINT ["python", "-m", "pytest"]
 CMD []

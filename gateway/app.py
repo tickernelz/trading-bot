@@ -35,13 +35,16 @@ from engine.logredact import redact
 from engine.risk import day_start
 from engine.settings import ConfigError, Settings, load_settings
 from gateway import VERSION
+from gateway.analyst import AnalystLink, install_analyst
 from gateway.analytics_context import AnalyticsContext
 from gateway.control import IDEMPOTENCY_KEY, Confirmations, digest, idempotency_key, is_local, sanitize
 from gateway.events import FILL_SIDES, translate
 from gateway.feed import Client, Hub, now_iso
 from gateway.history import periods
 from gateway.ledger import Ledger, LoginThrottle, iso
+from gateway.modeapi import ModeDesk, install_mode
 from gateway.outcomes import Candle, by_open_time, explain
+
 from gateway.settings import BotRef, GatewaySettings
 from gateway.upstream import ApiError, Upstream
 from gateway.views import (
@@ -119,14 +122,16 @@ class Action:
     params: dict[str, Any]
     targets: list[str]
     summary: str
-    method: str
-    path: str
+    method: str = ""
+    path: str = ""
     risky: bool = False
     query: dict[str, Any] | None = None
     body: Any = None
     expect_key: str | None = None
     entries_stopped: bool | None = None
     precheck: Callable[[], Awaitable[None]] | None = None
+    run: Callable[[], Awaitable[Any]] | None = None
+    outcome: Callable[[Any], dict[str, Any]] | None = None
 
 
 def balance_summary(balance: dict[str, Any]) -> dict[str, Any]:
@@ -162,6 +167,7 @@ class Gateway:
         if missing:
             raise ConfigError(f"set environment variables: {', '.join(missing)}")
         self.settings = settings
+        self.env = env
         self.password = password
         self.started = time.monotonic()
         self.ledger = Ledger(Path(settings.state_dir) / "gateway.sqlite")
@@ -193,6 +199,8 @@ class Gateway:
         self.analytics = AnalyticsContext(self, analysis)
         self.confirmations = Confirmations()
         self.inflight: set[str] = set()
+        self.analyst = AnalystLink(self)
+        self.modes = ModeDesk(self)
 
     def primary(self) -> BotRef:
         return self.settings.bots[0]
@@ -504,6 +512,7 @@ class Gateway:
             "cost": sum(costs) if costs else None,
             "cost_unit": "as reported by each provider; providers that report nothing leave cost null",
             "bots": per_bot,
+            "analyst": self.ledger.analyst_usage(since_text),
         }
 
     async def on_message(self, bot_id: str, message: dict[str, Any], received_ms: int) -> None:
@@ -621,9 +630,12 @@ class Gateway:
                 self.audit_control(action, "rejected", ip=ip, key=key, error=exc.code, message=exc.message)
             raise
         try:
-            result = await self.upstreams[action.bot.id].send(
-                action.method, action.path, params=action.query, body=action.body
-            )
+            if action.run is not None:
+                result = await action.run()
+            else:
+                result = await self.upstreams[action.bot.id].send(
+                    action.method, action.path, params=action.query, body=action.body
+                )
             if action.expect_key is not None and not (isinstance(result, dict) and action.expect_key in result):
                 status = result.get("status") if isinstance(result, dict) else None
                 raise ApiError(502, "upstream_error", str(status or "Freqtrade did not carry out the action"))
@@ -638,7 +650,7 @@ class Gateway:
         self.ledger.store_result(key, request_hash, 200, result)
         if action.entries_stopped is not None:
             self.ledger.set_entries_stopped(action.bot.id, action.entries_stopped)
-        self.audit_control(action, "ok", ip=ip, key=key)
+        self.audit_control(action, "ok", ip=ip, key=key, **(action.outcome(result) if action.outcome else {}))
         return result
 
     async def reapply_entry_stop(self, bot: BotRef) -> None:
@@ -861,6 +873,7 @@ class Gateway:
             (60, self.probe_exchange),
             (30, self.probe_shadows),
             (10, self.sample_cpu),
+            (60, self.analyst.tick),
         ):
             self.tasks.append(asyncio.create_task(self.every(seconds, action)))
         self.spawn(self.analytics.run_auto_disable())
@@ -872,6 +885,7 @@ class Gateway:
         for upstream in self.upstreams.values():
             await upstream.aclose()
         await self.http.aclose()
+        await self.analyst.aclose()
         await self.analytics.aclose()
         for store in self.stores.values():
             store.close()
@@ -1495,4 +1509,6 @@ def create_app(gateway: Gateway) -> FastAPI:
                 },
             )
 
+    install_analyst(app, gateway, reader)
+    install_mode(app, gateway, reader)
     return app
