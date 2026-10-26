@@ -73,11 +73,8 @@ def freqtrade_config(
             "risk": settings.risk.model_dump(),
         },
     }
-    rule = settings.strategy.rule
-    if rule is not None:
-        config["trading_bot"]["rule"] = rule.model_dump()
-        config["stoploss"] = rule.stoploss
-        config["minimal_roi"] = rule.freqtrade_roi(settings.exchange.fee_pct / 100)
+    if settings.strategy.rule is not None:
+        config["trading_bot"]["rule"] = settings.strategy.rule.model_dump()
     if serve_api:
         config["api_server"] = {
             "enabled": True,

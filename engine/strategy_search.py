@@ -376,6 +376,17 @@ def shifted(signals: dict[str, Signals], rows: int) -> dict[str, Signals]:
     return out
 
 
+def peeked(signals: dict[str, Signals]) -> dict[str, Signals]:
+    """Entries kept only when the candle they fill on closes above its open: knowledge of the future."""
+    out = {}
+    for pair, item in signals.items():
+        opens = item.candles["open"].to_numpy(dtype=float)
+        closes = item.candles["close"].to_numpy(dtype=float)
+        green_next = np.concatenate([closes[1:] > opens[1:], [False]])
+        out[pair] = Signals(item.candles, item.enter & green_next, item.exit_signal, item.atr, item.exits)
+    return out
+
+
 def frame_equal(a: Signals, b: Signals, dates: pd.Series) -> bool:
     left = pd.DataFrame({"date": a.candles["date"], "e": a.enter, "x": a.exit_signal, "atr": a.atr})
     right = pd.DataFrame({"date": b.candles["date"], "e": b.enter, "x": b.exit_signal, "atr": b.atr})
@@ -405,6 +416,7 @@ def controls(args, ledger_entry: dict) -> dict:
             ("honest", honest),
             ("shift_1h", shifted(honest, 1)),
             ("shift_tf", shifted(honest, tf_rows)),
+            ("peek_next_close", peeked(honest)),
         ):
             rows = rows_of(trades_of(signals, costs), costs, regimes, start, end)
             summary = metrics.summarize(rows, start, end, stoploss_of(signals), mean_fee(costs))

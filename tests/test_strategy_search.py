@@ -183,6 +183,25 @@ def test_shifting_the_signal_into_the_future_is_detected_as_an_edge():
     assert gross_mean(cheat) > gross_mean(honest) + 0.002
 
 
+def test_peeking_at_the_fill_candle_is_detected_for_a_dip_buyer():
+    frame = daily_walk(120, seed=11)
+    frame["open"] = frame["close"].shift(1).fillna(frame["close"].iloc[0])
+    rule = spec(
+        entry="rsi_dip", timeframe="1h", lookback=14, threshold=35, exit="none", take_profit=0.01, stoploss=-0.05
+    )
+    signals = rule_frame(frame, rule, {})
+    item = strategy_search.Signals(
+        frame,
+        signals["enter"].to_numpy(),
+        signals["exit_signal"].to_numpy(),
+        signals["atr"].to_numpy(),
+        exits_for(rule),
+    )
+    honest = strategy_search.trades_of({"BTC/IDR": item}, Costs(0, 0))
+    cheat = strategy_search.trades_of(strategy_search.peeked({"BTC/IDR": item}), Costs(0, 0))
+    assert gross_mean(cheat) > gross_mean(honest) + 0.002
+
+
 def test_wilson_lower_bound_matches_reference_values():
     assert metrics.wilson_lower(60, 100) == pytest.approx(0.5020, abs=1e-4)
     assert metrics.wilson_lower(0, 0) == 0.0

@@ -80,7 +80,7 @@ def test_swing_strategy_is_still_selectable(example_raw, write_config, tmp_path,
     [(_, argv, _)] = exec_calls
     assert argv[argv.index("--strategy") + 1] == "SwingEmaRsi"
     rendered = json.loads((tmp_path / "user_data" / "trading-bot.freqtrade.json").read_text(encoding="utf-8"))
-    assert "stoploss" not in rendered and "rule" not in rendered["trading_bot"]
+    assert "rule" not in rendered["trading_bot"]
 
 
 @pytest.mark.parametrize("command", ["download-data", "backtesting", "show-config"])

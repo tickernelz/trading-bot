@@ -23,6 +23,8 @@ class RuleStrategy(RiskGated):
 
     def __init__(self, config: dict) -> None:
         self.rule = RuleSpec.model_validate(config["trading_bot"]["rule"])
+        self.stoploss = self.rule.stoploss
+        self.minimal_roi = self.rule.freqtrade_roi(float(config["fee"]))
         super().__init__(config)
 
     def informative_pairs(self) -> list[tuple[str, str]]:
@@ -56,10 +58,11 @@ class RuleStrategy(RiskGated):
         dataframe, _ = self.dp.get_analyzed_dataframe(pair, self.timeframe)
         if dataframe.empty:
             return None
-        held = dataframe[dataframe["date"] >= pd.Timestamp(trade.open_date_utc).floor("1h")]
+        opened = pd.Timestamp(trade.open_date_utc).floor("1h")
+        held = dataframe[dataframe["date"] >= opened]
         if held.empty:
             return None
         closes = held["close"].to_numpy(dtype=float)
-        hours = (current_time - trade.open_date_utc).total_seconds() / 3600
+        hours = (pd.Timestamp(current_time) - opened).total_seconds() / 3600
         reason = trade_exit_reason(self.rule, trade.open_rate, closes, float(held["rule_atr"].iloc[-1]), hours)
         return None if reason is None else f"rule_{reason}"
