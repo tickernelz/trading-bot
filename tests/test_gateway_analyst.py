@@ -209,6 +209,28 @@ def test_bad_input_is_rejected_before_any_model_call(rig):
     assert rig.post("/gw/v1/analyst/ask", {"question": "hi", "bot": "Z"}).status_code == 404
 
 
+def test_manual_report_days_are_limited_to_the_last_two_weeks_and_never_reach_the_model(rig):
+    today = datetime.now(TZ).date()
+    for day in (today - timedelta(days=14), today + timedelta(days=1), today - timedelta(days=400)):
+        response = rig.post("/gw/v1/analyst/reports", {"day": day.isoformat()})
+        assert response.status_code == 400 and response.json()["error"]["code"] == "invalid_request"
+    assert rig.post("/gw/v1/analyst/reports", {"day": "2026-02-30"}).status_code == 400
+    assert rig.service_calls == [] and rig.model.offered == []
+    rig.model.script = [answer(GOOD)]
+    oldest = (today - timedelta(days=13)).isoformat()
+    assert rig.post("/gw/v1/analyst/reports", {"day": oldest}).status_code == 200
+
+
+def test_manual_reports_share_the_per_minute_budget_with_questions(rig):
+    for _ in range(3):
+        assert rig.post("/gw/v1/analyst/ask", {"question": "hi"}).status_code == 200
+    rig.model.script = [AIMessage(content="done")] * 3 + [answer(GOOD)] * 3
+    for _ in range(3):
+        assert rig.post("/gw/v1/analyst/reports", {"day": TODAY}).status_code == 200
+    blocked = rig.post("/gw/v1/analyst/reports", {"day": TODAY})
+    assert blocked.status_code == 429 and blocked.json()["error"]["code"] == "rate_limited"
+
+
 def test_a_bot_without_an_analyst_section_has_no_analyst(rig):
     raw = yaml.safe_load(rig.config.read_text())
     del raw["analyst"]

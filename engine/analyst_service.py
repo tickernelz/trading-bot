@@ -7,7 +7,6 @@ import os
 import secrets
 import sys
 from collections.abc import Mapping
-from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -66,11 +65,7 @@ def provider_failure(exc: ProviderError) -> HTTPException:
 
 
 def create_app(service: AnalystService, token: str) -> FastAPI:
-    @asynccontextmanager
-    async def lifespan(_: FastAPI):
-        yield
-
-    app = FastAPI(lifespan=lifespan, openapi_url=None, docs_url=None, redoc_url=None)
+    app = FastAPI(openapi_url=None, docs_url=None, redoc_url=None)
 
     async def caller(request: Request) -> None:
         offered = request.headers.get(TOKEN_HEADER, "")

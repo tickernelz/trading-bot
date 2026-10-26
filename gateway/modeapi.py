@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import time
 from pathlib import Path
 from typing import Annotated, Any, Literal
@@ -39,7 +40,7 @@ class ModeDesk:
     def __init__(self, gateway) -> None:
         self.gateway = gateway
         self.controllers: dict[str, ModeController] = {}
-        self.replays: dict[tuple[str, str], tuple[float, int, dict[str, Any]]] = {}
+        self.replays: dict[tuple[str, str], tuple[float, str, int, dict[str, Any]]] = {}
 
     def controller(self, bot: BotRef) -> ModeController:
         if bot.id not in self.controllers:
@@ -49,19 +50,21 @@ class ModeDesk:
             )
         return self.controllers[bot.id]
 
-    def remember(self, bot: BotRef, key: str, status: int, body: dict[str, Any]) -> None:
+    def remember(self, bot: BotRef, key: str, request: str, status: int, body: dict[str, Any]) -> None:
         now = time.monotonic()
         live = {item: value for item, value in self.replays.items() if now - value[0] < IDEMPOTENCY_TTL_S}
         if len(live) >= IDEMPOTENCY_MAX:
             live.pop(next(iter(live)))
-        live[(bot.id, key)] = (now, status, body)
+        live[(bot.id, key)] = (now, request, status, body)
         self.replays = live
 
-    def replay(self, bot: BotRef, key: str) -> tuple[int, dict[str, Any]] | None:
+    def replay(self, bot: BotRef, key: str, request: str) -> tuple[int, dict[str, Any]] | None:
         found = self.replays.get((bot.id, key))
         if found is None or time.monotonic() - found[0] >= IDEMPOTENCY_TTL_S:
             return None
-        return found[1], found[2]
+        if found[1] != request:
+            raise ApiError(422, "invalid_request", "this Idempotency-Key was already used for a different request")
+        return found[2], found[3]
 
 
 def confirmation_body(confirmation: Confirmation) -> dict[str, Any]:
@@ -115,7 +118,8 @@ def install_mode(app: FastAPI, gateway: Any, reader: Any) -> None:
             raise ApiError(400, "invalid_request", "a confirmation only applies to the switch to live")
         if not idempotency_key or len(idempotency_key) > 128:
             raise ApiError(400, "invalid_request", "send an Idempotency-Key header of at most 128 characters")
-        replayed = desk.replay(ref, idempotency_key)
+        fingerprint = json.dumps([body.mode, body.confirm])
+        replayed = desk.replay(ref, idempotency_key, fingerprint)
         if replayed is not None:
             return JSONResponse(replayed[1], status_code=replayed[0])
         controller = desk.controller(ref)
@@ -144,5 +148,5 @@ def install_mode(app: FastAPI, gateway: Any, reader: Any) -> None:
             detail=detail,
         )
         if result != "confirmation_required":
-            desk.remember(ref, idempotency_key, status, payload)
+            desk.remember(ref, idempotency_key, fingerprint, status, payload)
         return JSONResponse(payload, status_code=status)

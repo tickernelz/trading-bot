@@ -88,6 +88,15 @@ def test_repeating_the_confirming_call_replays_the_result_without_a_second_chang
     assert len([row for row in audit(rig) if row["result"] == "ok"]) == 1
 
 
+def test_a_replayed_key_with_a_different_request_is_refused_not_answered_with_the_old_result(rig):
+    first = switch(rig, LIVE, key="shared")
+    assert first.status_code == 422
+    other = switch(rig, {"mode": "dry_run"}, key="shared")
+    assert other.status_code == 422 and other.json()["error"]["code"] == "invalid_request"
+    assert "different request" in other.json()["error"]["message"]
+    assert switch(rig, LIVE, key="shared").json() == first.json()
+
+
 def test_confirming_with_another_key_after_use_is_refused(rig):
     proven_controller(rig)
     confirmation = switch(rig, LIVE).json()["error"]["confirmation"]

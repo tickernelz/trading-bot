@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Annotated, Any
 from zoneinfo import ZoneInfo
@@ -44,6 +44,7 @@ PROFIT_KEYS = (
     "worst_pair",
     "max_drawdown",
 )
+REPORT_DAYS_BACK = 13
 KIND_STATUS = {400: "invalid_request", 404: "not_found", 409: "invalid_request"}
 
 
@@ -227,8 +228,19 @@ def install_analyst(app: FastAPI, gateway: Any, reader: Any, control: Any) -> No
     @app.post("/gw/v1/analyst/reports", dependencies=[Depends(control)])
     async def generate(body: ReportBody, request: Request) -> dict[str, Any]:
         ref = gateway.bot(body.bot)
+        link.require(ref)
+        today = link.today(ref)
+        day = body.day or today
+        oldest = (date.fromisoformat(today) - timedelta(days=REPORT_DAYS_BACK)).isoformat()
+        try:
+            in_range = oldest <= day <= today and date.fromisoformat(day) is not None
+        except ValueError:
+            in_range = False
+        if not in_range:
+            raise ApiError(400, "invalid_request", f"day must be a real date from {oldest} to {today}")
+        link.take_ask_slot()
         ip = request.client.host if request.client else None
-        return await link.generate(ref, body.day or link.today(ref), "owner", ip)
+        return await link.generate(ref, day, "owner", ip)
 
     @app.post("/gw/v1/analyst/ask", dependencies=[Depends(reader)])
     async def ask(body: AskBody, request: Request) -> dict[str, Any]:
