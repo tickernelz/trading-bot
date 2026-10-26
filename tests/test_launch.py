@@ -115,3 +115,31 @@ def test_valid_config_execs_freqtrade_with_strategy(monkeypatch, tmp_path, exec_
     assert env["FREQTRADE__API_SERVER__PASSWORD"] == "pw-example"
     rendered = json.loads((tmp_path / "user_data" / "trading-bot.freqtrade.json").read_text(encoding="utf-8"))
     assert "pw-example" not in json.dumps(rendered)
+
+
+def test_recorded_live_mode_stops_the_engine_before_it_starts(monkeypatch, tmp_path, exec_calls):
+    userdir = tmp_path / "user_data"
+    userdir.mkdir()
+    (userdir / "mode.json").write_text('{"mode": "live"}')
+    for name, value in SECRETS.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.setenv("TRADING_BOT_CONFIG", str(EXAMPLE))
+    monkeypatch.setenv("TRADING_BOT_USERDIR", str(userdir))
+    assert launch.main(["trade"]) == 2
+    assert exec_calls == [] and not (userdir / "trading-bot.freqtrade.json").exists()
+
+
+@pytest.mark.parametrize("content", [None, '{"mode": "dry_run"}', "{broken"])
+def test_dry_run_or_unreadable_mode_state_still_starts_dry_run(monkeypatch, tmp_path, exec_calls, content):
+    userdir = tmp_path / "user_data"
+    userdir.mkdir()
+    if content is not None:
+        (userdir / "mode.json").write_text(content)
+    for name, value in SECRETS.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.setenv("TRADING_BOT_CONFIG", str(EXAMPLE))
+    monkeypatch.setenv("TRADING_BOT_USERDIR", str(userdir))
+    launch.main(["trade"])
+    [(_, argv, _)] = exec_calls
+    assert argv[1] == "trade"
+    assert json.loads((userdir / "trading-bot.freqtrade.json").read_text())["dry_run"] is True
