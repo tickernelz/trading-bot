@@ -9,7 +9,10 @@ Notes on running, testing, and understanding the limits of the engine. The proje
 - engine/settings.py: the single schema for config/config.yaml, validated before the engine starts
 - engine/risk.py: daily loss limit, drawdown limit, risk-based position sizing
 - engine/news.py: fetcher for CoinDesk and Cointelegraph RSS headlines and alternative.me Fear and Greed for the chart layer (15-minute and 1-hour cache, fetched only on request)
-- engine/strategies/swing_ema_rsi.py: 1h swing strategy (EMA 20/50 + RSI) with a risk gate
+- engine/strategies/gated.py: risk gate, startup check, heartbeat and shadow hooks shared by the strategies
+- engine/strategies/rule_strategy.py: the default strategy, any rule from engine/rules.py set in config strategy.rule
+- engine/strategies/swing_ema_rsi.py: 1h swing strategy (EMA 20/50 + RSI), selectable with strategy.name
+- engine/strategy_search.py, engine/search_plan.py: the locked strategy search and its run ledger (docs/strategy-research.md)
 - engine/launch.py: validates the config, renders the Freqtrade config (trade database in the userdir), execs Freqtrade
 - engine/heartbeat.py: heartbeat file and start log per bot
 - engine/shadow.py, engine/shadow_client.py: the shadow swarm service for bot B and the candidate sender from the strategy

@@ -1,0 +1,1450 @@
+{
+ "candidate": "J-rsi14-1h-tp3-sl10",
+ "period": [
+  "2026-04-26T00:00:00+00:00",
+  "2026-10-26T00:00:00+00:00"
+ ],
+ "costs": {
+  "taker": {
+   "all": {
+    "trades": 54,
+    "trades_per_month": 8.982,
+    "win_rate": 0.7777777777777778,
+    "wilson_lower": 0.6506132834036111,
+    "mean": -0.0011195980846921787,
+    "ci95": [
+     -0.014667367447028382,
+     0.01111132932963087
+    ],
+    "median": 0.02361579273802694,
+    "profit_factor": 0.942547699241685,
+    "payoff_ratio": 0.26929934264048144,
+    "largest_loss": -0.10557843352987939,
+    "worst5_mean": -0.10557843352987936,
+    "max_drawdown": 0.02153131612911685,
+    "rolling30_min_win_rate": 0.7666666666666667,
+    "longest_days_without_entry": 11.8,
+    "days_without_entry_at_end": 3.5,
+    "exit_reasons": {
+     "end": 3,
+     "roi": 42,
+     "stoploss": 9
+    }
+   },
+   "folds": {},
+   "pairs": {
+    "BTC/IDR": {
+     "trades": 11,
+     "trades_per_month": 1.83,
+     "win_rate": 0.7272727272727273,
+     "wilson_lower": 0.43435469882387095,
+     "mean": -0.006242443624986685,
+     "ci95": [
+      -0.03709250441043402,
+      0.023615792738027
+     ],
+     "median": 0.02361579273802694,
+     "profit_factor": 0.7334290110562492,
+     "payoff_ratio": 0.27503587914609345,
+     "largest_loss": -0.10557843352987939,
+     "worst5_mean": -0.04207232726060317,
+     "max_drawdown": 0.008840833082468857,
+     "rolling30_min_win_rate": null,
+     "longest_days_without_entry": 36.0,
+     "days_without_entry_at_end": 18.9,
+     "exit_reasons": {
+      "end": 1,
+      "roi": 8,
+      "stoploss": 2
+     }
+    },
+    "ETH/IDR": {
+     "trades": 19,
+     "trades_per_month": 3.16,
+     "win_rate": 0.7894736842105263,
+     "wilson_lower": 0.5666572155618583,
+     "mean": 0.0002928518313352817,
+     "ci95": [
+      -0.02303008907535649,
+      0.020691940189425728
+     ],
+     "median": 0.02361579273802694,
+     "profit_factor": 1.0159581885683397,
+     "payoff_ratio": 0.27092218361822396,
+     "largest_loss": -0.10557843352987939,
+     "worst5_mean": -0.06501138270740163,
+     "max_drawdown": 0.009944744336714662,
+     "rolling30_min_win_rate": null,
+     "longest_days_without_entry": 31.7,
+     "days_without_entry_at_end": 3.5,
+     "exit_reasons": {
+      "end": 1,
+      "roi": 15,
+      "stoploss": 3
+     }
+    },
+    "SOL/IDR": {
+     "trades": 24,
+     "trades_per_month": 3.992,
+     "win_rate": 0.7916666666666666,
+     "wilson_lower": 0.5952954674681135,
+     "mean": 0.00011018327108773078,
+     "ci95": [
+      -0.01998557185697708,
+      0.018232699976864247
+     ],
+     "median": 0.02361579273802694,
+     "profit_factor": 1.0059284047315056,
+     "payoff_ratio": 0.26471800124513306,
+     "largest_loss": -0.10557843352987939,
+     "worst5_mean": -0.08921113270328163,
+     "max_drawdown": 0.007735690967571429,
+     "rolling30_min_win_rate": null,
+     "longest_days_without_entry": 29.6,
+     "days_without_entry_at_end": 3.6,
+     "exit_reasons": {
+      "end": 1,
+      "roi": 19,
+      "stoploss": 4
+     }
+    }
+   },
+   "regimes": {
+    "bear": {
+     "trades": 27,
+     "trades_per_month": 4.491,
+     "win_rate": 0.8518518518518519,
+     "wilson_lower": 0.6752131457218702,
+     "mean": 0.004475907365003856,
+     "ci95": [
+      -0.014663978008019305,
+      0.018830821394771245
+     ],
+     "median": 0.02361579273802694,
+     "profit_factor": 1.286160475237831,
+     "payoff_ratio": 0.22368008265005757,
+     "largest_loss": -0.10557843352987939,
+     "worst5_mean": -0.07973958827629808,
+     "max_drawdown": 0.009952943146761983,
+     "rolling30_min_win_rate": null,
+     "longest_days_without_entry": 70.1,
+     "days_without_entry_at_end": 70.1,
+     "exit_reasons": {
+      "roi": 23,
+      "stoploss": 4
+     }
+    },
+    "range": {
+     "trades": 7,
+     "trades_per_month": 1.164,
+     "win_rate": 0.5714285714285714,
+     "wilson_lower": 0.2504583645276572,
+     "mean": -0.0317531613767899,
+     "ci95": [
+      -0.08712211549160684,
+      0.005159474699754847
+     ],
+     "median": 0.02361579273802694,
+     "profit_factor": 0.2982401102000781,
+     "payoff_ratio": 0.22368008265005862,
+     "largest_loss": -0.10557843352987939,
+     "worst5_mean": -0.053900743022716725,
+     "max_drawdown": 0.014954388795781148,
+     "rolling30_min_win_rate": null,
+     "longest_days_without_entry": 107.1,
+     "days_without_entry_at_end": 54.2,
+     "exit_reasons": {
+      "roi": 4,
+      "stoploss": 3
+     }
+    },
+    "bull": {
+     "trades": 20,
+     "trades_per_month": 3.327,
+     "win_rate": 0.75,
+     "wilson_lower": 0.531299122381256,
+     "mean": 0.0020482167104523773,
+     "ci95": [
+      -0.01807039656481606,
+      0.018060472895684642
+     ],
+     "median": 0.02361579273802694,
+     "profit_factor": 1.1307626005273637,
+     "payoff_ratio": 0.37692086684245457,
+     "largest_loss": -0.10557843352987939,
+     "worst5_mean": -0.06265451137227158,
+     "max_drawdown": 0.01145497386282679,
+     "rolling30_min_win_rate": null,
+     "longest_days_without_entry": 134.7,
+     "days_without_entry_at_end": 3.5,
+     "exit_reasons": {
+      "end": 3,
+      "roi": 15,
+      "stoploss": 2
+     }
+    }
+   }
+  },
+  "stress_041": {
+   "all": {
+    "trades": 54,
+    "trades_per_month": 8.982,
+    "win_rate": 0.7777777777777778,
+    "wilson_lower": 0.6506132834036111,
+    "mean": -0.0030979143460559844,
+    "ci95": [
+     -0.016618851895110715,
+     0.009108789304792562
+    ],
+    "median": 0.021588487202469864,
+    "profit_factor": 0.8442394999960223,
+    "payoff_ratio": 0.24121128571314923,
+    "largest_loss": -0.10734986555124004,
+    "worst5_mean": -0.10734986555123993,
+    "max_drawdown": 0.021841233626031187,
+    "rolling30_min_win_rate": 0.7666666666666667,
+    "longest_days_without_entry": 11.8,
+    "days_without_entry_at_end": 3.5,
+    "exit_reasons": {
+     "end": 3,
+     "roi": 42,
+     "stoploss": 9
+    }
+   },
+   "folds": {},
+   "pairs": {
+    "BTC/IDR": {
+     "trades": 11,
+     "trades_per_month": 1.83,
+     "win_rate": 0.7272727272727273,
+     "wilson_lower": 0.43435469882387095,
+     "mean": -0.008210613918307281,
+     "ci95": [
+      -0.03899957511986159,
+      0.021588487202469864
+     ],
+     "median": 0.021588487202469864,
+     "profit_factor": 0.6566224768144084,
+     "payoff_ratio": 0.2462334288054032,
+     "largest_loss": -0.10734986555124004,
+     "worst5_mean": -0.04396953526323995,
+     "max_drawdown": 0.008942905385621591,
+     "rolling30_min_win_rate": null,
+     "longest_days_without_entry": 36.0,
+     "days_without_entry_at_end": 18.9,
+     "exit_reasons": {
+      "end": 1,
+      "roi": 8,
+      "stoploss": 2
+     }
+    },
+    "ETH/IDR": {
+     "trades": 19,
+     "trades_per_month": 3.16,
+     "win_rate": 0.7894736842105263,
+     "wilson_lower": 0.5666572155618583,
+     "mean": -0.0016882618346345875,
+     "ci95": [
+      -0.024965010871739086,
+      0.018670425442266925
+     ],
+     "median": 0.021588487202469864,
+     "profit_factor": 0.9098719054541102,
+     "payoff_ratio": 0.2426325081210961,
+     "largest_loss": -0.10734986555123993,
+     "worst5_mean": -0.06686315913852718,
+     "max_drawdown": 0.009934371159711186,
+     "rolling30_min_win_rate": null,
+     "longest_days_without_entry": 31.7,
+     "days_without_entry_at_end": 3.5,
+     "exit_reasons": {
+      "end": 1,
+      "roi": 15,
+      "stoploss": 3
+     }
+    },
+    "SOL/IDR": {
+     "trades": 24,
+     "trades_per_month": 3.992,
+     "win_rate": 0.7916666666666666,
+     "wilson_lower": 0.5952954674681135,
+     "mean": -0.001870568613649412,
+     "ci95": [
+      -0.021926523422198464,
+      0.01621605583773196
+     ],
+     "median": 0.021588487202469864,
+     "profit_factor": 0.9013488848210346,
+     "payoff_ratio": 0.23719707495290385,
+     "largest_loss": -0.10734986555123993,
+     "worst5_mean": -0.0910149807149027,
+     "max_drawdown": 0.007950446743632544,
+     "rolling30_min_win_rate": null,
+     "longest_days_without_entry": 29.6,
+     "days_without_entry_at_end": 3.6,
+     "exit_reasons": {
+      "end": 1,
+      "roi": 19,
+      "stoploss": 4
+     }
+    }
+   },
+   "regimes": {
+    "bear": {
+     "trades": 27,
+     "trades_per_month": 4.491,
+     "win_rate": 0.8518518518518519,
+     "wilson_lower": 0.6752131457218702,
+     "mean": 0.0024865090167350916,
+     "ci95": [
+      -0.01661546916899969,
+      0.016812992656036193
+     ],
+     "median": 0.021588487202469864,
+     "profit_factor": 1.1563479914648855,
+     "payoff_ratio": 0.20110399851563227,
+     "largest_loss": -0.10734986555123993,
+     "worst5_mean": -0.081562195000498,
+     "max_drawdown": 0.009944227485923607,
+     "rolling30_min_win_rate": null,
+     "longest_days_without_entry": 70.1,
+     "days_without_entry_at_end": 70.1,
+     "exit_reasons": {
+      "roi": 23,
+      "stoploss": 4
+     }
+    },
+    "range": {
+     "trades": 7,
+     "trades_per_month": 1.164,
+     "win_rate": 0.5714285714285714,
+     "wilson_lower": 0.2504583645276572,
+     "mean": -0.03367080683483429,
+     "ci95": [
+      -0.08893010087213844,
+      0.0031687225233685756
+     ],
+     "median": 0.021588487202469864,
+     "profit_factor": 0.2681386646875103,
+     "payoff_ratio": 0.20110399851563274,
+     "largest_loss": -0.10734986555124004,
+     "worst5_mean": -0.05577452444975599,
+     "max_drawdown": 0.014938751120406213,
+     "rolling30_min_win_rate": null,
+     "longest_days_without_entry": 107.1,
+     "days_without_entry_at_end": 54.2,
+     "exit_reasons": {
+      "roi": 4,
+      "stoploss": 3
+     }
+    },
+    "bull": {
+     "trades": 20,
+     "trades_per_month": 3.327,
+     "win_rate": 0.75,
+     "wilson_lower": 0.531299122381256,
+     "mean": 6.362648524846915e-05,
+     "ci95": [
+      -0.02001514119917426,
+      0.016044169858084312
+     ],
+     "median": 0.021588487202469864,
+     "profit_factor": 1.0039451584364976,
+     "payoff_ratio": 0.3346483861454992,
+     "largest_loss": -0.10734986555123982,
+     "worst5_mean": -0.0645109556664158,
+     "max_drawdown": 0.011962611034383674,
+     "rolling30_min_win_rate": null,
+     "longest_days_without_entry": 134.7,
+     "days_without_entry_at_end": 3.5,
+     "exit_reasons": {
+      "end": 3,
+      "roi": 15,
+      "stoploss": 2
+     }
+    }
+   }
+  },
+  "no_tax": {
+   "all": {
+    "trades": 54,
+    "trades_per_month": 8.982,
+    "win_rate": 0.7777777777777778,
+    "wilson_lower": 0.6506132834036111,
+    "mean": 0.000986803912830662,
+    "ci95": [
+     -0.012589534483788413,
+     0.013243523453906515
+    ],
+    "median": 0.025774355811629235,
+    "profit_factor": 1.051773777327837,
+    "payoff_ratio": 0.30050679352223914,
+    "largest_loss": -0.10369231045585814,
+    "worst5_mean": -0.10369231045585806,
+    "max_drawdown": 0.021185428202155077,
+    "rolling30_min_win_rate": 0.7666666666666667,
+    "longest_days_without_entry": 11.8,
+    "days_without_entry_at_end": 3.5,
+    "exit_reasons": {
+     "end": 3,
+     "roi": 42,
+     "stoploss": 9
+    }
+   },
+   "folds": {},
+   "pairs": {
+    "BTC/IDR": {
+     "trades": 11,
+     "trades_per_month": 1.83,
+     "win_rate": 0.7272727272727273,
+     "wilson_lower": 0.43435469882387095,
+     "mean": -0.00414684449441212,
+     "ci95": [
+      -0.03506196074549636,
+      0.025774355811629155
+     ],
+     "median": 0.025774355811629235,
+     "profit_factor": 0.8188504633867083,
+     "payoff_ratio": 0.3070689237700156,
+     "largest_loss": -0.10369231045585814,
+     "worst5_mean": -0.04005228486166175,
+     "max_drawdown": 0.00872665679203466,
+     "rolling30_min_win_rate": null,
+     "longest_days_without_entry": 36.0,
+     "days_without_entry_at_end": 18.9,
+     "exit_reasons": {
+      "end": 1,
+      "roi": 8,
+      "stoploss": 2
+     }
+    },
+    "ETH/IDR": {
+     "trades": 19,
+     "trades_per_month": 3.16,
+     "win_rate": 0.7894736842105263,
+     "wilson_lower": 0.5666572155618583,
+     "mean": 0.0024022323509302656,
+     "ci95": [
+      -0.02096989110976874,
+      0.02284433755105981
+     ],
+     "median": 0.025774355811629235,
+     "profit_factor": 1.1338593526199128,
+     "payoff_ratio": 0.3023624940319767,
+     "largest_loss": -0.10369231045585803,
+     "worst5_mean": -0.06303971333902694,
+     "max_drawdown": 0.009954589623119237,
+     "rolling30_min_win_rate": null,
+     "longest_days_without_entry": 31.7,
+     "days_without_entry_at_end": 3.5,
+     "exit_reasons": {
+      "end": 1,
+      "roi": 15,
+      "stoploss": 3
+     }
+    },
+    "SOL/IDR": {
+     "trades": 24,
+     "trades_per_month": 3.992,
+     "win_rate": 0.7916666666666666,
+     "wilson_lower": 0.5952954674681135,
+     "mean": 0.0022191785859880845,
+     "ci95": [
+      -0.01791895372623444,
+      0.020379911383817274
+     ],
+     "median": 0.025774355811629235,
+     "profit_factor": 1.12202997850373,
+     "payoff_ratio": 0.2952710469746658,
+     "largest_loss": -0.10369231045585803,
+     "worst5_mean": -0.08729049487144838,
+     "max_drawdown": 0.00749720098127471,
+     "rolling30_min_win_rate": null,
+     "longest_days_without_entry": 29.6,
+     "days_without_entry_at_end": 3.6,
+     "exit_reasons": {
+      "end": 1,
+      "roi": 19,
+      "stoploss": 4
+     }
+    }
+   },
+   "regimes": {
+    "bear": {
+     "trades": 27,
+     "trades_per_month": 4.491,
+     "win_rate": 0.8518518518518519,
+     "wilson_lower": 0.6752131457218702,
+     "mean": 0.006594108957186685,
+     "ci95": [
+      -0.012586137897255871,
+      0.020979294098018617
+     ],
+     "median": 0.025774355811629235,
+     "profit_factor": 1.4292530011659659,
+     "payoff_ratio": 0.24856573933321147,
+     "largest_loss": -0.10369231045585814,
+     "worst5_mean": -0.07779897720236062,
+     "max_drawdown": 0.009960951792280515,
+     "rolling30_min_win_rate": null,
+     "longest_days_without_entry": 70.1,
+     "days_without_entry_at_end": 70.1,
+     "exit_reasons": {
+      "roi": 23,
+      "stoploss": 4
+     }
+    },
+    "range": {
+     "trades": 7,
+     "trades_per_month": 1.164,
+     "win_rate": 0.5714285714285714,
+     "wilson_lower": 0.2504583645276572,
+     "mean": -0.0297113583030081,
+     "ci95": [
+      -0.08519707241764543,
+      0.0072791177734168955
+     ],
+     "median": 0.025774355811629235,
+     "profit_factor": 0.33142098577761614,
+     "payoff_ratio": 0.24856573933321208,
+     "largest_loss": -0.10369231045585803,
+     "worst5_mean": -0.05190564394886308,
+     "max_drawdown": 0.014969230746201156,
+     "rolling30_min_win_rate": null,
+     "longest_days_without_entry": 107.1,
+     "days_without_entry_at_end": 54.2,
+     "exit_reasons": {
+      "roi": 4,
+      "stoploss": 3
+     }
+    },
+    "bull": {
+     "trades": 20,
+     "trades_per_month": 3.327,
+     "win_rate": 0.75,
+     "wilson_lower": 0.531299122381256,
+     "mean": 0.004161298878493596,
+     "ci95": [
+      -0.015999739783346827,
+      0.020207321116547362
+     ],
+     "median": 0.025774355811629235,
+     "profit_factor": 1.2743206870483117,
+     "payoff_ratio": 0.42477356234943725,
+     "largest_loss": -0.10369231045585803,
+     "worst5_mean": -0.06067787192091327,
+     "max_drawdown": 0.010892275004206309,
+     "rolling30_min_win_rate": null,
+     "longest_days_without_entry": 134.7,
+     "days_without_entry_at_end": 3.5,
+     "exit_reasons": {
+      "end": 3,
+      "roi": 15,
+      "stoploss": 2
+     }
+    }
+   }
+  },
+  "slip_005": {
+   "all": {
+    "trades": 54,
+    "trades_per_month": 8.982,
+    "win_rate": 0.7777777777777778,
+    "wilson_lower": 0.6506132834036111,
+    "mean": -0.002119039381707854,
+    "ci95": [
+     -0.015653253367287037,
+     0.01009965023724425
+    ],
+    "median": 0.02259160216067846,
+    "profit_factor": 0.8923814801472042,
+    "payoff_ratio": 0.2549661371849155,
+    "largest_loss": -0.10647335733532959,
+    "worst5_mean": -0.10647335733532952,
+    "max_drawdown": 0.02169019480122336,
+    "rolling30_min_win_rate": 0.7666666666666667,
+    "longest_days_without_entry": 11.8,
+    "days_without_entry_at_end": 3.5,
+    "exit_reasons": {
+     "end": 3,
+     "roi": 42,
+     "stoploss": 9
+    }
+   },
+   "folds": {},
+   "pairs": {
+    "BTC/IDR": {
+     "trades": 11,
+     "trades_per_month": 1.83,
+     "win_rate": 0.7272727272727273,
+     "wilson_lower": 0.43435469882387095,
+     "mean": -0.007236759199862492,
+     "ci95": [
+      -0.03805595260148158,
+      0.02259160216067838
+     ],
+     "median": 0.02259160216067846,
+     "profit_factor": 0.6942259468286185,
+     "payoff_ratio": 0.26033473006073193,
+     "largest_loss": -0.10647335733532948,
+     "worst5_mean": -0.043030792832511634,
+     "max_drawdown": 0.008893232665329265,
+     "rolling30_min_win_rate": null,
+     "longest_days_without_entry": 36.0,
+     "days_without_entry_at_end": 18.9,
+     "exit_reasons": {
+      "end": 1,
+      "roi": 8,
+      "stoploss": 2
+     }
+    },
+    "ETH/IDR": {
+     "trades": 19,
+     "trades_per_month": 3.16,
+     "win_rate": 0.7894736842105263,
+     "wilson_lower": 0.5666572155618583,
+     "mean": -0.0007080027087206407,
+     "ci95": [
+      -0.02400760757811973,
+      0.019670675106438495
+     ],
+     "median": 0.02259160216067846,
+     "profit_factor": 0.9618193143189717,
+     "payoff_ratio": 0.2564851504850591,
+     "largest_loss": -0.10647335733532959,
+     "worst5_mean": -0.06594689634303812,
+     "max_drawdown": 0.009939884515844155,
+     "rolling30_min_win_rate": null,
+     "longest_days_without_entry": 31.7,
+     "days_without_entry_at_end": 3.5,
+     "exit_reasons": {
+      "end": 1,
+      "roi": 15,
+      "stoploss": 3
+     }
+    },
+    "SOL/IDR": {
+     "trades": 24,
+     "trades_per_month": 3.992,
+     "win_rate": 0.7916666666666666,
+     "wilson_lower": 0.5952954674681135,
+     "mean": -0.0008904884978351892,
+     "ci95": [
+      -0.02096613658652752,
+      0.017213895515011443
+     ],
+     "median": 0.02259160216067846,
+     "profit_factor": 0.9525717998580882,
+     "payoff_ratio": 0.25067678943633903,
+     "largest_loss": -0.10647335733532948,
+     "worst5_mean": -0.09012243300018705,
+     "max_drawdown": 0.007845474336450886,
+     "rolling30_min_win_rate": null,
+     "longest_days_without_entry": 29.6,
+     "days_without_entry_at_end": 3.6,
+     "exit_reasons": {
+      "end": 1,
+      "roi": 19,
+      "stoploss": 4
+     }
+    }
+   },
+   "regimes": {
+    "bear": {
+     "trades": 27,
+     "trades_per_month": 4.491,
+     "win_rate": 0.8518518518518519,
+     "wilson_lower": 0.6752131457218702,
+     "mean": 0.0034708674205291227,
+     "ci95": [
+      -0.015649867319620193,
+      0.01781141847564113
+     ],
+     "median": 0.02259160216067846,
+     "profit_factor": 1.220039601219541,
+     "payoff_ratio": 0.21218080021209407,
+     "largest_loss": -0.10647335733532948,
+     "worst5_mean": -0.08066036543612791,
+     "max_drawdown": 0.00994892917740553,
+     "rolling30_min_win_rate": null,
+     "longest_days_without_entry": 70.1,
+     "days_without_entry_at_end": 70.1,
+     "exit_reasons": {
+      "roi": 23,
+      "stoploss": 4
+     }
+    },
+    "range": {
+     "trades": 7,
+     "trades_per_month": 1.164,
+     "win_rate": 0.5714285714285714,
+     "wilson_lower": 0.2504583645276572,
+     "mean": -0.03272195190903926,
+     "ci95": [
+      -0.08803550597875687,
+      0.004153750804105912
+     ],
+     "median": 0.022591602160678237,
+     "profit_factor": 0.2829077336161249,
+     "payoff_ratio": 0.21218080021209368,
+     "largest_loss": -0.10647335733532959,
+     "worst5_mean": -0.05484737353692635,
+     "max_drawdown": 0.014947062553596568,
+     "rolling30_min_win_rate": null,
+     "longest_days_without_entry": 107.1,
+     "days_without_entry_at_end": 54.2,
+     "exit_reasons": {
+      "roi": 4,
+      "stoploss": 3
+     }
+    },
+    "bull": {
+     "trades": 20,
+     "trades_per_month": 3.327,
+     "win_rate": 0.75,
+     "wilson_lower": 0.531299122381256,
+     "mean": 0.001045605819838219,
+     "ci95": [
+      -0.019052877545075182,
+      0.017041840757622596
+     ],
+     "median": 0.02259160216067846,
+     "profit_factor": 1.065769248905527,
+     "payoff_ratio": 0.35525641630184235,
+     "largest_loss": -0.10647335733532959,
+     "worst5_mean": -0.0635923832026825,
+     "max_drawdown": 0.011714192569236559,
+     "rolling30_min_win_rate": null,
+     "longest_days_without_entry": 134.7,
+     "days_without_entry_at_end": 3.5,
+     "exit_reasons": {
+      "end": 3,
+      "roi": 15,
+      "stoploss": 2
+     }
+    }
+   }
+  },
+  "slip_010": {
+   "all": {
+    "trades": 54,
+    "trades_per_month": 8.982,
+    "win_rate": 0.7777777777777778,
+    "wilson_lower": 0.6506132834036111,
+    "mean": -0.003117484281917082,
+    "ci95": [
+     -0.016638156404823724,
+     0.009088979742180788
+    ],
+    "median": 0.021568432654025527,
+    "profit_factor": 0.843286836886605,
+    "payoff_ratio": 0.24093909625331572,
+    "largest_loss": -0.10736738894308451,
+    "worst5_mean": -0.10736738894308447,
+    "max_drawdown": 0.021845910884504827,
+    "rolling30_min_win_rate": 0.7666666666666667,
+    "longest_days_without_entry": 11.8,
+    "days_without_entry_at_end": 3.5,
+    "exit_reasons": {
+     "end": 3,
+     "roi": 42,
+     "stoploss": 9
+    }
+   },
+   "folds": {},
+   "pairs": {
+    "BTC/IDR": {
+     "trades": 11,
+     "trades_per_month": 1.83,
+     "win_rate": 0.7272727272727273,
+     "wilson_lower": 0.43435469882387095,
+     "mean": -0.008230083488040017,
+     "ci95": [
+      -0.039018440279186724,
+      0.021568432654025527
+     ],
+     "median": 0.021568432654025527,
+     "profit_factor": 0.6558785313112124,
+     "payoff_ratio": 0.24595444924170468,
+     "largest_loss": -0.10736738894308451,
+     "worst5_mean": -0.043988302858518714,
+     "max_drawdown": 0.008944579910204253,
+     "rolling30_min_win_rate": null,
+     "longest_days_without_entry": 36.0,
+     "days_without_entry_at_end": 18.9,
+     "exit_reasons": {
+      "end": 1,
+      "roi": 8,
+      "stoploss": 2
+     }
+    },
+    "ETH/IDR": {
+     "trades": 19,
+     "trades_per_month": 3.16,
+     "win_rate": 0.7894736842105263,
+     "wilson_lower": 0.5666572155618583,
+     "mean": -0.0017078594430320775,
+     "ci95": [
+      -0.024984151540089747,
+      0.01865042817756421
+     ],
+     "median": 0.021568432654025527,
+     "profit_factor": 0.908844006629488,
+     "payoff_ratio": 0.2423584017678635,
+     "largest_loss": -0.10736738894308451,
+     "worst5_mean": -0.0668814773147935,
+     "max_drawdown": 0.00993502798681134,
+     "rolling30_min_win_rate": null,
+     "longest_days_without_entry": 31.7,
+     "days_without_entry_at_end": 3.5,
+     "exit_reasons": {
+      "end": 1,
+      "roi": 15,
+      "stoploss": 3
+     }
+    },
+    "SOL/IDR": {
+     "trades": 24,
+     "trades_per_month": 3.992,
+     "win_rate": 0.7916666666666666,
+     "wilson_lower": 0.5952954674681135,
+     "mean": -0.0018901626432280317,
+     "ci95": [
+      -0.02194572373833736,
+      0.016196106754145984
+     ],
+     "median": 0.021568432654025527,
+     "profit_factor": 0.9003350636417221,
+     "payoff_ratio": 0.23693027990571636,
+     "largest_loss": -0.10736738894308451,
+     "worst5_mean": -0.09103282477279177,
+     "max_drawdown": 0.007953141002267738,
+     "rolling30_min_win_rate": null,
+     "longest_days_without_entry": 29.6,
+     "days_without_entry_at_end": 3.6,
+     "exit_reasons": {
+      "end": 1,
+      "roi": 19,
+      "stoploss": 4
+     }
+    }
+   },
+   "regimes": {
+    "bear": {
+     "trades": 27,
+     "trades_per_month": 4.491,
+     "win_rate": 0.8518518518518519,
+     "wilson_lower": 0.6752131457218702,
+     "mean": 0.002466829454453715,
+     "ci95": [
+      -0.01663477374511813,
+      0.016793031854132615
+     ],
+     "median": 0.021568432654025527,
+     "profit_factor": 1.1550852542981123,
+     "payoff_ratio": 0.2008843920518456,
+     "largest_loss": -0.10736738894308451,
+     "worst5_mean": -0.08158022462366243,
+     "max_drawdown": 0.00994490191587405,
+     "rolling30_min_win_rate": null,
+     "longest_days_without_entry": 70.1,
+     "days_without_entry_at_end": 70.1,
+     "exit_reasons": {
+      "roi": 23,
+      "stoploss": 4
+     }
+    },
+    "range": {
+     "trades": 7,
+     "trades_per_month": 1.164,
+     "win_rate": 0.5714285714285714,
+     "wilson_lower": 0.2504583645276572,
+     "mean": -0.03368977660187874,
+     "ci95": [
+      -0.08894798585778298,
+      0.0031490295687241093
+     ],
+     "median": 0.021568432654025527,
+     "profit_factor": 0.267845856069127,
+     "payoff_ratio": 0.20088439205184522,
+     "largest_loss": -0.10736738894308451,
+     "worst5_mean": -0.05579306030424045,
+     "max_drawdown": 0.014939741291861708,
+     "rolling30_min_win_rate": null,
+     "longest_days_without_entry": 107.1,
+     "days_without_entry_at_end": 54.2,
+     "exit_reasons": {
+      "roi": 4,
+      "stoploss": 3
+     }
+    },
+    "bull": {
+     "trades": 20,
+     "trades_per_month": 3.327,
+     "win_rate": 0.75,
+     "wilson_lower": 0.531299122381256,
+     "mean": 4.3994485968923414e-05,
+     "ci95": [
+      -0.020034379037180194,
+      0.01602422414874908
+     ],
+     "median": 0.021568432654025527,
+     "profit_factor": 1.002727100546326,
+     "payoff_ratio": 0.3342423668487754,
+     "largest_loss": -0.10736738894308451,
+     "worst5_mean": -0.06452932001820111,
+     "max_drawdown": 0.011968458608338728,
+     "rolling30_min_win_rate": null,
+     "longest_days_without_entry": 134.7,
+     "days_without_entry_at_end": 3.5,
+     "exit_reasons": {
+      "end": 3,
+      "roi": 15,
+      "stoploss": 2
+     }
+    }
+   }
+  }
+ },
+ "null": {
+  "shuffles": 1000,
+  "entry_rate_per_bar": {
+   "BTC/IDR": 0.015027322404371584,
+   "ETH/IDR": 0.012067395264116576,
+   "SOL/IDR": 0.01343351548269581
+  },
+  "mean_p95": -0.0005260604677858133,
+  "mean_p50": -0.006754285960911592,
+  "win_rate_p95": 0.7924528301886793,
+  "win_rate_p50": 0.7446808510638298,
+  "trades_median": 51.0
+ },
+ "null_beaten": false,
+ "checks": {
+  "a_win_rate": false,
+  "b_folds": true,
+  "c_rolling": true,
+  "d_regimes": true,
+  "met": false,
+  "trades": 54,
+  "win_rate": 0.7777777777777778,
+  "wilson_lower": 0.6506132834036111,
+  "trades_per_pair": {
+   "BTC/IDR": 11,
+   "ETH/IDR": 19,
+   "SOL/IDR": 24
+  },
+  "fold_win_rates": {
+   "F1": 0.7529411764705882,
+   "F2": 0.8153846153846154,
+   "F3": 0.8421052631578947,
+   "F4": 0.7837837837837838,
+   "F5": 0.7301587301587301,
+   "F6": 0.7183098591549296,
+   "F7": 0.821917808219178,
+   "F8": 0.72
+  },
+  "fold_std": 0.04945262104002322,
+  "rolling30_min": [
+   0.5333333333333333,
+   0.7666666666666667
+  ],
+  "regimes": [
+   {
+    "bear": {
+     "trades": 155,
+     "win_rate": 0.7677419354838709
+    },
+    "range": {
+     "trades": 69,
+     "win_rate": 0.855072463768116
+    },
+    "bull": {
+     "trades": 295,
+     "win_rate": 0.752542372881356
+    }
+   },
+   {
+    "bear": {
+     "trades": 27,
+     "win_rate": 0.8518518518518519
+    },
+    "range": {
+     "trades": 7,
+     "win_rate": 0.5714285714285714
+    },
+    "bull": {
+     "trades": 20,
+     "win_rate": 0.75
+    }
+   }
+  ]
+ },
+ "tier": "T4",
+ "trades": [
+  [
+   "BTC/IDR",
+   "2026-04-27T16:00:00+00:00",
+   "2026-05-03T22:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bear"
+  ],
+  [
+   "BTC/IDR",
+   "2026-05-07T15:00:00+00:00",
+   "2026-06-02T07:00:00+00:00",
+   -0.10557843,
+   "stoploss",
+   "range"
+  ],
+  [
+   "BTC/IDR",
+   "2026-06-03T02:00:00+00:00",
+   "2026-06-03T05:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bear"
+  ],
+  [
+   "BTC/IDR",
+   "2026-06-03T21:00:00+00:00",
+   "2026-06-26T02:00:00+00:00",
+   -0.10557843,
+   "stoploss",
+   "bear"
+  ],
+  [
+   "BTC/IDR",
+   "2026-06-30T13:00:00+00:00",
+   "2026-07-01T15:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bear"
+  ],
+  [
+   "BTC/IDR",
+   "2026-07-17T06:00:00+00:00",
+   "2026-07-20T00:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bear"
+  ],
+  [
+   "BTC/IDR",
+   "2026-07-23T18:00:00+00:00",
+   "2026-08-19T15:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bear"
+  ],
+  [
+   "BTC/IDR",
+   "2026-08-28T17:00:00+00:00",
+   "2026-09-03T15:00:00+00:00",
+   0.02361579,
+   "roi",
+   "range"
+  ],
+  [
+   "BTC/IDR",
+   "2026-09-07T16:00:00+00:00",
+   "2026-09-19T16:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bull"
+  ],
+  [
+   "BTC/IDR",
+   "2026-09-23T16:00:00+00:00",
+   "2026-10-02T12:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bull"
+  ],
+  [
+   "BTC/IDR",
+   "2026-10-07T02:00:00+00:00",
+   "2026-10-25T23:00:00+00:00",
+   -0.04643635,
+   "end",
+   "bull"
+  ],
+  [
+   "ETH/IDR",
+   "2026-04-27T16:00:00+00:00",
+   "2026-04-29T04:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bear"
+  ],
+  [
+   "ETH/IDR",
+   "2026-05-07T15:00:00+00:00",
+   "2026-05-23T07:00:00+00:00",
+   -0.10557843,
+   "stoploss",
+   "range"
+  ],
+  [
+   "ETH/IDR",
+   "2026-05-27T22:00:00+00:00",
+   "2026-06-03T20:00:00+00:00",
+   -0.10557843,
+   "stoploss",
+   "bear"
+  ],
+  [
+   "ETH/IDR",
+   "2026-06-05T06:00:00+00:00",
+   "2026-06-15T11:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bear"
+  ],
+  [
+   "ETH/IDR",
+   "2026-06-18T16:00:00+00:00",
+   "2026-06-20T05:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bear"
+  ],
+  [
+   "ETH/IDR",
+   "2026-06-23T07:00:00+00:00",
+   "2026-07-03T10:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bear"
+  ],
+  [
+   "ETH/IDR",
+   "2026-07-17T03:00:00+00:00",
+   "2026-07-20T18:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bear"
+  ],
+  [
+   "ETH/IDR",
+   "2026-07-23T18:00:00+00:00",
+   "2026-07-26T22:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bear"
+  ],
+  [
+   "ETH/IDR",
+   "2026-07-28T02:00:00+00:00",
+   "2026-08-19T14:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bear"
+  ],
+  [
+   "ETH/IDR",
+   "2026-08-28T19:00:00+00:00",
+   "2026-08-30T16:00:00+00:00",
+   0.02361579,
+   "roi",
+   "range"
+  ],
+  [
+   "ETH/IDR",
+   "2026-09-01T19:00:00+00:00",
+   "2026-09-03T15:00:00+00:00",
+   0.02361579,
+   "roi",
+   "range"
+  ],
+  [
+   "ETH/IDR",
+   "2026-09-10T13:00:00+00:00",
+   "2026-09-11T12:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bull"
+  ],
+  [
+   "ETH/IDR",
+   "2026-09-13T10:00:00+00:00",
+   "2026-09-14T20:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bull"
+  ],
+  [
+   "ETH/IDR",
+   "2026-09-15T15:00:00+00:00",
+   "2026-09-18T05:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bull"
+  ],
+  [
+   "ETH/IDR",
+   "2026-09-23T15:00:00+00:00",
+   "2026-10-02T08:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bull"
+  ],
+  [
+   "ETH/IDR",
+   "2026-10-07T02:00:00+00:00",
+   "2026-10-15T02:00:00+00:00",
+   -0.10557843,
+   "stoploss",
+   "bull"
+  ],
+  [
+   "ETH/IDR",
+   "2026-10-15T06:00:00+00:00",
+   "2026-10-15T15:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bull"
+  ],
+  [
+   "ETH/IDR",
+   "2026-10-18T20:00:00+00:00",
+   "2026-10-19T00:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bull"
+  ],
+  [
+   "ETH/IDR",
+   "2026-10-22T12:00:00+00:00",
+   "2026-10-25T23:00:00+00:00",
+   -0.03193741,
+   "end",
+   "bull"
+  ],
+  [
+   "SOL/IDR",
+   "2026-04-27T13:00:00+00:00",
+   "2026-05-06T03:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bear"
+  ],
+  [
+   "SOL/IDR",
+   "2026-05-13T14:00:00+00:00",
+   "2026-05-23T07:00:00+00:00",
+   -0.10557843,
+   "stoploss",
+   "range"
+  ],
+  [
+   "SOL/IDR",
+   "2026-05-23T08:00:00+00:00",
+   "2026-05-23T18:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bear"
+  ],
+  [
+   "SOL/IDR",
+   "2026-05-28T04:00:00+00:00",
+   "2026-05-28T18:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bear"
+  ],
+  [
+   "SOL/IDR",
+   "2026-06-01T14:00:00+00:00",
+   "2026-06-04T00:00:00+00:00",
+   -0.10557843,
+   "stoploss",
+   "bear"
+  ],
+  [
+   "SOL/IDR",
+   "2026-06-04T02:00:00+00:00",
+   "2026-06-04T03:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bear"
+  ],
+  [
+   "SOL/IDR",
+   "2026-06-05T07:00:00+00:00",
+   "2026-06-07T22:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bear"
+  ],
+  [
+   "SOL/IDR",
+   "2026-06-09T17:00:00+00:00",
+   "2026-06-11T11:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bear"
+  ],
+  [
+   "SOL/IDR",
+   "2026-06-18T16:00:00+00:00",
+   "2026-06-20T04:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bear"
+  ],
+  [
+   "SOL/IDR",
+   "2026-06-23T07:00:00+00:00",
+   "2026-06-26T15:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bear"
+  ],
+  [
+   "SOL/IDR",
+   "2026-07-05T10:00:00+00:00",
+   "2026-07-05T22:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bear"
+  ],
+  [
+   "SOL/IDR",
+   "2026-07-08T05:00:00+00:00",
+   "2026-08-01T18:00:00+00:00",
+   -0.10557843,
+   "stoploss",
+   "bear"
+  ],
+  [
+   "SOL/IDR",
+   "2026-08-06T20:00:00+00:00",
+   "2026-08-08T11:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bear"
+  ],
+  [
+   "SOL/IDR",
+   "2026-08-16T22:00:00+00:00",
+   "2026-08-18T14:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bear"
+  ],
+  [
+   "SOL/IDR",
+   "2026-08-31T00:00:00+00:00",
+   "2026-09-06T03:00:00+00:00",
+   0.02361579,
+   "roi",
+   "range"
+  ],
+  [
+   "SOL/IDR",
+   "2026-09-09T23:00:00+00:00",
+   "2026-09-11T13:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bull"
+  ],
+  [
+   "SOL/IDR",
+   "2026-09-13T11:00:00+00:00",
+   "2026-09-14T16:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bull"
+  ],
+  [
+   "SOL/IDR",
+   "2026-09-15T15:00:00+00:00",
+   "2026-09-17T17:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bull"
+  ],
+  [
+   "SOL/IDR",
+   "2026-09-20T03:00:00+00:00",
+   "2026-09-20T23:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bull"
+  ],
+  [
+   "SOL/IDR",
+   "2026-09-23T16:00:00+00:00",
+   "2026-09-24T16:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bull"
+  ],
+  [
+   "SOL/IDR",
+   "2026-09-28T10:00:00+00:00",
+   "2026-09-30T12:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bull"
+  ],
+  [
+   "SOL/IDR",
+   "2026-10-07T04:00:00+00:00",
+   "2026-10-08T17:00:00+00:00",
+   -0.10557843,
+   "stoploss",
+   "bull"
+  ],
+  [
+   "SOL/IDR",
+   "2026-10-13T00:00:00+00:00",
+   "2026-10-21T15:00:00+00:00",
+   0.02361579,
+   "roi",
+   "bull"
+  ],
+  [
+   "SOL/IDR",
+   "2026-10-22T09:00:00+00:00",
+   "2026-10-25T23:00:00+00:00",
+   -0.02374193,
+   "end",
+   "bull"
+  ]
+ ],
+ "comparators": {
+  "K-SwingEmaRsi": {
+   "trades": 124,
+   "trades_per_month": 20.624,
+   "win_rate": 0.3387096774193548,
+   "wilson_lower": 0.2613738631494022,
+   "mean": -0.005830618336684375,
+   "ci95": [
+    -0.00902892511534643,
+    -0.002580604225655078
+   ],
+   "median": -0.012898363940148039,
+   "profit_factor": 0.5030259705817433,
+   "payoff_ratio": 0.982098323516737,
+   "largest_loss": -0.036012311693314425,
+   "worst5_mean": -0.03601231169331427,
+   "max_drawdown": 0.10454847449839633,
+   "rolling30_min_win_rate": 0.23333333333333334,
+   "longest_days_without_entry": 9.2,
+   "days_without_entry_at_end": 5.3,
+   "exit_reasons": {
+    "exit_signal": 82,
+    "roi": 37,
+    "stoploss": 5
+   }
+  },
+  "K-buy-and-hold": {
+   "BTC/IDR": 0.0787473670335812,
+   "ETH/IDR": 0.04778112800257106,
+   "SOL/IDR": 0.22940966156090203
+  }
+ }
+}

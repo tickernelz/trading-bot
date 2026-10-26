@@ -8,9 +8,9 @@
   <img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-1c1f26">
 </p>
 
-An always-on spot crypto swing bot that runs on your own PC, with a PWA control panel for phone and desktop. A rule-based 1-hour swing strategy proposes entries. A **swarm** of voters (many models, one typed question, answers combined with the **median**) may only filter them. Loss limits and position sizing are enforced by **code**, not by prompts.
+An always-on spot crypto swing bot that runs on your own PC, with a PWA control panel for phone and desktop. A rule-based strategy on 1-hour candles, chosen in config, proposes entries. A **swarm** of voters (many models, one typed question, answers combined with the **median**) may only filter them. Loss limits and position sizing are enforced by **code**, not by prompts.
 
-> **Honest status.** This project has not been shown to make money. Everything runs in dry-run: no exchange account, no exchange keys, no real funds, and live mode is deliberately unable to start in this build. A 3-year backtest on Indodax data, after a 0.2% fee and 0.21% tax per side, gives a **negative** expectancy: out-of-sample -0.832% per trade (221 trades, 95% CI -1.098% to -0.561%). Details in [docs/stage2-backtest.md](docs/stage2-backtest.md). Not financial advice.
+> **Honest status.** This project has not been shown to make money. Everything runs in dry-run: no exchange account, no exchange keys, no real funds, and live mode is deliberately unable to start in this build. The default strategy wins often but loses money after costs: on Indodax data from 2022-07 to 2026-04, after the official taker fees and the 0.21% tax on sells, it won 77.1% of 519 trades with a **negative** expectancy of -0.599% per trade (95% CI -1.07% to -0.15%); on the untouched last six months it won 77.8% of 54 trades at -0.112% per trade (95% CI -1.47% to +1.11%). Strategies with a positive backtest expectancy win only 34% to 57% of trades and are unstable from period to period. Details in [docs/strategy-research.md](docs/strategy-research.md). Not financial advice.
 
 ## Screens
 
@@ -37,7 +37,7 @@ The visual direction is written down in [PRODUCT.md](PRODUCT.md) and [DESIGN.md]
 
 ```mermaid
 flowchart LR
-    S[1h swing strategy\nEMA 20/50 + RSI] --> C[Entry candidate]
+    S[1h rule strategy\nstrategy.name in config] --> C[Entry candidate]
     C --> R{Risk layer\ndeterministic code}
     R -- passes --> W[Voter swarm\nmedian + spread + quorum]
     W -- shadow: recorded only --> O[Dry-run order\nFreqtrade]
@@ -110,7 +110,8 @@ API keys come from environment variables (`api_key_env`) or are written directly
 ## Limits you should know about
 
 - Indodax is not officially supported by Freqtrade 2026.9. OHLCV data works, but the live order path has never been run. For that reason live mode cannot start in this build, and the stop loss runs on the bot side, so the PC must stay on.
-- The 0.21% tax per side comes from a secondary source and has not been checked against an official document.
+- Costs follow the official Indodax all-in fee table and PMK 50/2025: taker 0.20555% on a buy and 0.41555% on a sell, the 0.21% tax applying to sells only. Backtests assume taker fills and no slippage; +0.10% slippage per side lowers the default's expectancy by about 0.2 points per trade.
+- The default strategy (`RuleStrategy`, RSI 14 below 30 on 1h, 3% take-profit, 10% stop) gets its high win rate from a small target and a wide stop: each stop costs about 10.6% of the stake, as much as four to five wins of about 2.4%. Random entries with the same exits win as often. `SwingEmaRsi` can still be selected with `strategy.name`.
 - The swarm is built as a filter that gets measured, not as an assumed source of profit. Evidence that ensembles raise trading profit has not been found; what exists is for event forecasting, not prices ([docs/research-swarm-pwa.md](docs/research-swarm-pwa.md)).
 - During testing every voter used the same model, so their errors are correlated. The swarm's value can only be measured with voters from several vendors in a forward test.
 - A 7-day non-stop engine test on the complete application is in progress; there are no results yet.
