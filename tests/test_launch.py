@@ -190,6 +190,8 @@ def test_launch_records_whether_exchange_keys_exist_without_their_values(
     recorded = json.loads((userdir / "capabilities.json").read_text())
     assert recorded["exchange_key_configured"] is expected
     assert "k-1" not in json.dumps(recorded) and "s-1" not in json.dumps(recorded)
+
+
 @pytest.mark.parametrize("command", ["webserver", "backtesting"])
 def test_only_trade_renders_the_shadow_service(monkeypatch, tmp_path, exec_calls, command):
     for name, value in SECRETS.items():

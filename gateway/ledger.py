@@ -1,4 +1,4 @@
-"""Gateway-owned SQLite state: sessions, audit log, fill latency samples, config hashes."""
+"""Gateway-owned SQLite state: sessions, append-only audit log, idempotent control results, fills, config hashes."""
 
 from __future__ import annotations
 
@@ -45,7 +45,24 @@ CREATE TABLE IF NOT EXISTS config_hashes (
     sha256 TEXT NOT NULL,
     snapshot TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS idempotency (
+    key TEXT PRIMARY KEY,
+    request_hash TEXT NOT NULL,
+    status INTEGER NOT NULL,
+    body TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS entry_stops (
+    bot TEXT PRIMARY KEY,
+    stopped INTEGER NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE TRIGGER IF NOT EXISTS audit_no_update BEFORE UPDATE ON audit
+BEGIN SELECT RAISE(ABORT, 'audit is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON audit
+BEGIN SELECT RAISE(ABORT, 'audit is append-only'); END;
 """
+IDEMPOTENCY_KEEP = timedelta(days=1)
 
 
 ANALYST_USAGE_ACTIONS = {"analyst.report": "reports", "analyst.ask": "asks"}
@@ -130,8 +147,41 @@ class Ledger:
             )
         return {"id": cursor.lastrowid, **row}
 
-    def audit_rows(self, limit: int) -> list[dict[str, Any]]:
-        rows = self._db.execute("SELECT * FROM audit ORDER BY id DESC LIMIT ?", (limit,))
+    def audit_rows(
+        self,
+        limit: int,
+        *,
+        before_id: int | None = None,
+        action: str | None = None,
+        result: str | None = None,
+        actor: str | None = None,
+        target: str | None = None,
+        since: str | None = None,
+        until: str | None = None,
+    ) -> list[dict[str, Any]]:
+        clauses: list[str] = []
+        args: list[Any] = []
+        if before_id is not None:
+            clauses.append("id < ?")
+            args.append(before_id)
+        if action is not None:
+            clauses.append("substr(action, 1, ?) = ?")
+            args += [len(action), action]
+        for column, value in (("result", result), ("actor", actor)):
+            if value is not None:
+                clauses.append(f"{column} = ?")
+                args.append(value)
+        if target is not None:
+            clauses.append("EXISTS (SELECT 1 FROM json_each(audit.targets) WHERE json_each.value = ?)")
+            args.append(target)
+        if since is not None:
+            clauses.append("ts >= ?")
+            args.append(since)
+        if until is not None:
+            clauses.append("ts < ?")
+            args.append(until)
+        where = f"WHERE {' AND '.join(clauses)} " if clauses else ""
+        rows = self._db.execute(f"SELECT * FROM audit {where}ORDER BY id DESC LIMIT ?", (*args, limit))
         return [
             {
                 **dict(row),
@@ -159,6 +209,31 @@ class Ledger:
             if tokens.get("cost") is not None:
                 bucket["cost"] = (bucket["cost"] or 0.0) + tokens["cost"]
         return usage
+
+    def stored_result(self, key: str) -> tuple[str, int, Any] | None:
+        row = self._db.execute("SELECT request_hash, status, body FROM idempotency WHERE key = ?", (key,)).fetchone()
+        return (row["request_hash"], row["status"], json.loads(row["body"])) if row else None
+
+    def store_result(self, key: str, request_hash: str, status: int, body: Any) -> None:
+        now = datetime.now(UTC)
+        with self._db:
+            self._db.execute("DELETE FROM idempotency WHERE created_at < ?", (iso(now - IDEMPOTENCY_KEEP),))
+            self._db.execute(
+                "INSERT INTO idempotency VALUES (?, ?, ?, ?, ?)",
+                (key, request_hash, status, json.dumps(body), iso(now)),
+            )
+
+    def entries_stopped(self, bot: str) -> bool:
+        row = self._db.execute("SELECT stopped FROM entry_stops WHERE bot = ?", (bot,)).fetchone()
+        return bool(row and row["stopped"])
+
+    def set_entries_stopped(self, bot: str, stopped: bool) -> None:
+        with self._db:
+            self._db.execute(
+                "INSERT INTO entry_stops VALUES (?, ?, ?) ON CONFLICT(bot) DO UPDATE SET stopped = excluded.stopped,"
+                " updated_at = excluded.updated_at",
+                (bot, int(stopped), iso(datetime.now(UTC))),
+            )
 
     def config_hash(self, bot: str) -> tuple[str, dict[str, Any]] | None:
         row = self._db.execute("SELECT sha256, snapshot FROM config_hashes WHERE bot = ?", (bot,)).fetchone()

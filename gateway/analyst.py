@@ -11,7 +11,7 @@ from typing import Annotated, Any
 from zoneinfo import ZoneInfo
 
 import httpx
-from fastapi import Depends, FastAPI, Request
+from fastapi import Body, Depends, FastAPI, Request
 from fastapi import Path as PathParam
 from pydantic import BaseModel, ConfigDict, Field
 from tb_swarm.analyst import ChatTurn
@@ -52,7 +52,6 @@ class ReportBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     day: Annotated[str, Field(pattern=r"^\d{4}-\d{2}-\d{2}$")] | None = None
-    bot: str | None = None
 
 
 class AskBody(BaseModel):
@@ -153,29 +152,38 @@ class AnalystLink:
             raise ApiError(429, "rate_limited", "too many analyst questions", retry)
         self.asked.append(now)
 
-    async def generate(self, bot: BotRef, day: str, actor: str, ip: str | None = None) -> dict[str, Any]:
+    async def generate(
+        self, bot: BotRef, day: str, actor: str, ip: str | None = None, audit: bool = True
+    ) -> dict[str, Any]:
         analyst = self.require(bot)
         await self.refresh(bot, analyst)
         try:
             report = await self.call(bot, analyst, "POST", "/reports", {"day": day})
         except ApiError as exc:
+            if audit:
+                self.gateway.ledger.audit(
+                    actor=actor,
+                    ip=ip,
+                    action="analyst.report",
+                    targets=[bot.id],
+                    result="error",
+                    detail={"day": day, "code": exc.code},
+                )
+            raise
+        if audit:
             self.gateway.ledger.audit(
                 actor=actor,
                 ip=ip,
                 action="analyst.report",
                 targets=[bot.id],
-                result="error",
-                detail={"day": day, "code": exc.code},
+                result="ok",
+                detail={
+                    "day": day,
+                    "model": report["model"],
+                    "tokens": report["usage"],
+                    "latency_s": report["latency_s"],
+                },
             )
-            raise
-        self.gateway.ledger.audit(
-            actor=actor,
-            ip=ip,
-            action="analyst.report",
-            targets=[bot.id],
-            result="ok",
-            detail={"day": day, "model": report["model"], "tokens": report["usage"], "latency_s": report["latency_s"]},
-        )
         return report
 
     async def tick(self) -> None:
@@ -208,7 +216,7 @@ class AnalystLink:
         await self.http.aclose()
 
 
-def install_analyst(app: FastAPI, gateway: Any, reader: Any, control: Any) -> None:
+def install_analyst(app: FastAPI, gateway: Any, reader: Any) -> None:
     link: AnalystLink = gateway.analyst
 
     @app.get("/gw/v1/analyst/reports", dependencies=[Depends(reader)])
@@ -225,22 +233,41 @@ def install_analyst(app: FastAPI, gateway: Any, reader: Any, control: Any) -> No
         ref = gateway.bot(bot)
         return await link.call(ref, link.require(ref), "GET", f"/reports/{day}")
 
-    @app.post("/gw/v1/analyst/reports", dependencies=[Depends(control)])
-    async def generate(body: ReportBody, request: Request) -> dict[str, Any]:
-        ref = gateway.bot(body.bot)
-        link.require(ref)
-        today = link.today(ref)
-        day = body.day or today
-        oldest = (date.fromisoformat(today) - timedelta(days=REPORT_DAYS_BACK)).isoformat()
-        try:
-            in_range = oldest <= day <= today and date.fromisoformat(day) is not None
-        except ValueError:
-            in_range = False
-        if not in_range:
-            raise ApiError(400, "invalid_request", f"day must be a real date from {oldest} to {today}")
-        link.take_ask_slot()
-        ip = request.client.host if request.client else None
-        return await link.generate(ref, day, "owner", ip)
+    @app.post("/gw/v1/analyst/reports")
+    async def generate(
+        request: Request, body: ReportBody | None = Body(None), bot: str | None = None, token: str = Depends(reader)
+    ) -> Any:
+        from gateway.app import Action
+
+        ref = gateway.bot(bot)
+        requested = body.day if body else None
+
+        async def precheck() -> None:
+            link.require(ref)
+            today = link.today(ref)
+            oldest = (date.fromisoformat(today) - timedelta(days=REPORT_DAYS_BACK)).isoformat()
+            day = requested or today
+            try:
+                in_range = oldest <= day <= today and date.fromisoformat(day) is not None
+            except ValueError:
+                in_range = False
+            if not in_range:
+                raise ApiError(400, "invalid_request", f"day must be a real date from {oldest} to {today}")
+
+        async def run() -> dict[str, Any]:
+            link.take_ask_slot()
+            return await link.generate(ref, requested or link.today(ref), "owner", audit=False)
+
+        action = Action(
+            name="analyst.report",
+            bot=ref,
+            params={"day": requested},
+            targets=[],
+            summary=f"Write the daily report for {ref.label}",
+            precheck=precheck,
+            run=run,
+        )
+        return await gateway.execute(request, token, action, None)
 
     @app.post("/gw/v1/analyst/ask", dependencies=[Depends(reader)])
     async def ask(body: AskBody, request: Request) -> dict[str, Any]:

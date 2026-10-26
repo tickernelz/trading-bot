@@ -1,14 +1,12 @@
-"""Fail-closed, two-step switch between dry_run and live, persisted next to the bot's data."""
+"""Fail-closed state of the dry_run and live mode, persisted next to the bot's data."""
 
 from __future__ import annotations
 
 import json
 import os
-import secrets
 import tempfile
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
@@ -18,7 +16,6 @@ LIVE_ENGINE_PROVEN = False
 MODE_FILE = "mode.json"
 CAPABILITIES_FILE = "capabilities.json"
 DEFAULT_KEY_ENVS = ("INDODAX_API_KEY", "INDODAX_API_SECRET")
-CONFIRMATION_TTL_S = 60
 MODES = ("dry_run", "live")
 
 BLOCKER_MESSAGES = {
@@ -35,22 +32,6 @@ class ModeRefused(Exception):
         self.code = code
         self.message = message
         self.blockers = blockers
-
-
-@dataclass(frozen=True)
-class Confirmation:
-    id: str
-    action: str
-    targets: tuple[str, ...]
-    summary: str
-    expires_at: datetime
-
-
-@dataclass(frozen=True)
-class _Pending:
-    target: str
-    actor: str
-    expires_at: datetime
 
 
 def _stamp(moment: datetime) -> str:
@@ -112,16 +93,13 @@ class ModeController:
         exchange_key_configured: Callable[[], bool],
         key_envs: tuple[str, ...] = DEFAULT_KEY_ENVS,
         live_engine_proven: bool = LIVE_ENGINE_PROVEN,
-        ttl_s: float = CONFIRMATION_TTL_S,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         self._path = Path(state_path)
         self._key_probe = exchange_key_configured
         self._key_envs = key_envs
         self._proven = live_engine_proven
-        self._ttl = timedelta(seconds=ttl_s)
         self._clock = clock
-        self._pending: dict[str, _Pending] = {}
 
     def blockers(self) -> tuple[dict[str, str], ...]:
         found = []
@@ -145,43 +123,20 @@ class ModeController:
             out["state_problem"] = problem
         return out
 
-    def request(self, target: str, actor: str) -> Confirmation | dict[str, Any]:
-        """Ask for a switch; live returns a Confirmation to repeat within the TTL, dry_run applies at once."""
-        if target not in MODES:
+    def ensure_live_allowed(self) -> None:
+        blockers = self.blockers()
+        if blockers:
+            raise ModeRefused("live_blocked", blockers[0]["message"], blockers)
+
+    def apply(self, mode: str, actor: str) -> dict[str, Any]:
+        """Record the mode; live is re-checked here so no caller can reach it without every precondition."""
+        if mode not in MODES:
             raise ModeRefused("invalid_request", f"mode must be one of {', '.join(MODES)}")
+        if mode == "live":
+            self.ensure_live_allowed()
         current, _ = read_mode(self._path)
-        if target == current:
+        if mode == current:
             return self.status()
-        if target == "dry_run":
-            return self._apply("dry_run", actor)
-        blockers = self.blockers()
-        if blockers:
-            raise ModeRefused("live_blocked", blockers[0]["message"], blockers)
-        now = self._clock()
-        self._pending = {key: item for key, item in self._pending.items() if item.expires_at > now}
-        confirmation = Confirmation(
-            id=f"cf_{secrets.token_hex(8)}",
-            action="mode.live",
-            targets=("live",),
-            summary=f"Switch {current} to live: orders will use real money",
-            expires_at=now + self._ttl,
-        )
-        self._pending[confirmation.id] = _Pending("live", actor, confirmation.expires_at)
-        return confirmation
-
-    def confirm(self, confirmation_id: str, actor: str) -> dict[str, Any]:
-        pending = self._pending.get(confirmation_id)
-        if pending is None or pending.actor != actor:
-            raise ModeRefused("confirmation_invalid", "unknown confirmation")
-        del self._pending[confirmation_id]
-        if pending.expires_at <= self._clock():
-            raise ModeRefused("confirmation_expired", "confirmation expired; request the switch again")
-        blockers = self.blockers()
-        if blockers:
-            raise ModeRefused("live_blocked", blockers[0]["message"], blockers)
-        return self._apply(pending.target, actor)
-
-    def _apply(self, mode: str, actor: str) -> dict[str, Any]:
         record = {"mode": mode, "changed_at": _stamp(self._clock()), "actor": actor}
         _write_json(self._path, record)
         return {**self.status(), "changed_at": record["changed_at"]}
