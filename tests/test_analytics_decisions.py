@@ -46,7 +46,7 @@ def recorded(
 
 
 def split_vote(timeouts: int = 0):
-    voters = [record("v1"), record("v2"), record("v3"), record("v4", "lewati"), record("v5", "lewati")]
+    voters = [record("v1"), record("v2"), record("v3"), record("v4", "skip"), record("v5", "skip")]
     for index in range(timeouts):
         voters[-1 - index] = record(voters[-1 - index].voter_id, None, status="timeout")
     return voters
@@ -69,16 +69,16 @@ class TestReplay:
 
     def test_a_lower_quorum_lets_a_decision_that_missed_quorum_through(self):
         decision = recorded("q", split_vote(timeouts=2))
-        assert decision.verdict == "lewati" and decision.reason == "quorum_not_met"
+        assert decision.verdict == "skip" and decision.reason == "quorum_not_met"
         result = whatif_replay((decision,), WEIGHTS, 3, None)
-        assert result["transitions"] == {"lewati->izinkan": 1}
+        assert result["transitions"] == {"skip->allow": 1}
         assert result["changed"][0]["replayed"]["status"] == "ok"
 
     def test_a_tighter_spread_limit_turns_a_split_vote_into_a_skip(self):
         decision = recorded("s", split_vote())
-        assert decision.verdict == "izinkan"
+        assert decision.verdict == "allow"
         result = whatif_replay((decision,), WEIGHTS, 5, 0.1)
-        assert result["transitions"] == {"izinkan->lewati": 1}
+        assert result["transitions"] == {"allow->skip": 1}
         assert result["changed"][0]["replayed"]["reason"].startswith("spread_exceeded")
 
     def test_a_unanimous_vote_passes_the_same_tight_spread_limit(self):
@@ -88,7 +88,7 @@ class TestReplay:
         decision = recorded("e", split_vote(), max_spread=0.1)
         assert decision.reason and decision.reason.startswith("spread_exceeded")
         outcome = replay_decision(decision, WEIGHTS, 3, 0.1, frozenset({"v4", "v5"}))
-        assert outcome.proceed and verdict_of(outcome) == "izinkan"
+        assert outcome.proceed and verdict_of(outcome) == "allow"
 
     def test_decisions_without_voter_records_are_not_replayed(self):
         interrupted = recorded("i", [])
@@ -105,7 +105,7 @@ class TestReplay:
         result = whatif_replay(decisions, WEIGHTS, 5, 0.1)
         assert result["trade_groups"]["take->take"] == {"trades": 1, "profit_abs_idr": 500.0}
         assert result["trade_groups"]["take->skip"] == {"trades": 1, "profit_abs_idr": -300.0}
-        assert "bukan kesimpulan" in result["note"]
+        assert "not a conclusion" in result["note"]
 
     def test_a_voter_missing_from_the_current_config_is_reported_and_weighted_one(self):
         decision = recorded("w", unanimous())
@@ -169,7 +169,7 @@ class TestSource:
 def scored(profits_and_takes, voter="x", closed=True):
     decisions = []
     for index, (profit, take) in enumerate(profits_and_takes):
-        choice = "izinkan" if take >= 0.5 else "lewati"
+        choice = "allow" if take >= 0.5 else "skip"
         decisions.append(
             RecordedDecision(
                 decision_id=f"{voter}{index}",
@@ -410,8 +410,8 @@ class TestApplyModes:
         rows, outcomes = [], {}
         for index in range(40):
             profit = 100.0 if index % 2 == 0 else -100.0
-            voters = [record(f"v{n}", "izinkan", take=0.9 if profit > 0 else 0.1) for n in range(1, 8)]
-            voters[0] = record("v1", "lewati" if profit > 0 else "izinkan", take=0.1 if profit > 0 else 0.9)
+            voters = [record(f"v{n}", "allow", take=0.9 if profit > 0 else 0.1) for n in range(1, 8)]
+            voters[0] = record("v1", "skip" if profit > 0 else "allow", take=0.1 if profit > 0 else 0.9)
             rows.append({"decision_id": f"x{index:02d}", "voters": voters})
             outcomes[f"x{index:02d}"] = (profit, False)
         write_decisions(tmp_path / "d.sqlite", rows)

@@ -21,7 +21,7 @@ DECISION = {
     "decision_id": "dec_1",
     "ts": "2026-10-25T17:02:05Z",
     "pair": "BTC/IDR",
-    "verdict": "lewati",
+    "verdict": "skip",
     "request": {"state": "private market state"},
     "voters": [{"voter_id": "v1", "provider": "p", "status": "timeout", "error_text": "Bearer abcdef0123456789"}],
 }
@@ -72,7 +72,7 @@ def test_snapshot_is_what_the_analyst_tools_read(tmp_path):
             + "]"
         )
     ] == [8]
-    assert json.loads(tools["get_voter_log"].invoke({"decision_id": "dec_1"}))["verdict"] == "lewati"
+    assert json.loads(tools["get_voter_log"].invoke({"decision_id": "dec_1"}))["verdict"] == "skip"
     assert json.loads(tools["get_metrics"].invoke({"name": "win_rate"})) == {"win_rate": 0.4}
     assert "Bearer" not in "".join(p.read_text() for p in tmp_path.iterdir())
 
@@ -97,7 +97,7 @@ def test_swarm_by_day_counts_per_local_day_and_lists_the_skips():
             "reason": "quorum_not_met",
             "answered": 2,
             "required": 5,
-            "verdict": "lewati",
+            "verdict": "skip",
             "voters": [{"voter_id": "v1", "status": "timeout"}, {"voter_id": "v2", "status": "ok"}],
         },
         {
@@ -105,7 +105,7 @@ def test_swarm_by_day_counts_per_local_day_and_lists_the_skips():
             "ts": "2026-10-25T16:30:00Z",
             "pair": "BTC/IDR",
             "status": "ok",
-            "verdict": "izinkan",
+            "verdict": "allow",
             "voters": [{"voter_id": "v1", "status": "ok"}],
         },
         {
@@ -113,7 +113,7 @@ def test_swarm_by_day_counts_per_local_day_and_lists_the_skips():
             "ts": "2026-10-26T03:00:00Z",
             "pair": "ETH/IDR",
             "status": "ok",
-            "verdict": "izinkan",
+            "verdict": "allow",
             "voters": [],
         },
     ]
@@ -123,10 +123,10 @@ def test_swarm_by_day_counts_per_local_day_and_lists_the_skips():
     assert (
         mon["decisions"] == 2
         and mon["by_status"] == {"skip": 1, "ok": 1}
-        and mon["by_verdict"] == {"lewati": 1, "izinkan": 1}
+        and mon["by_verdict"] == {"skip": 1, "allow": 1}
     )
     assert mon["voters"] == {"v1": {"calls": 1, "not_ok": 1}, "v2": {"calls": 1, "not_ok": 0}}
-    assert mon["by_pair"]["BTC/IDR"] == {"decisions": 1, "verdicts": {"lewati": 1}}
+    assert mon["by_pair"]["BTC/IDR"] == {"decisions": 1, "verdicts": {"skip": 1}}
     assert mon["skips"] == [
         {
             "decision_id": "a",
@@ -148,7 +148,7 @@ def test_swarm_by_day_keeps_only_recent_days_and_caps_the_skip_list():
             "ts": f"2026-10-{n:02d}T05:00:00Z",
             "pair": "BTC/IDR",
             "status": "skip",
-            "verdict": "lewati",
+            "verdict": "skip",
         }
         for n in range(1, 21)
     ]
@@ -162,4 +162,4 @@ def test_swarm_by_day_keeps_only_recent_days_and_caps_the_skip_list():
 def test_snapshot_metrics_carry_the_daily_totals_next_to_the_given_metrics(tmp_path):
     write_snapshot(tmp_path, metrics={"win_rate": 0.4}, trades=[], decisions=[DECISION])
     saved = json.loads((tmp_path / "metrics.json").read_text())
-    assert saved["win_rate"] == 0.4 and saved["swarm_by_day"]["2026-10-26"]["by_verdict"] == {"lewati": 1}
+    assert saved["win_rate"] == 0.4 and saved["swarm_by_day"]["2026-10-26"]["by_verdict"] == {"skip": 1}

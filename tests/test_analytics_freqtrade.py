@@ -98,7 +98,7 @@ class TestViews:
             {"ts": 2, "kind": "enter", "rate": 11, "tag": "ema_cross_up"},
             {"ts": 3, "kind": "exit", "rate": 9, "tag": "exit_signal"},
         ]
-        assert "bukan order" in view["note"]
+        assert "not orders" in view["note"]
 
     def test_signals_view_names_the_columns_a_payload_lacks(self):
         payload = history([])

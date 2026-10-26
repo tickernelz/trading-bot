@@ -89,8 +89,8 @@ def replay(tmp_path):
         bots = []
         fakes = {}
         for name, label, strategy in (
-            ("bot-a", "Bot A", "aturan saja"),
-            ("bot-b", "Bot B", "aturan + swarm bayangan"),
+            ("bot-a", "Bot A", "rules only"),
+            ("bot-b", "Bot B", "rules + shadow swarm"),
         ):
             bot = recorded(f"{name}.json")
             config = base / f"{name}.yaml"
@@ -133,13 +133,13 @@ def test_decision_detail_shows_every_voter_the_quorum_and_what_followed(replay):
     client, headers = replay()
     decision = client.get(f"/gw/v1/decisions/{BTC_FIRST}", headers=headers).json()
     assert [(voter["voter_id"], voter["answers"]["verdict"]["choice"]) for voter in decision["voters"]] == [
-        (f"v{index}", "lewati") for index in range(1, 8)
+        (f"v{index}", "skip") for index in range(1, 8)
     ]
     verdict = decision["aggregate"]["questions"]["verdict"]
-    assert verdict["median_probabilities"] == {"izinkan": 0.0, "kecilkan": 0.0, "lewati": 1.0}
+    assert verdict["median_probabilities"] == {"allow": 0.0, "reduce": 0.0, "skip": 1.0}
     assert verdict["spread"]["iqr"] == 0.0
     assert decision["quorum"] == {"required": 5, "answered": 7, "met": True}
-    assert decision["would_take"] == {"verdict": "lewati", "action": "tidak masuk", "applied": False}
+    assert decision["would_take"] == {"verdict": "skip", "action": "stay out", "applied": False}
     outcome = decision["outcome"]
     assert {key: outcome[key] for key in ("state", "basis", "trade_id", "is_open", "profit_abs", "profit_pct")} == {
         "state": "settled",
@@ -170,7 +170,7 @@ def test_decision_detail_shows_every_voter_the_quorum_and_what_followed(replay):
 def test_skipped_entry_without_a_trade_is_judged_by_price_after_costs(replay):
     client, headers = replay(frozenset({ETH}))
     decision = client.get(f"/gw/v1/decisions/{ETH}?horizons=1", headers=headers).json()
-    assert decision["aggregate"]["questions"]["verdict"]["votes"] == {"izinkan": 0, "kecilkan": 1, "lewati": 6}
+    assert decision["aggregate"]["questions"]["verdict"]["votes"] == {"allow": 0, "reduce": 1, "skip": 6}
     outcome = decision["outcome"]
     assert {key: outcome[key] for key in ("state", "basis", "horizon_h", "price_after", "trade_id")} == {
         "state": "settled",
@@ -196,7 +196,7 @@ def test_failed_quorum_skips_and_an_open_trade_is_not_judged_yet(replay):
     assert (decision["status"], decision["reason"]) == ("skip", "quorum_not_met")
     assert decision["quorum"] == {"required": 5, "answered": 3, "met": False}
     assert [voter["status"] for voter in decision["voters"]].count("failed") == 4
-    assert decision["would_take"]["verdict"] == "lewati"
+    assert decision["would_take"]["verdict"] == "skip"
     outcome = decision["outcome"]
     assert (outcome["state"], outcome["basis"], outcome["is_open"], outcome["effect"]) == (
         "pending",
@@ -272,12 +272,12 @@ def test_history_exit_reasons_and_entry_tags_come_from_the_recorded_bot(replay):
     assert trade_ids("limit=10") == [4, 3, 2, 1]
     performance = client.get("/gw/v1/performance?bot=B", headers=headers).json()
     assert {row["mix_tag"]: (row["count"], row["profit_pct"]) for row in performance["by_mix_tag"]} == {
-        "uji_rekam force_exit": (2, -0.95),
+        "recorded_test force_exit": (2, -0.95),
         "force_entry force_exit": (1, -0.69),
     }
     assert {row["enter_tag"]: row["profit_abs"] for row in performance["by_enter_tag"]} == {
         "force_entry": -2049.413504,
-        "uji_rekam": -2807.96692202,
+        "recorded_test": -2807.96692202,
     }
     stats = client.get("/gw/v1/stats?bot=B", headers=headers).json()
     assert stats["exit_reasons"] == {"force_exit": {"wins": 0, "losses": 3, "draws": 0}}

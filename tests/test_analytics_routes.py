@@ -71,7 +71,7 @@ class FakeContext:
 
 
 def split_vote():
-    return [record("v1"), record("v2"), record("v3"), record("v4", "lewati"), record("v5", "lewati")]
+    return [record("v1"), record("v2"), record("v3"), record("v4", "skip"), record("v5", "skip")]
 
 
 @pytest.fixture
@@ -87,7 +87,7 @@ def env(tmp_path, example_raw, upstream_calls):
     config.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
     write_decisions(
         tmp_path / "decisions.sqlite",
-        [{"decision_id": "d1", "voters": split_vote(), "verdict": "izinkan"}],
+        [{"decision_id": "d1", "voters": split_vote(), "verdict": "allow"}],
     )
     write_trades(tmp_path / "trades.sqlite", {"d1": (-200.0, False)})
 
@@ -163,7 +163,7 @@ class TestReplayRoute:
         client, *_ = env
         kept = client.post(f"{PREFIX}/replay", json={}).json()
         assert kept["params"]["max_spread"] == 0.5
-        assert kept["transitions"] == {"izinkan->lewati": 1}
+        assert kept["transitions"] == {"allow->skip": 1}
         removed = client.post(f"{PREFIX}/replay", json={"max_spread": None}).json()
         assert removed["params"]["max_spread"] is None
         assert removed["changed_total"] == 0
@@ -303,8 +303,8 @@ class TestScoreboardRoutes:
         outcomes = {}
         for index in range(40):
             profit = 100.0 if index % 2 == 0 else -100.0
-            voters = [record(f"v{n}", "izinkan", take=0.9 if profit > 0 else 0.1) for n in range(1, 6)]
-            voters[0] = record("v1", "lewati" if profit > 0 else "izinkan", take=0.1 if profit > 0 else 0.9)
+            voters = [record(f"v{n}", "allow", take=0.9 if profit > 0 else 0.1) for n in range(1, 6)]
+            voters[0] = record("v1", "skip" if profit > 0 else "allow", take=0.1 if profit > 0 else 0.9)
             rows.append({"decision_id": f"x{index:02d}", "voters": voters})
             outcomes[f"x{index:02d}"] = (profit, False)
         (tmp_path / "decisions.sqlite").unlink()
@@ -330,8 +330,8 @@ class TestControlScope:
         outcomes = {}
         for index in range(40):
             profit = 100.0 if index % 2 == 0 else -100.0
-            voters = [record(f"v{n}", "izinkan", take=0.9 if profit > 0 else 0.1) for n in range(1, 6)]
-            voters[0] = record("v1", "lewati" if profit > 0 else "izinkan", take=0.1 if profit > 0 else 0.9)
+            voters = [record(f"v{n}", "allow", take=0.9 if profit > 0 else 0.1) for n in range(1, 6)]
+            voters[0] = record("v1", "skip" if profit > 0 else "allow", take=0.1 if profit > 0 else 0.9)
             rows.append({"decision_id": f"x{index:02d}", "voters": voters})
             outcomes[f"x{index:02d}"] = (profit, False)
         (tmp_path / "decisions.sqlite").unlink()

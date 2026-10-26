@@ -26,7 +26,7 @@ TRADES_SCHEMA = """
 CREATE TABLE trades (id INTEGER PRIMARY KEY, close_profit_abs REAL, is_open INTEGER NOT NULL);
 CREATE TABLE trade_custom_data (id INTEGER PRIMARY KEY, ft_trade_id INTEGER, cd_key TEXT, cd_value TEXT);
 """
-OPTIONS = {"izinkan": "take", "kecilkan": "half", "lewati": "skip"}
+OPTIONS = {"allow": "take", "reduce": "half", "skip": "skip"}
 NOW = datetime(2026, 10, 26, 6, 0, tzinfo=UTC)
 
 
@@ -37,11 +37,11 @@ def request() -> DecisionRequest:
 def answer(choice: str, take: float | None = None) -> ChoiceAnswer:
     if take is None:
         return ChoiceAnswer(type="choice", choice=choice)
-    probabilities = {"izinkan": take * 0.8, "kecilkan": take * 0.2, "lewati": 1 - take}
+    probabilities = {"allow": take * 0.8, "reduce": take * 0.2, "skip": 1 - take}
     return ChoiceAnswer(type="choice", choice=choice, probabilities=probabilities)
 
 
-def record(voter_id: str, choice: str | None = "izinkan", take: float | None = None, status: str = "ok") -> VoterRecord:
+def record(voter_id: str, choice: str | None = "allow", take: float | None = None, status: str = "ok") -> VoterRecord:
     answers = {"verdict": answer(choice, take)} if status == "ok" and choice else None
     return VoterRecord(voter_id=voter_id, status=status, latency_s=0.5, answers=answers)
 
@@ -122,7 +122,7 @@ def write_decisions(path: Path, rows: list[dict[str, Any]]) -> None:
                 row.get("reason"),
                 row.get("required", 5),
                 sum(1 for voter in voters if voter.status == "ok"),
-                row.get("verdict", "izinkan"),
+                row.get("verdict", "allow"),
                 row.get("iqr_limit"),
                 row.get("request") or json.dumps(request().model_dump(mode="json")),
                 json.dumps([voter.model_dump(mode="json") for voter in voters]),
