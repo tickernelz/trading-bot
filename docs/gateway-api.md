@@ -502,7 +502,7 @@ Klien WebSocket Freqtrade (gateway) mengirim `{"type": "subscribe", "data": ["en
 
 - Indodax bukan exchange yang didukung resmi Freqtrade 2026.9; Freqtrade memakai kelas exchange generik dan mencetak peringatan saat start. Kontrak ini tetap sah, tetapi tidak ada subclass khusus Indodax.
 - Indodax tidak menyediakan `fetchMyTrades` dan `watchOHLCV` (dilaporkan Freqtrade sebagai `missing opt`); riwayat trade diambil dari database bot, bukan dari exchange.
-- Riwayat OHLCV 1h Indodax hanya ±649 candle terakhir (≈27 hari) walau diminta lebih; permintaan 1d mengembalikan 1000 candle dalam satu panggilan (batas satu permintaan, bukan bukti batas exchange). Grafik jangka panjang di PWA harus memakai 1d, bukan 1h.
+- Satu permintaan OHLCV Indodax dengan rentang panjang hanya mengembalikan candle terbaru (1h: ±649 candle, ≈27 hari; 1d: 1000 candle). Ini batas satu permintaan, bukan batas riwayat: per jendela 500 candle, 1h tersedia minimal sejak 2023-10-01 (tahap 2e, docs/stage2-backtest.md). Kontrak grafik tidak berubah: grafik jangka panjang di PWA tetap memakai 1d, karena gateway belum punya endpoint riwayat berjendela.
 - Tidak ada endpoint untuk mengubah nilai strategi langsung (stoploss, ROI) selain lewat berkas. Perubahan dilakukan lewat `PATCH /gw/v1/settings` lalu `POST /gw/v1/control/reload-config`: `/reload_config` membuang instance bot lama, memuat ulang config dan strategi, lalu membuat instance baru (`worker._reconfigure`), jadi perubahan ikut berlaku tanpa restart kontainer.
 - Tahap 0a tidak membuka `/forceenter` ke PWA secara default: `api.force_entry` tetap `false` kecuali dinyalakan untuk uji.
 
