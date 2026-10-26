@@ -266,6 +266,12 @@ def install_analyst(app: FastAPI, gateway: Any, reader: Any) -> None:
             summary=f"Write the daily report for {ref.label}",
             precheck=precheck,
             run=run,
+            outcome=lambda report: {
+                "day": report["day"],
+                "model": report["model"],
+                "tokens": report["usage"],
+                "latency_s": report["latency_s"],
+            },
         )
         return await gateway.execute(request, token, action, None)
 

@@ -181,7 +181,7 @@ API key boleh lewat variabel lingkungan (salin .env.example ke .env) atau langsu
 
 ## Tahap 3a: agen analis dan kontrol mode live
 
-Satu proses baru, `analyst-b` (port 8092, loopback), dan dua kelompok endpoint gateway; kontrak di `docs/gateway-api.md\` bagian 16, angka dan batas bukti di `docs/stage3a-findings.md`.
+Satu proses baru, `analyst-b` (port 8092, loopback), dan dua kelompok endpoint gateway; kontrak di `docs/gateway-api.md` bagian 16, angka dan batas bukti di `docs/stage3a-findings.md`.
 
 | Komponen | Isi |
 | --- | --- |

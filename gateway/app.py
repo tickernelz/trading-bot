@@ -124,6 +124,7 @@ class Action:
     entries_stopped: bool | None = None
     precheck: Callable[[], Awaitable[None]] | None = None
     run: Callable[[], Awaitable[Any]] | None = None
+    outcome: Callable[[Any], dict[str, Any]] | None = None
 
 
 def balance_summary(balance: dict[str, Any]) -> dict[str, Any]:
@@ -564,7 +565,7 @@ class Gateway:
         self.ledger.store_result(key, request_hash, 200, result)
         if action.entries_stopped is not None:
             self.ledger.set_entries_stopped(action.bot.id, action.entries_stopped)
-        self.audit_control(action, "ok", ip=ip, key=key)
+        self.audit_control(action, "ok", ip=ip, key=key, **(action.outcome(result) if action.outcome else {}))
         return result
 
     async def reapply_entry_stop(self, bot: BotRef) -> None:

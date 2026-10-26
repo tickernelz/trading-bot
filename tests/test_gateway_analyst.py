@@ -141,6 +141,8 @@ def test_report_is_built_from_a_fresh_snapshot_and_stored(rig):
     assert rig.get(f"/gw/v1/analyst/reports/{TODAY}").json()["summary"] == GOOD["summary"]
     [row] = [item for item in rig.gateway.ledger.audit_rows(10) if item["action"] == "analyst.report"]
     assert row["result"] == "ok" and row["detail"]["params"] == {"day": TODAY} and row["actor"] == "owner"
+    assert row["detail"]["model"] == report["model"] and row["detail"]["latency_s"] == report["latency_s"]
+    assert row["detail"]["tokens"] == report["usage"]
 
 
 def test_snapshot_carries_trades_decisions_and_risk_but_no_secrets(rig):
@@ -193,15 +195,12 @@ def test_costs_list_analyst_tokens_in_their_own_rows_per_window(rig):
     assert rig.post("/gw/v1/analyst/ask", {"question": "Why was BTC skipped?"}).status_code == 200
     ledger = rig.gateway.ledger
     ledger.audit(actor="owner", action="analyst.ask", targets=["B"], result="error", detail={"code": "provider_error"})
-    old = ledger.audit(
-        actor="scheduler",
-        action="analyst.report",
-        targets=["B"],
-        result="ok",
-        detail={"day": "2026-10-01", "tokens": {"input_tokens": 1000, "output_tokens": 100, "reasoning_tokens": 7}},
-    )
+    detail = {"day": "2026-10-01", "tokens": {"input_tokens": 1000, "output_tokens": 100, "reasoning_tokens": 7}}
     with ledger._db:
-        ledger._db.execute("UPDATE audit SET ts = '2020-01-01T00:00:00.000Z' WHERE id = ?", (old["id"],))
+        ledger._db.execute(
+            "INSERT INTO audit (ts, actor, action, targets, result, detail) VALUES (?, ?, ?, ?, ?, ?)",
+            ("2020-01-01T00:00:00.000Z", "scheduler", "analyst.report", '["B"]', "ok", json.dumps(detail)),
+        )
     costs = {window: rig.get(f"/gw/v1/costs?window={window}").json() for window in ("day", "7d", "total")}
     for window in ("day", "7d"):
         assert costs[window]["analyst"] == {"reports": row(1, 100, 10), "asks": row(1, 300, 30)}
