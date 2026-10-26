@@ -169,6 +169,43 @@ def test_ask_answers_through_the_read_tools_only(rig):
     assert row["result"] == "ok" and "Why was BTC" not in json.dumps(row)
 
 
+def counted(content, tokens_in, tokens_out):
+    usage = {"input_tokens": tokens_in, "output_tokens": tokens_out, "total_tokens": tokens_in + tokens_out}
+    return AIMessage(content=content, usage_metadata=usage)
+
+
+def row(calls, tokens_in, tokens_out, reasoning=0):
+    return {
+        "calls": calls,
+        "input_tokens": tokens_in,
+        "output_tokens": tokens_out,
+        "reasoning_tokens": reasoning,
+        "cost": None,
+    }
+
+
+def test_costs_list_analyst_tokens_in_their_own_rows_per_window(rig):
+    rig.model.script = [counted(json.dumps(GOOD), 100, 10), counted("Skipped.", 300, 30)]
+    assert rig.post("/gw/v1/analyst/reports", {"day": TODAY}).status_code == 200
+    assert rig.post("/gw/v1/analyst/ask", {"question": "Why was BTC skipped?"}).status_code == 200
+    ledger = rig.gateway.ledger
+    ledger.audit(actor="owner", action="analyst.ask", targets=["B"], result="error", detail={"code": "provider_error"})
+    old = ledger.audit(
+        actor="scheduler",
+        action="analyst.report",
+        targets=["B"],
+        result="ok",
+        detail={"day": "2026-10-01", "tokens": {"input_tokens": 1000, "output_tokens": 100, "reasoning_tokens": 7}},
+    )
+    with ledger._db:
+        ledger._db.execute("UPDATE audit SET ts = '2020-01-01T00:00:00.000Z' WHERE id = ?", (old["id"],))
+    costs = {window: rig.get(f"/gw/v1/costs?window={window}").json() for window in ("day", "7d", "total")}
+    for window in ("day", "7d"):
+        assert costs[window]["analyst"] == {"reports": row(1, 100, 10), "asks": row(1, 300, 30)}
+    assert costs["total"]["analyst"] == {"reports": row(2, 1100, 110, 7), "asks": row(1, 300, 30)}
+    assert costs["total"]["input_tokens"] == 0
+
+
 def test_ask_is_rate_limited_per_minute(rig):
     for _ in range(6):
         assert rig.post("/gw/v1/analyst/ask", {"question": "hi"}).status_code == 200

@@ -347,6 +347,7 @@ class Gateway:
             "cost": sum(costs) if costs else None,
             "cost_unit": "as reported by each provider; providers that report nothing leave cost null",
             "bots": per_bot,
+            "analyst": self.ledger.analyst_usage(since_text),
         }
 
     async def on_message(self, bot_id: str, message: dict[str, Any], received_ms: int) -> None:

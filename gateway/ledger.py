@@ -48,6 +48,9 @@ CREATE TABLE IF NOT EXISTS config_hashes (
 """
 
 
+ANALYST_USAGE_ACTIONS = {"analyst.report": "reports", "analyst.ask": "asks"}
+
+
 def iso(moment: datetime) -> str:
     return moment.astimezone(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
@@ -137,6 +140,25 @@ class Ledger:
             }
             for row in rows
         ]
+
+    def analyst_usage(self, since: str | None) -> dict[str, dict[str, Any]]:
+        usage = {
+            kind: {"calls": 0, "input_tokens": 0, "output_tokens": 0, "reasoning_tokens": 0, "cost": None}
+            for kind in ANALYST_USAGE_ACTIONS.values()
+        }
+        marks = ",".join("?" for _ in ANALYST_USAGE_ACTIONS)
+        where, params = f"action IN ({marks}) AND result = 'ok'", list(ANALYST_USAGE_ACTIONS)
+        if since:
+            where, params = f"{where} AND ts >= ?", [*params, since]
+        for row in self._db.execute(f"SELECT action, detail FROM audit WHERE {where}", params):
+            tokens = (json.loads(row["detail"] or "{}").get("tokens")) or {}
+            bucket = usage[ANALYST_USAGE_ACTIONS[row["action"]]]
+            bucket["calls"] += 1
+            for field in ("input_tokens", "output_tokens", "reasoning_tokens"):
+                bucket[field] += tokens.get(field) or 0
+            if tokens.get("cost") is not None:
+                bucket["cost"] = (bucket["cost"] or 0.0) + tokens["cost"]
+        return usage
 
     def config_hash(self, bot: str) -> tuple[str, dict[str, Any]] | None:
         row = self._db.execute("SELECT sha256, snapshot FROM config_hashes WHERE bot = ?", (bot,)).fetchone()
