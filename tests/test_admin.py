@@ -18,8 +18,7 @@ from engine.settings import Provider
 from gateway import configstore
 from gateway.admin import Admin
 from gateway.app import Gateway, create_app
-from gateway.control import Confirmations
-from gateway.locality import is_local_request
+from gateway.control import Confirmations, is_local
 from gateway.providers import ProviderTester, build_test_request
 from gateway.redact import REDACTED, SecretRegistry, install_log_redaction, key_last4, registry
 from gateway.settings import GatewaySettings
@@ -428,10 +427,10 @@ def test_login_scope_follows_where_the_sign_in_came_from(rig):
     relayed = rig.login(rig.local, **{"X-Forwarded-For": "203.0.113.9"})
     assert ledger.session_scope(relayed) == "read"
     foreign_host = rig.login(rig.local, Host="bot.example.test")
-    assert ledger.session_scope(foreign_host) == "control"
-    refused = rig.call(
-        "PATCH", "/gw/v1/settings", token=foreign_host, json={"changes": {}}, headers={"Host": "bot.example.test"}
-    )
+    assert ledger.session_scope(foreign_host) == "read"
+    foreign_origin = rig.login(rig.local, Origin="https://evil.example")
+    assert ledger.session_scope(foreign_origin) == "read"
+    refused = rig.call("POST", "/gw/v1/control/pause", headers={"Host": "bot.example.test"})
     assert refused.status_code == 403
     assert refused.json()["error"]["code"] == "forbidden_local_only"
 
@@ -672,7 +671,7 @@ def test_locality_rules(host, headers, client, expected):
         "client": (client, 1),
         "query_string": b"",
     }
-    assert is_local_request(Request(scope)) is expected
+    assert is_local(Request(scope)) is expected
 
 
 @pytest.mark.parametrize(
@@ -713,6 +712,10 @@ def test_connection_test_reports_latency_and_persists_the_last_result(rig):
     assert request.headers["authorization"] == "Bearer env-key-0123456789abcdef"
     row = next(item for item in rig.audit() if item["action"] == "provider.test")
     assert (row["actor"], row["targets"], row["result"]) == ("remote", ["A", "nutaraline"], "ok")
+    rig.admin.test_started.clear()
+    assert rig.call("POST", "/gw/v1/providers/nutaraline/test").status_code == 200
+    local_row = next(item for item in rig.audit() if item["action"] == "provider.test")
+    assert local_row["actor"] == "owner"
     view = rig.call("GET", "/gw/v1/providers", client=rig.remote, token=rig.reader).json()["providers"][0]
     assert view["last_test"]["ok"] is True
     assert view["last_test"]["tested_at"].endswith("Z")
@@ -1042,3 +1045,32 @@ def test_inline_keys_are_refused_in_a_git_work_tree_unless_the_file_is_ignored(t
         assert MARK in rig.config.read_text()
     finally:
         rig.close()
+
+
+def test_a_hostile_idempotency_key_never_reaches_the_audit_table(rig):
+    huge = "x" * 6000
+    denied = rig.call(
+        "PATCH",
+        "/gw/v1/settings",
+        token=rig.reader,
+        client=rig.remote,
+        json={"changes": {}},
+        headers={"Idempotency-Key": huge},
+    )
+    assert denied.status_code == 403
+    invalid = rig.call("PATCH", "/gw/v1/settings", json={"changes": {}}, headers={"Idempotency-Key": huge})
+    assert invalid.status_code == 400
+    rows = rig.audit(10)
+    assert rows[0]["action"] == "config.update" and rows[1]["action"] == "admin.denied"
+    assert [row["idempotency_key"] for row in rows[:2]] == [None, None]
+    assert huge not in json.dumps(rows)
+
+
+def test_bot_logs_forwarded_to_the_pwa_are_scrubbed_of_registered_provider_keys(rig):
+    registry.add(MARK)
+    rig.fake.logs = [
+        ["2026-10-26 00:17:53", 1792973873000.0, "freqtrade", "INFO", f"provider said {MARK} and ws?token=abc123def"]
+    ]
+    text = rig.call("GET", "/gw/v1/logs?limit=5", client=rig.remote, token=rig.reader).text
+    assert MARK not in text
+    assert "abc123def" not in text

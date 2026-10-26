@@ -29,15 +29,15 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from engine.decisions import DecisionStore
 from engine.heartbeat import read_heartbeat
 from engine.launch import TRADABLE_BALANCE_RATIO
-from engine.logredact import redact
 from engine.risk import day_start
 from engine.settings import ConfigError, Settings, load_settings
 from gateway import VERSION
 from gateway.admin import Admin
-from gateway.control import IDEMPOTENCY_KEY, Confirmations, digest, idempotency_key, is_local, sanitize
+from gateway.control import Confirmations, digest, idempotency_key, is_local, loggable_key, sanitize
 from gateway.events import FILL_SIDES, translate
 from gateway.feed import Client, Hub, now_iso
 from gateway.ledger import Ledger, LoginThrottle, iso
+from gateway.redact import redact
 from gateway.settings import BotRef, GatewaySettings
 from gateway.upstream import ApiError, Upstream
 from gateway.views import (
@@ -483,8 +483,7 @@ class Gateway:
         raw_key = request.headers.get("idempotency-key")
         scope = self.ledger.session_scope(token)
         if not is_local(request) or scope != "control":
-            stored_key = raw_key if raw_key is not None and IDEMPOTENCY_KEY.match(raw_key) else None
-            self.audit_control(action, "forbidden", actor=f"{scope}_session", ip=ip, key=stored_key)
+            self.audit_control(action, "forbidden", actor=f"{scope}_session", ip=ip, key=loggable_key(raw_key))
             raise ApiError(403, "forbidden_local_only", "control actions are accepted only on the bot machine itself")
         try:
             key = idempotency_key(raw_key)

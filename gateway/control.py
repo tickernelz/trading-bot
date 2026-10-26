@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 import json
 import re
 import secrets
@@ -11,6 +12,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from urllib.parse import urlsplit
 
 from starlette.requests import HTTPConnection
 
@@ -28,16 +30,45 @@ FORWARD_HEADERS = (
     "cf-connecting-ip",
     "cf-ray",
     "true-client-ip",
+    "x-forwarded-proto",
+    "x-forwarded-server",
+    "x-original-forwarded-for",
+    "via",
+    "cdn-loop",
+    "cf-visitor",
+    "cf-ipcountry",
 )
 IDEMPOTENCY_KEY = re.compile(r"^[A-Za-z0-9_-]{8,128}$")
 SECRET_PARTS = ("key", "password", "secret", "token")
 RISK_LIMITS = ("max_daily_loss_pct", "max_total_drawdown_pct", "risk_per_trade_pct", "max_open_trades")
 
 
+def loopback_name(host: str | None) -> bool:
+    if not host:
+        return False
+    name = host.strip("[]").lower()
+    if name == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(name).is_loopback
+    except ValueError:
+        return False
+
+
 def is_local(connection: HTTPConnection) -> bool:
-    """True only for a direct loopback client; anything relayed by a proxy or tunnel carries forwarding headers."""
+    """True for a loopback peer with no forwarding header, a loopback Host, and a loopback Origin when one is sent."""
     host = connection.client.host if connection.client else None
-    return host in LOOPBACK and not any(name in connection.headers for name in FORWARD_HEADERS)
+    if host not in LOOPBACK or any(name in connection.headers for name in FORWARD_HEADERS):
+        return False
+    if not loopback_name(urlsplit("//" + connection.headers.get("host", "")).hostname):
+        return False
+    origin = connection.headers.get("origin")
+    return origin is None or loopback_name(urlsplit(origin).hostname)
+
+
+def loggable_key(raw: str | None) -> str | None:
+    """The Idempotency-Key header when it is well formed, else None, so client text never reaches the audit log."""
+    return raw if raw is not None and IDEMPOTENCY_KEY.match(raw) else None
 
 
 def digest(value: Any) -> str:

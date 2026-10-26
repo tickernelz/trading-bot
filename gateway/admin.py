@@ -30,9 +30,8 @@ from gateway.configstore import (
     validate_or_none,
     write_raw,
 )
-from gateway.control import digest, idempotency_key, sanitize
+from gateway.control import digest, idempotency_key, is_local, loggable_key, sanitize
 from gateway.ledger import iso
-from gateway.locality import is_local_request
 from gateway.providers import (
     PROVIDER_ID,
     TEST_COOLDOWN_S,
@@ -181,7 +180,7 @@ class Admin:
             action=action,
             targets=targets if targets is not None else [ref.id],
             result=result,
-            idempotency_key=request.headers.get("idempotency-key"),
+            idempotency_key=loggable_key(request.headers.get("idempotency-key")),
             detail=detail,
         )
         self.gateway.hub.emit("gw.audit", row, bot=ref.id if ref is not None else None)
@@ -325,7 +324,7 @@ class Admin:
 
         async def owner(request: Request, token: str = Depends(reader)) -> str:
             scope = gateway.ledger.session_scope(token)
-            reason = "not_local" if not is_local_request(request) else ("scope" if scope != "control" else None)
+            reason = "not_local" if not is_local(request) else ("scope" if scope != "control" else None)
             if reason is not None:
                 self.audit(
                     request,
@@ -426,7 +425,7 @@ class Admin:
                     apply_import(raw, read_models_yml(self.models_yml), [item.model_dump() for item in body.providers])
                 )
 
-            response = await self.write(
+            return await self.write(
                 request,
                 token,
                 ref,
@@ -435,9 +434,6 @@ class Admin:
                 extra=body.model_dump(),
                 render=lambda settings: {"results": results},
             )
-            if isinstance(response, dict) and not response["changes"]:
-                response["results"] = results
-            return response
 
         @api.put("/providers/{provider_id}")
         async def put_provider(
@@ -539,7 +535,7 @@ class Admin:
                 "ok" if result["ok"] else "failed",
                 {name: value for name, value in result.items() if name != "tested_at"},
                 targets=[ref.id, provider_id],
-                actor="owner" if scope == "owner" else "remote",
+                actor="owner" if scope == "control" else "remote",
             )
             return {"bot": ref.id, "provider": provider_id, **result}
 

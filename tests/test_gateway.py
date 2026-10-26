@@ -452,7 +452,7 @@ def test_short_trade_page_fails_closed(setup):
 def test_logs_never_carry_websocket_tokens(setup):
     _, _, client, _ = setup
     [line] = _get(client, "/gw/v1/logs?limit=5", _token(client)).json()["logs"]
-    assert line[4] == '127.0.0.1:41506 - "WebSocket /api/v1/message/ws?token=<redacted>" [accepted]'
+    assert line[4] == '127.0.0.1:41506 - "WebSocket /api/v1/message/ws?token=[redacted]" [accepted]'
 
 
 def test_feed_survives_binary_frames_and_bad_limits(setup):

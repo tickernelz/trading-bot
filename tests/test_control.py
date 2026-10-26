@@ -93,7 +93,7 @@ def setup(tmp_path):
     upstream.client = httpx.AsyncClient(base_url=upstream.bot.api_url + "/api/v1", transport=httpx.MockTransport(fake))
     clock = Clock()
     gateway.confirmations = Confirmations(clock=clock)
-    client = TestClient(create_app(gateway), client=LOCAL)
+    client = TestClient(create_app(gateway), base_url="http://127.0.0.1:8090", client=LOCAL)
     yield gateway, fake, client, clock, config
     gateway.ledger.close()
 
