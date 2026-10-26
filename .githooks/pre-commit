@@ -1,11 +1,12 @@
 #!/bin/sh
-shebang='^\+#!'
-pragma='^\+\s*(//|#|/\*)\s*(@ts-|eslint|noqa|type:|pragma|yaml-language-server|ruff|pyright|biome)'
-other='^\+\s*(//|#|/\*|\*)'
-python='^\+\s*#'
-hits=$(git diff --cached -U0 --diff-filter=ACM -- '*.ts' '*.tsx' '*.js' '*.yaml' '*.yml' | grep -E "$other" | grep -v -E "$shebang" | grep -v -E "$pragma" || true)
-pyhits=$(git diff --cached -U0 --diff-filter=ACM -- '*.py' | grep -E "$python" | grep -v -E "$shebang" | grep -v -E "$pragma" || true)
-hits=$(printf '%s\n%s' "$hits" "$pyhits" | sed '/^$/d')
+added() {
+  git diff --cached -U0 --diff-filter=ACM -- "$@" | grep -E '^\+' | grep -v -E '^\+\+\+ '
+}
+py_hits=$(added '*.py' | grep -E '^\+\s*#' | grep -v -E '^\+#!' | grep -v -E '^\+\s*#\s*(noqa|type:|pragma|ruff|pyright)' || true)
+script_hits=$(added '*.ts' '*.tsx' '*.js' '*.mjs' '*.vue' '*.svelte' '*.html' | grep -E '^\+\s*(//|/\*|<!--)|[[:space:]](//|/\*)' | grep -v -E '^\+\s*(//|/\*)\s*(@ts-|eslint|biome)' || true)
+yaml_hits=$(added '*.yaml' '*.yml' | grep -E '^\+\s*#' | grep -v -E '^\+\s*#\s*yaml-language-server' || true)
+css_hits=$(added '*.css' '*.scss' | grep -E '^\+\s*(/\*|//)' || true)
+hits=$(printf '%s\n%s\n%s\n%s\n' "$py_hits" "$script_hits" "$yaml_hits" "$css_hits" | grep -v -E '^$' || true)
 if [ -n "$hits" ]; then
   echo "pre-commit: comment gate failed:"
   echo "$hits"

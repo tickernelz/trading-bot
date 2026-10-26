@@ -1,4 +1,4 @@
-# Plan final bot trading otonom 24 jam (revisi 9)
+# Plan final bot trading otonom 24 jam (revisi 10)
 
 Disusun 2026-10-25 setelah riset mendalam (dokumen research-swarm-pwa pada issue ini). Arahan Zhafron yang dipenuhi: modal Rp 2 juta; profit masuk lagi jadi modal; analisis memakai berita dan social; demo dulu; decision model (System One) sebagai bantuan cepat untuk LLM dan harus mendukung banyak model, bukan hanya Jev; analisis dengan swarm dan median; jalan di semua OS, mobile lewat PWA. Belum ada kode, akun, atau uang yang disentuh.
 
@@ -12,7 +12,9 @@ Perubahan revisi 7 (Zhafron 2026-10-25): (a) bot berjalan di PC Zhafron sendiri;
 
 Perubahan revisi 8 (Zhafron 2026-10-25): aplikasi dibuat full features, termasuk grafik live, aksi live, dan pratinjau live; daftar fitur must-have dan nice-to-have mengikuti saran Wira (bagian 13).
 
-Perubahan revisi 9 (Zhafron 2026-10-25): (a) secret tidak perlu terlalu dalam: API key boleh lewat variabel lingkungan atau langsung di config; keyring dibuang (bagian 4.5); (b) Freqtrade dijadikan vendor lewat git submodule supaya modifikasi mudah dan fleksibel (bagian 11); (c) yang memakai aplikasi adalah Zhafron di PC-nya sendiri, tema visual mengikuti keputusan Wira; (d) mode full otonom: setelah plan selesai, pekerjaan berjalan sampai selesai tanpa menunggu persetujuan per langkah, Zhafron mengoreksi sambil jalan (jendela otonom 24 jam, tanpa tindakan destruktif).
+Perubahan revisi 9 (Zhafron 2026-10-25): (a) secret tidak perlu terlalu dalam: API key boleh lewat variabel lingkungan atau langsung di config; keyring dibuang (bagian 4.5); (b) Freqtrade dijadikan vendor lewat git submodule supaya modifikasi mudah dan fleksibel (bagian 11); (c) yang memakai aplikasi adalah Zhafron di PC-nya sendiri, tema visual mengikuti keputusan Wira; (d) mode full otonom: setelah plan selesai, pekerjaan berjalan sampai selesai tanpa menunggu persetujuan per langkah, Zhafron mengoreksi sambil jalan (jendela otonom 24 jam).
+
+Perubahan revisi 10 (Zhafron 2026-10-25): (a) destruktif diizinkan ("full otonom destruktif true"); uang sungguhan dan push ke remote tetap di luar yang Wira kerjakan sendiri; (b) arah visual diputuskan Wira dan ditulis di PRODUCT.md dan DESIGN.md (bagian 12); (c) task tahap 0 dan 1 dibuat (bagian 8).
 
 ## 1. Pernyataan jujur tentang hasil
 
@@ -259,7 +261,7 @@ Masih dibutuhkan dari Zhafron: tidak ada yang menghalangi pekerjaan. Mode full o
 - Lokasi: ~/Projects/trading-bot (nama kerja, mudah diganti). Branch main. Identitas commit mengikuti ~/.gitconfig (Zhafron), tanpa Co-Authored-By.
 - Freqtrade sebagai git submodule di vendor/freqtrade (arahan Zhafron revisi 9): url https://github.com/freqtrade/freqtrade.git, branch stable, shallow, terkunci di commit 1f394eae yang adalah tag 2026.9 (commit 568b46b). Strategi, konfigurasi, dan data pengguna ada di luar vendor lewat --strategy-path dan --userdir (dokumen Freqtrade), jadi isi vendor tidak diubah. Bila suatu saat engine perlu dimodifikasi: fork Freqtrade lalu ubah url di .gitmodules ke fork itu. Memperbarui versi: fetch tag baru di submodule, checkout, commit gitlink-nya (langkah ada di README).
 - Ukuran: submodule shallow sekitar 58 MB berkas kerja dan 41 MB data git (diukur saat dipasang).
-- Sudah ada di repo: README, .gitignore, .gitattributes, .editorconfig, .env.example, hook git, contoh konfigurasi tanpa komentar, salinan plan dan riset di docs/. Tautan skill impeccable di .agents/skills tidak di-commit.
+- Sudah ada di repo: README, .gitignore, .gitattributes, .editorconfig, .env.example, hook git, contoh konfigurasi tanpa komentar, salinan plan dan riset di docs/. PRODUCT.md dan DESIGN.md (seed) dari impeccable. Tautan skill impeccable di .agents/skills tidak di-commit.
 - Dibuat di tahap 0, belum ada: strategi Freqtrade, gateway, adapter DecisionProvider dan voter, agen analis deepagents, PWA, docker-compose.
 - Commit: Conventional Commits berbahasa Inggris, subject di bawah 72 karakter. Hook commit-msg menolak format salah dan trailer Co-Authored-By. Hook pre-commit menjalankan gerbang komentar pada kode kita (aturan Zhafron: tanpa komentar); isi vendor/freqtrade adalah kode pihak ketiga dan tidak diperiksa.
 - Cabang: main dan cabang fitur (feat/..., fix/...). Worktree lewat ~/Projects/.worktrees.
@@ -272,12 +274,18 @@ Masih dibutuhkan dari Zhafron: tidak ada yang menghalangi pekerjaan. Mode full o
 
 Zhafron: UI/UX harus unik dan tidak terlihat seperti AI slop; skill impeccable disiapkan.
 
-Status setup (2026-10-25):
-- Skill impeccable sudah terpasang global di ~/.agents/skills/impeccable. Untuk proyek ini ia ditautkan ke ~/Projects/trading-bot/.agents/skills/impeccable (tidak di-commit).
-- context.mjs dijalankan di proyek dan melaporkan NO_PRODUCT_MD: PRODUCT.md belum ada. Menurut reference/init.md, init wajib lewat wawancara (2-3 pertanyaan per putaran) dan tidak boleh menebak PRODUCT.md dari brief satu kalimat. Karena itu PRODUCT.md dan DESIGN.md belum ditulis; menunggu jawaban Zhafron.
-- Pertanyaan putaran 1: (1) siapa yang memakai dan di mana (HP saat di luar, atau PC saat analisa; hanya Zhafron atau nanti orang lain); (2) nuansa yang diinginkan dan yang pasti tidak diinginkan, dengan 1 sampai 3 contoh aplikasi atau desain yang disuka dan yang dibenci; (3) tema gelap atau terang atau ikut sistem, dan kebutuhan aksesibilitas, termasuk apakah merah dan hijau untuk untung dan rugi nyaman di mata Zhafron.
+Status (2026-10-25, mode full otonom): PRODUCT.md dan DESIGN.md (seed) sudah ditulis di ~/Projects/trading-bot dan di-commit (54ed647). Zhafron mendelegasikan tema ke Wira dan tidak menjawab wawancara; jadi isi keduanya adalah keputusan Wira yang dikoreksi Zhafron sambil jalan. Skill impeccable ditautkan ke proyek (.agents/skills, tidak di-commit); context.mjs kini membaca PRODUCT.md.
 
-Register: product (aplikasi, dasbor, alat), menurut reference/product.md; hipotesis, dikonfirmasi di wawancara.
+Register: product. Pemakai: Zhafron saja, di PC (konfigurasi, analisa) dan di ponsel (sekilas, notifikasi, siang terik dan tengah malam).
+
+Arah visual yang diputuskan (rincian di DESIGN.md):
+- Creative North Star: papan informasi stasiun bertemu strip kertas seismograf. Satu jawaban besar yang terbaca dari jauh (aman, ditahan, berhenti) dan satu jejak garis tentang apa yang baru terjadi.
+- Tema: terang sebagai bawaan (kontras tertinggi di bawah matahari), gelap mengikuti pengaturan sistem untuk malam; keduanya dirancang.
+- Warna: strategi Restrained. Satu warna sinyal hangat (benih seed-041 dari palette.mjs untuk kunci trading-bot, oklch(0.673 0.217 38.6)) hanya untuk rugi, batas, peringatan, dan kill switch. Untung memakai biru tua. Pasangan biru dan jingga dipilih karena tetap terbedakan bagi buta warna merah-hijau; setiap angka juga memakai tanda plus atau minus dan arah. Tombol utama memakai tinta. Tanpa pita krem atau pasir.
+- Tipografi: satu keluarga sans yang teknis dengan angka tabular wajib; keluarga konkret dipilih saat implementasi setelah dipastikan mendukung angka tabular. Skala tetap.
+- Datar, tanpa bayangan lebar; gerak 150 sampai 250 ms hanya untuk perubahan keadaan.
+- Dilarang: gaya Binance atau Robinhood, gamifikasi, template hero-metric, dasbor AI generik, tampilan bawaan FreqUI dan Nuxt UI.
+- Uji cepat: bila layar langsung ditebak sebagai "dasbor trading" dari warna dan bentuk saja, arahnya gagal.
 
 Aturan anti-slop dari skill yang berlaku untuk proyek ini:
 - Tidak ada template hero-metric (angka besar, label kecil, statistik pendukung, aksen gradient): dasbor profit biasanya persis itu, jadi harus dihindari.
@@ -286,11 +294,7 @@ Aturan anti-slop dari skill yang berlaku untuk proyek ini:
 - Product: satu keluarga huruf sudah cukup, skala tipografi tetap (bukan fluid), setiap komponen punya state default, hover, focus, active, disabled, loading, error; skeleton alih-alih spinner; empty state yang mengajar; modal bukan pilihan pertama; gerak 150-250 ms hanya untuk menyampaikan state; prefers-reduced-motion wajib.
 - Uji category-reflex dua tingkat: tingkat satu, dasbor trading yang mudah ditebak adalah tema gelap dengan hijau dan merah neon plus grafik candlestick; tingkat dua, terminal-native dark mode. Arah yang dipilih harus lolos keduanya.
 
-Warna dan semantik untung dan rugi: jangan hanya merah dan hijau (buta warna). Tambahkan tanda plus dan minus, arah panah, posisi, dan teks. Warna primer jangan memakai hue merah atau hijau supaya tidak bentrok dengan semantik untung dan rugi. Benih warna proyek diambil dengan palette.mjs saat tahap desain setelah wawancara (opsi --from trading-bot memberi benih deterministik).
-
-Dua arah awal sebagai hipotesis (belum diputuskan, belum diuji oleh Zhafron, dan harus lolos uji category-reflex saat wawancara):
-- Papan informasi stasiun: tipografi sebagai pusat, blok warna solid, angka tabular, setiap status berupa teks besar yang terbaca sekilas di HP maupun PC.
-- Seismograf: jejak garis (profit, sebaran voter) sebagai elemen utama, permukaan hitam murni atau putih murni, satu warna sinyal, angka mengikuti jejak.
+Warna dan semantik untung dan rugi: jangan hanya merah dan hijau (buta warna). Tambahkan tanda plus dan minus, arah panah, posisi, dan teks. Tombol utama memakai tinta, dan warna sinyal hanya untuk risiko, supaya tidak bentrok dengan semantik untung dan rugi. Benih warna sudah diambil: palette.mjs --from trading-bot memberi seed-041, dipakai sebagai warna sinyal risiko.
 
 Layar yang dirancang: Dasbor, Grafik live, Aksi live, Pratinjau, Swarm, Konfigurasi, Provider dan key, Kill switch dan konfirmasi dua langkah, notifikasi, pasang PWA di iOS. Layar Provider dan key mengikuti bagian 4.5; di PWA jarak jauh kolom key tidak ada, hanya status, aktif atau nonaktif, dan uji koneksi.
 

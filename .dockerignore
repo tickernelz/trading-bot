@@ -1,0 +1,6 @@
+*
+!engine
+!tests
+!pyproject.toml
+!config/config.example.yaml
+**/__pycache__

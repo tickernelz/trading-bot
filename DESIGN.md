@@ -24,11 +24,11 @@ Strategi: Restrained. Netral murni atau dengan tint sangat tipis, satu warna sin
 
 **The Not-Red-Not-Green Rule.** Untung memakai biru tua, rugi memakai warna sinyal hangat; keduanya selalu disertai tanda plus atau minus dan arah. Pasangan biru dan jingga dipilih karena tetap terbedakan bagi buta warna merah-hijau. Tombol utama memakai tinta (hampir hitam), bukan warna sinyal.
 
-Nilai: [to be resolved during implementation]. Permukaan terang memakai putih murni; permukaan gelap hampir hitam tanpa tint; lapisan netral kedua untuk panel sedikit lebih dingin. Hindari pita krem, pasir, dan kertas.
+Nilai (token di `pwa/src/app.css`, terang / gelap): latar `oklch(1 0 0)` / `oklch(0.15 0 0)`; panel `oklch(0.965 0.006 255)` / `oklch(0.2 0.006 255)`; tinta `oklch(0.19 0.012 255)` / `oklch(0.96 0 0)`; tinta kedua `oklch(0.42 0.015 255)` / `oklch(0.76 0.01 255)`; untung `oklch(0.4 0.15 258)` / `oklch(0.78 0.12 250)`; rugi (teks) `oklch(0.5 0.19 38.6)` / `oklch(0.72 0.19 38.6)`; sinyal (bidang) `oklch(0.673 0.217 38.6)`. Kontras terukur di Chromium: tinta kedua di atas latar 8,41:1 / 9,14:1, rugi 6,55:1 / 7,2:1, untung 9,46:1 / 9,88:1, tinta di atas sinyal 5,71:1. Permukaan terang memakai putih murni; permukaan gelap hampir hitam tanpa tint; lapisan netral kedua untuk panel sedikit lebih dingin. Hindari pita krem, pasir, dan kertas.
 
 ## Typography
 
-Arah: satu keluarga sans yang teknis dan mudah dibaca, dengan angka tabular wajib (kolom harga, jumlah, dan persen sejajar). Keluarga huruf konkret dipilih saat implementasi setelah dipastikan mendukung angka tabular dan aksara Indonesia: [font to be chosen at implementation]. Skala tetap, bukan fluid. Judul tidak memakai huruf tampilan; label dan tombol memakai keluarga yang sama.
+Arah: satu keluarga sans yang teknis dan mudah dibaca, dengan angka tabular wajib (kolom harga, jumlah, dan persen sejajar). Keluarga huruf: Atkinson Hyperlegible Next (variabel, `@fontsource-variable/atkinson-hyperlegible-next`), dibuat untuk keterbacaan rendah-penglihatan, cocok untuk layar ponsel di bawah matahari. Angka tabular terbukti di render Chromium: dengan `tnum` sepuluh angka 1 dan sepuluh angka 0 sama lebar (632 px pada 100 px), tanpa `tnum` berbeda (407 dan 648 px); glif minus U+2212 ada. Inter ditolak karena detector impeccable menandainya sebagai huruf yang terlalu umum. Skala tetap, bukan fluid. Judul tidak memakai huruf tampilan; label dan tombol memakai keluarga yang sama.
 
 ## Elevation
 
