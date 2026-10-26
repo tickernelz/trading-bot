@@ -152,6 +152,21 @@ Zhafron's direction replaces the decision to pause rounds 3 to 5 until forward d
 
 The total over all rounds is raised from 600 to 1,500 configurations (Zhafron). The multiple-testing correction keeps using the cumulative count.
 
-## Round 3 matrix
+## Ranking (Zhafron, 2026-10-26 13:39 UTC)
 
-Locked in a later commit, from the shortlist of ZHA-3902 (Agent Laras), before the first round 3 walk-forward run.
+"The research is free as long as the monthly profit is as high as possible." From round 3 on, both the walk-forward selection and the cross-asset ranking order configurations by tier, then compounded net profit per month on one Rp 2,000,000 account (3 slots, sized to lose 0.5% of equity at the stop, the bot's setting), then lower drawdown. Reported next to it: the same account sized at 2% risk with its drawdown and worst month, largest loss, mean of the 5 worst trades, max drawdown, worst calendar month in rupiah, and the equal-weight buy-and-hold of the same pairs over the same period as rupiah per month. Tiers, targets and the wording rules do not change; the default still changes only with a higher tier.
+
+## Round 3 matrix: 26 configurations (cumulative 168 of 1,500)
+
+Locked in the commit that adds this section, before the first round 3 run. The ZHA-3913 shortlist (Agent Laras) was not out at lock time; it goes into round 4. Evidence: the only configurations with a positive mean and a bootstrap CI above zero in round 1 (25 of 93) were trend rules that let winners run (Donchian, time-series momentum, EMA trend), all with low win rates; for profit per month, the right tail matters more than the win rate.
+
+| Family | Configurations |
+| --- | --- |
+| P round 1 positive Donchian 1d rules on the five pairs: lookback 30, 60, 90, Donchian-mid exit, 20% stop | 3 |
+| L Donchian 1d breakout, lookback 30, 55, 90, filter SMA100 or none, exit on a close 3 or 4 ATR(1d) below the highest close, 20% stop | 12 |
+| M time-series momentum 1d, 30, 60, 90 days, filter SMA100 or none, exit when the return turns negative, 20% stop | 6 |
+| E EMA trend 1d, 20/100 and 50/200, exit on the cross or a 3 ATR trail, 20% stop | 2 |
+| R random entries with the exits of \`L-don1d-55-nofilter-trail4atr\` (control, not deployable) | 1 |
+| K benchmarks: SwingEmaRsi, buy-and-hold | 2 |
+
+Runs: walk-forward on the five pairs, controls, then \`cross-asset\` in research mode for the first three configurations of the walk-forward ranking (named by the ranking, not by hand). Tiers from cross-asset are provisional until forward data.

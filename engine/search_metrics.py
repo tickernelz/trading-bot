@@ -81,7 +81,12 @@ Mark = Callable[[Row, pd.Timestamp], float]
 
 
 def portfolio(
-    rows: list[Row], stoploss: float, fee: float, limits: Limits | None = None, mark: Mark | None = None
+    rows: list[Row],
+    stoploss: float,
+    fee: float,
+    limits: Limits | None = None,
+    mark: Mark | None = None,
+    risk: float = plan.RISK_PER_TRADE,
 ) -> dict:
     """One account over all rows with the risk layer's sizing and slot cap, and the loss limits when given.
 
@@ -108,7 +113,7 @@ def portfolio(
                 refused_limits += 1
                 continue
             free = equity - sum(stakes.values())
-            stakes[i] = max(0.0, min(equity * plan.RISK_PER_TRADE / per_stake, free))
+            stakes[i] = max(0.0, min(equity * risk / per_stake, free))
             taken.append(i)
         elif i in stakes:
             pnl = stakes.pop(i) * rows[i].profit
@@ -138,6 +143,13 @@ def _breached(now, equity, peak, closed, stakes, rows, limits: Limits, mark: Mar
     return daily_loss >= limits.max_daily_loss or total >= limits.max_total_drawdown
 
 
+def monthly_profit_idr(final_equity: float, months: float) -> float | None:
+    """Compounded mean profit per month in rupiah on the plan capital, from the account's final equity."""
+    if months <= 0:
+        return None
+    return plan.CAPITAL_IDR * (max(final_equity, 0.0) ** (1 / months) - 1)
+
+
 def max_drawdown(rows: list[Row], stoploss: float, fee: float) -> float:
     """Realised-equity drawdown with the risk layer's sizing: risk_per_trade of equity lost at the stop."""
     return portfolio(rows, stoploss, fee)["max_drawdown"]
@@ -158,6 +170,7 @@ def summarize(rows: list[Row], start: pd.Timestamp, end: pd.Timestamp, stoploss:
     gaps = [(b - a).total_seconds() / 86400 for a, b in zip(entries, entries[1:])]
     lo, hi = bootstrap_ci(profits)
     account = portfolio(rows, stoploss, fee)
+    bold = portfolio(rows, stoploss, fee, risk=plan.RESEARCH_RISK_PER_TRADE)
     out.update(
         {
             "win_rate": float(wins.mean()),
@@ -173,6 +186,10 @@ def summarize(rows: list[Row], start: pd.Timestamp, end: pd.Timestamp, stoploss:
             "worst5_mean": float(np.sort(profits)[:5].mean()),
             "max_drawdown": account["max_drawdown"],
             "worst_month_idr": account["worst_month"] * plan.CAPITAL_IDR,
+            "monthly_profit_idr": monthly_profit_idr(account["final_equity"], months),
+            "monthly_profit_idr_research_risk": monthly_profit_idr(bold["final_equity"], months),
+            "max_drawdown_research_risk": bold["max_drawdown"],
+            "worst_month_idr_research_risk": bold["worst_month"] * plan.CAPITAL_IDR,
             "rolling30_min_win_rate": rolling_min_win_rate(wins),
             "longest_days_without_entry": round(max(gaps), 1),
             "days_without_entry_at_end": round(gaps[-1], 1),

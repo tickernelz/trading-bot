@@ -338,9 +338,18 @@ def test_worst_month_is_the_largest_realised_monthly_loss_of_the_account():
     assert metrics.portfolio(rows, -0.10, 0.0031)["worst_month"] == pytest.approx(-loss)
 
 
-def test_cross_asset_ranking_puts_tier_before_win_rate_before_drawdown():
-    def entry(cid, tier, win_rate, drawdown):
-        summary = {"win_rate": win_rate, "max_drawdown": drawdown}
+def test_monthly_profit_compounds_the_final_equity_over_the_months():
+    assert metrics.monthly_profit_idr(1.0, 12) == 0
+    assert metrics.monthly_profit_idr(1.01**12, 12) == pytest.approx(plan.CAPITAL_IDR * 0.01)
+    assert metrics.monthly_profit_idr(0.0, 12) == -plan.CAPITAL_IDR
+    rows = [day_row(0.10, 1, 2), day_row(0.10, 3, 4)]
+    low, high = metrics.portfolio(rows, -0.10, 0.0031), metrics.portfolio(rows, -0.10, 0.0031, risk=0.02)
+    assert 1 < low["final_equity"] < high["final_equity"]
+
+
+def test_cross_asset_ranking_puts_tier_before_monthly_profit_before_drawdown():
+    def entry(cid, tier, monthly, drawdown):
+        summary = {"monthly_profit_idr": monthly, "max_drawdown": drawdown}
         return {"id": cid, "tier": tier, "costs": {plan.PRIMARY_COST: {"all": summary}}}
 
     entries = [
@@ -353,11 +362,13 @@ def test_cross_asset_ranking_puts_tier_before_win_rate_before_drawdown():
 
 
 def test_rounds_stay_within_the_search_budget_and_ids_are_unique():
-    ids = [candidate.id for candidate in plan.round1_candidates()]
-    current = [candidate.id for candidate in plan.candidates()]
-    assert len(current) == len(set(current))
-    assert not set(current) & set(ids) - {"K-SwingEmaRsi", "K-buy-and-hold"}
-    assert plan.cumulative_trials() == len(ids) + len(current) <= plan.SEARCH_BUDGET
+    rounds = [plan.round1_candidates(), plan.round2_candidates(), plan.candidates()]
+    ids = [[candidate.id for candidate in matrix] for matrix in rounds]
+    benchmarks = {"K-SwingEmaRsi", "K-buy-and-hold"}
+    assert all(len(matrix) == len(set(matrix)) for matrix in ids)
+    assert all(not (set(a) & set(b)) - benchmarks for i, a in enumerate(ids) for b in ids[i + 1 :])
+    assert plan.cumulative_trials() == sum(map(len, ids)) <= plan.SEARCH_BUDGET
+    assert set(plan.all_candidates()) == set().union(*ids)
 
 
 def test_adjusted_lower_bound_widens_with_the_number_of_trials():

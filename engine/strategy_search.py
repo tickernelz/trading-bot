@@ -200,6 +200,14 @@ def report(rows, start, end, stoploss, costs: Costs) -> dict:
     }
 
 
+def basket_monthly_idr(returns: dict[str, float], start: pd.Timestamp, end: pd.Timestamp) -> float | None:
+    """Equal-weight buy-and-hold of the pairs over the window, as compounded rupiah per month on the plan capital."""
+    if not returns:
+        return None
+    months = (end - start).total_seconds() / 86400 / metrics.DAYS_PER_MONTH
+    return metrics.monthly_profit_idr(1 + sum(returns.values()) / len(returns), months)
+
+
 def buy_and_hold(candles: dict[str, pd.DataFrame], costs: Costs, windows: list[tuple[str, pd.Timestamp, pd.Timestamp]]):
     out = {}
     for name, start, end in windows:
@@ -256,7 +264,7 @@ def tier_on(rows: list[metrics.Row], checks: dict, null: dict | None = None) -> 
 
 def rank_key(entry: dict) -> tuple:
     primary = entry["costs"][plan.PRIMARY_COST]["all"]
-    return (entry["wf_tier"]["tier"], -primary.get("mean", -1.0), primary.get("max_drawdown", 1.0))
+    return (entry["wf_tier"]["tier"], -(primary.get("monthly_profit_idr") or -1e18), primary.get("max_drawdown", 1.0))
 
 
 def eligible(entry: dict) -> bool:
@@ -334,6 +342,9 @@ def walk_forward(args, ledger_entry: dict) -> dict:
         "selected": selected["id"] if selected else None,
         "selection_process": selection_process(results),
     }
+    out["buy_and_hold_monthly_idr"] = basket_monthly_idr(
+        out["buy_and_hold"][plan.PRIMARY_COST]["walk_forward"], start, end
+    )
     if selected:
         out["selected_null"] = null_distribution(
             kept_signals[selected["id"]], plan.COSTS[plan.PRIMARY_COST], regimes, start, end
@@ -550,7 +561,7 @@ def presample(args, ledger_entry: dict) -> dict:
     fear_greed = load_fear_greed(args.fear_greed)
     regimes = regime_by_hour(candles[plan.REGIME_PAIR])
     wf_regimes = regime_by_hour(wf_candles[plan.REGIME_PAIR])
-    by_id = {candidate.id: candidate for candidate in plan.candidates()}
+    by_id = plan.all_candidates()
     candidate = by_id[args.candidate]
     start, end = plan.PRESAMPLE_START, plan.PRESAMPLE_END
     signals = build_signals(candidate, candles, fear_greed, by_id)
@@ -633,7 +644,7 @@ def cross_asset(args, ledger_entry: dict) -> dict:
     cross = load_candles(args.cross_datadir, plan.HOLDOUT_START, plan.CROSS_PAIRS)
     fear_greed = load_fear_greed(args.fear_greed)
     regimes = regime_by_hour(wf_candles[plan.REGIME_PAIR])
-    by_id = {candidate.id: candidate for candidate in plan.candidates()}
+    by_id = plan.all_candidates()
     start, end = plan.WALK_FORWARD_START, plan.HOLDOUT_START
     primary = plan.COSTS[plan.PRIMARY_COST]
     results = []
@@ -711,13 +722,16 @@ def cross_asset(args, ledger_entry: dict) -> dict:
         "cumulative_trials": plan.cumulative_trials(),
         "results": results,
         "ranked": [entry["id"] for entry in ranked],
+        "buy_and_hold_monthly_idr": basket_monthly_idr(
+            buy_and_hold(cross, primary, [("cross", start, end)])["cross"], start, end
+        ),
     }
 
 
 def cross_rank_key(entry: dict) -> tuple:
-    """Tier first, then the higher net win rate, then the lower drawdown."""
+    """Tier first, then the higher compounded monthly profit, then the lower drawdown."""
     primary = entry["costs"][plan.PRIMARY_COST]["all"]
-    return (entry["tier"], -(primary.get("win_rate") or 0.0), primary.get("max_drawdown", 1.0))
+    return (entry["tier"], -(primary.get("monthly_profit_idr") or -1e18), primary.get("max_drawdown", 1.0))
 
 
 def comparators(candles, fear_greed, regimes, by_id, start, end) -> dict:

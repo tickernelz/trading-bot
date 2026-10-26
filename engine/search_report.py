@@ -37,6 +37,9 @@ def summary_row(summary: dict) -> list[str]:
         pct(summary.get("worst5_mean")),
         pct(summary.get("max_drawdown"), 1, sign=False),
         rupiah(summary.get("worst_month_idr")),
+        rupiah(summary.get("monthly_profit_idr")),
+        rupiah(summary.get("monthly_profit_idr_research_risk")),
+        pct(summary.get("max_drawdown_research_risk"), 1, sign=False),
         num(summary.get("trades_per_month"), 1),
     ]
 
@@ -57,6 +60,9 @@ SUMMARY_HEAD = [
     "Worst 5 mean",
     "Max DD",
     "Worst month (Rp 2M)",
+    "Profit/month 0.5% risk",
+    "Profit/month 2% risk",
+    "Max DD 2% risk",
     "Trades/month",
 ]
 
@@ -182,6 +188,10 @@ def render(
         wf_table,
         "",
         f"Eligible for default: {len(wf['eligible'])}. Selected by the locked rule: `{wf['selected']}`.",
+        "",
+        "Profit per month: compounded mean on one Rp 2,000,000 account, 3 slots, sized to lose 0.5% (bot setting) or "
+        "2% (research sizing) of equity at the stop. Equal-weight buy-and-hold of the same pairs over the same period: "
+        f"{rupiah(wf.get('buy_and_hold_monthly_idr'))} per month.",
     ]
     selected = next((entry for entry in wf["results"] if entry["id"] == wf["selected"]), None)
     if selected and "ci_low_adjusted" in selected["wf_tier"]:
@@ -348,7 +358,8 @@ def render_cross(data: dict) -> str:
         ),
         "",
         "Target letters as in the walk-forward table: (a) on the cross-asset trades, (b) on the walk-forward folds, "
-        "(c) and (d) on both. Rows are in the locked ranking order: tier, then net win rate, then drawdown.",
+        "(c) and (d) on both. Rows are in the locked ranking order: tier, then compounded profit per month, then "
+        f"drawdown. Equal-weight buy-and-hold of these pairs: {rupiah(data.get('buy_and_hold_monthly_idr'))} per month.",
         "",
         "## Per pair",
         "",

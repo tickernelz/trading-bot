@@ -53,7 +53,11 @@ def test_a_first_run_interrupted_after_the_secrets_can_be_repeated(home):
     assert read_env_file(stale)["FT_API_USERNAME"] == "bot"
     assert stat.S_IMODE(stale.stat().st_mode) == 0o600
     assert sorted(path.name for path in (target / "secrets").iterdir()) == [
-        "analyst.env", "ft.env", "gateway.env", "shadow.env", "swarm.env",
+        "analyst.env",
+        "ft.env",
+        "gateway.env",
+        "shadow.env",
+        "swarm.env",
     ]
 
 

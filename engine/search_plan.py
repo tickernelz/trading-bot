@@ -10,7 +10,7 @@ import pandas as pd
 from engine.rules import RuleSpec
 from engine.simulate import Costs
 
-ROUND = 2
+ROUND = 3
 SEED = 3872
 BOOTSTRAP_SAMPLES = 10_000
 NULL_SHUFFLES = 1_000
@@ -61,6 +61,7 @@ COSTS = {
 RISK_PER_TRADE = 0.005
 MAX_OPEN_TRADES = 3
 CAPITAL_IDR = 2_000_000
+RESEARCH_RISK_PER_TRADE = 0.02
 MAX_DAILY_LOSS = 0.01
 MAX_TOTAL_DRAWDOWN = 0.10
 DAILY_RESET_TIMEZONE = "Asia/Jakarta"
@@ -404,7 +405,7 @@ def round1_candidates() -> list[Candidate]:
     return out
 
 
-def candidates() -> list[Candidate]:
+def round2_candidates() -> list[Candidate]:
     """The locked round 2 matrix, run on PAIRS."""
     out: list[Candidate] = []
     don1d20 = {"entry": "donchian", "timeframe": "1d", "lookback": 20, "exit": "donchian_mid", "exit_lookback": 20}
@@ -550,6 +551,87 @@ def candidates() -> list[Candidate]:
     return out
 
 
+def candidates() -> list[Candidate]:
+    """The locked round 3 matrix, run on PAIRS: trend entries that let winners run, ranked by monthly profit."""
+    out: list[Candidate] = []
+    for n in (30, 60, 90):
+        out.append(
+            _rule(
+                f"P-don1d-{n}-mid-sl20",
+                "P round 1 positive trend rules on five pairs",
+                entry="donchian",
+                timeframe="1d",
+                lookback=n,
+                exit="donchian_mid",
+                exit_lookback=n,
+                stoploss=-0.20,
+            )
+        )
+    for n in (30, 55, 90):
+        for tag, trend in (("sma100", "above_sma100_1d"), ("nofilter", "none")):
+            for trail in (3.0, 4.0):
+                out.append(
+                    _rule(
+                        f"L-don1d-{n}-{tag}-trail{trail:g}atr",
+                        "L Donchian 1d with ATR trailing exit",
+                        entry="donchian",
+                        timeframe="1d",
+                        lookback=n,
+                        trend_filter=trend,
+                        exit="none",
+                        trail_atr=trail,
+                        stoploss=-0.20,
+                    )
+                )
+    for n in (30, 60, 90):
+        for tag, trend in (("sma100", "above_sma100_1d"), ("nofilter", "none")):
+            out.append(
+                _rule(
+                    f"M-tsmom-{n}-{tag}",
+                    "M time-series momentum 1d with trend filter",
+                    entry="tsmom",
+                    timeframe="1d",
+                    lookback=n,
+                    trend_filter=trend,
+                    exit="tsmom_flip",
+                    stoploss=-0.20,
+                )
+            )
+    for fast, slow in ((20, 100), (50, 200)):
+        out.append(
+            _rule(
+                f"E-ema1d-{fast}-{slow}-trail3atr",
+                "E EMA trend 1d with ATR trailing exit",
+                entry="ema_trend",
+                timeframe="1d",
+                lookback=14,
+                fast=fast,
+                slow=slow,
+                exit="ema_cross",
+                trail_atr=3.0,
+                stoploss=-0.20,
+            )
+        )
+    out += [
+        Candidate(
+            "R3-random-L-exits",
+            "R random entry control",
+            "random",
+            random_rate=0.0008,
+            exits_from="L-don1d-55-nofilter-trail4atr",
+            deployable=False,
+        ),
+        Candidate("K-SwingEmaRsi", "K benchmark", "swing"),
+        Candidate("K-buy-and-hold", "K benchmark", "buy_hold", deployable=False),
+    ]
+    return out
+
+
+def all_candidates() -> dict[str, Candidate]:
+    """Every configuration of every round by id; a later round wins for the shared benchmarks."""
+    return {c.id: c for c in (*round1_candidates(), *round2_candidates(), *candidates())}
+
+
 def cumulative_trials() -> int:
     """Configurations tried over every round so far, the count the multiple-testing correction uses."""
-    return len(round1_candidates()) + len(candidates())
+    return len(round1_candidates()) + len(round2_candidates()) + len(candidates())
