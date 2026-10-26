@@ -124,8 +124,12 @@ def test_only_a_direct_loopback_login_may_control(setup):
         response = post(client, "/gw/v1/control/pause", token, "key-forbidden-1", **headers)
         assert response.status_code == 403
         assert response.json()["error"]["code"] == "forbidden_local_only"
+    junk = post(client, "/gw/v1/control/pause", tunnelled["token"], "x" * 4000)
+    assert junk.status_code == 403
     assert fake.calls == []
-    assert [row["result"] for row in gateway.ledger.audit_rows(2, action="control.")] == ["forbidden", "forbidden"]
+    rows = gateway.ledger.audit_rows(3, action="control.")
+    assert [row["result"] for row in rows] == ["forbidden"] * 3
+    assert [row["idempotency_key"] for row in rows] == [None, "key-forbidden-1", "key-forbidden-1"]
 
 
 def test_control_needs_an_idempotency_key(setup):
@@ -330,6 +334,14 @@ def test_stop_entry_is_sent_again_when_freqtrade_comes_back_running(setup):
 
     asyncio.run(gateway.reapply_entry_stop(bot))
     assert len(fake.calls) == 1
+
+    gateway.ledger.set_entries_stopped("A", False)
+    token = login(client)["token"]
+    assert confirmed(client, "/gw/v1/control/stop", token, "stop-bot-a").status_code == 200
+    assert gateway.ledger.entries_stopped("A") is True
+    fake.state = "running"
+    asyncio.run(gateway.reapply_entry_stop(bot))
+    assert fake.calls[-1] == ("POST", "/stopentry", None)
 
 
 def test_audit_log_is_append_only_and_filtered_by_page(setup):
