@@ -16,6 +16,22 @@ prefix=${UNIT_PREFIX:-trading-bot-stage1}
 run_dir=${RUN_DIR:?set RUN_DIR}
 mount=/opt/trading-bot/run
 
+data_dirs() {
+  case $1 in
+    bot-a) echo bot-a ;;
+    bot-b | shadow-b | analyst-b) echo bot-b ;;
+    gateway) echo gateway bot-a bot-b ;;
+    *) usage ;;
+  esac
+}
+
+mount_args() {
+  printf '%s' "-v $run_dir/config:$mount/config:ro"
+  for dir in $(data_dirs "$1"); do
+    printf '%s' " -v $run_dir/$dir:$mount/$dir"
+  done
+}
+
 container_args() {
   case $1 in
     bot-a)
@@ -53,9 +69,11 @@ for component in "${components[@]}"; do
   case $action in
     start)
       args=$(container_args "$component" | tr '\n' ' ')
+      mounts=$(mount_args "$component")
+      for dir in $(data_dirs "$component"); do mkdir -p "$run_dir/$dir"; done
       systemd-run --user --collect --unit "$unit" \
         -p Restart=always -p RestartSec=15 -p TimeoutStopSec=90 \
-        bash -c "docker rm -f $name >/dev/null 2>&1; exec docker run --rm --name $name --network host -v $run_dir:$mount $args"
+        bash -c "docker rm -f $name >/dev/null 2>&1; exec docker run --rm --name $name --network host $mounts $args"
       ;;
     stop) systemctl --user stop "$unit" ;;
     status) systemctl --user --no-pager --lines 0 status "$unit" || true ;;
