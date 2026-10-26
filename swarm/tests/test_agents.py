@@ -58,10 +58,10 @@ def test_metrics_tool(data_dir):
 
 
 def test_trade_history_is_newest_last_and_capped(data_dir):
-    *rows, note = tools_by_name(data_dir)["get_trade_history"].invoke({"limit": 5}).splitlines()
+    note, *rows = tools_by_name(data_dir)["get_trade_history"].invoke({"limit": 5}).splitlines()
     assert [json.loads(r)["id"] for r in rows] == [295, 296, 297, 298, 299]
     assert "newest 5 of 300" in note
-    *capped, note = tools_by_name(data_dir)["get_trade_history"].invoke({"limit": 10_000}).splitlines()
+    note, *capped = tools_by_name(data_dir)["get_trade_history"].invoke({"limit": 10_000}).splitlines()
     assert len(capped) == MAX_ROWS and f"newest {MAX_ROWS} of 300" in note
     assert "[showing" not in tools_by_name(data_dir)["get_trade_history"].invoke({"limit": 500, "day": "2020-01-01"})
 

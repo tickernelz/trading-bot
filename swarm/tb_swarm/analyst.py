@@ -1,9 +1,10 @@
 import asyncio
+import json
 import os
 import re
 import tempfile
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any, Literal
@@ -13,7 +14,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from tb_swarm.agents import DEFAULT_TIMEZONE, build_analyst
+from tb_swarm.agents import DEFAULT_TIMEZONE, TOOL_CALLS, build_analyst
 from tb_swarm.config import ProviderSpec
 from tb_swarm.errors import ConfigError, ProviderError
 from tb_swarm.models import Usage
@@ -37,8 +38,9 @@ RECURSION_LIMIT = 40
 CONCURRENT_RUNS = 2
 
 REPORT_PROMPT = (
-    "Write the daily report for {day} (timezone {timezone}). Call get_metrics first: it holds the daily swarm "
-    "totals and the list of skipped decisions for each day. Then call get_trade_history and get_voter_log with "
+    'Write the daily report for {day} (timezone {timezone}). Call get_metrics with day="{day}" first: it holds '
+    "the swarm totals and the list of skipped decisions for that day. Then call get_trade_history and "
+    "get_voter_log with "
     'day="{day}" for the rows behind anything you report. Answer with one JSON object and nothing else, shaped as '
     '{{"summary": str, "anomalies": [{{"title": str, "detail": str, "evidence": [str]}}], '
     '"suggestions": [{{"title": str, "detail": str, "evidence": [str]}}]}}. '
@@ -127,6 +129,36 @@ def message_text(message: BaseMessage) -> str:
     )
 
 
+def _scalars(value: Any, out: set[str]) -> None:
+    if isinstance(value, dict):
+        for key, item in value.items():
+            out.add(str(key))
+            _scalars(item, out)
+    elif isinstance(value, list):
+        for item in value:
+            _scalars(item, out)
+    elif isinstance(value, bool) or value is None:
+        return
+    elif isinstance(value, float):
+        out.add(repr(value))
+        if value.is_integer():
+            out.add(str(int(value)))
+    else:
+        out.add(str(value))
+
+
+def tool_values(messages: Iterable[BaseMessage]) -> set[str]:
+    """Every key and scalar value in the JSON the read tools returned, as the strings evidence must equal."""
+    found: set[str] = set()
+    for message in messages:
+        for line in message_text(message).splitlines():
+            try:
+                _scalars(json.loads(line), found)
+            except ValueError:
+                continue
+    return found
+
+
 class Run:
     """What one agent invocation produced: final text, tool trace, tool output and usage."""
 
@@ -138,9 +170,7 @@ class Run:
         self.tools_used = [
             ToolUse(name=call["name"], args=call.get("args") or {}) for m in assistants for call in m.tool_calls
         ]
-        self.corpus = "\n".join(
-            message_text(m) for m in self.messages if isinstance(m, ToolMessage) and m.status != "error"
-        )
+        self.values = tool_values(m for m in self.messages if isinstance(m, ToolMessage) and m.status != "error")
         total = Usage()
         for message in assistants:
             used = usage_from_message(message)
@@ -173,39 +203,47 @@ class AnalystRunner:
         self._timeout_s = timeout_s
         self._slots = asyncio.Semaphore(CONCURRENT_RUNS)
 
-    async def _invoke(self, messages: Sequence[BaseMessage], timeout_s: float | None = None) -> Run:
+    async def _invoke(self, messages: Sequence[BaseMessage], deadline: float) -> Run:
         started = time.monotonic()
-        async with self._slots:
-            try:
-                result = await asyncio.wait_for(
-                    self._agent.ainvoke({"messages": list(messages)}, config={"recursion_limit": RECURSION_LIMIT}),
-                    timeout=timeout_s or self._timeout_s,
+
+        async def run() -> Any:
+            TOOL_CALLS.set([0])
+            async with self._slots:
+                return await self._agent.ainvoke(
+                    {"messages": list(messages)}, config={"recursion_limit": RECURSION_LIMIT}
                 )
-            except Exception as exc:
-                raise classify_exception(exc, self._secrets) from None
+
+        try:
+            result = await asyncio.wait_for(run(), timeout=max(0.0, deadline - started))
+        except Exception as exc:
+            raise classify_exception(exc, self._secrets) from None
         return Run(result["messages"], self._model_id, started)
+
+    def _deadline(self, timeout_s: float | None) -> float:
+        return time.monotonic() + (timeout_s or self._timeout_s)
 
     async def daily_report(self, day: str, timeout_s: float | None = None) -> DailyReport:
         check_day(day)
         prompt = REPORT_PROMPT.format(day=day, timezone=self._timezone, language=LANGUAGE_NAMES[self._language])
-        run = await self._invoke([HumanMessage(prompt)], timeout_s)
+        deadline = self._deadline(timeout_s)
+        run = await self._invoke([HumanMessage(prompt)], deadline)
         parsed, problem = _parse_report(run.final)
         if parsed is None:
-            retry = await self._invoke([*run.messages, HumanMessage(REPAIR_PROMPT.format(problem=problem))], timeout_s)
+            retry = await self._invoke([*run.messages, HumanMessage(REPAIR_PROMPT.format(problem=problem))], deadline)
             retry.latency_s = round(retry.latency_s + run.latency_s, 3)
             run = retry
             parsed, problem = _parse_report(run.final)
             if parsed is None:
                 raise ProviderError("invalid", redact(f"analyst report unusable: {problem}", self._secrets))
-        corpus = run.corpus
+        values = run.values
         return DailyReport(
             day=day,
             generated_at=datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z"),
             model=run.model,
             language=self._language,
             summary=redact(parsed.summary, self._secrets),
-            anomalies=[_ground(item, corpus, self._secrets) for item in parsed.anomalies],
-            suggestions=[_ground(item, corpus, self._secrets) for item in parsed.suggestions],
+            anomalies=[_ground(item, values, self._secrets) for item in parsed.anomalies],
+            suggestions=[_ground(item, values, self._secrets) for item in parsed.suggestions],
             tools_used=run.tools_used,
             usage=run.usage,
             latency_s=run.latency_s,
@@ -228,7 +266,7 @@ class AnalystRunner:
             HumanMessage(turn.content) if turn.role == "user" else AIMessage(turn.content) for turn in history
         ]
         messages.append(HumanMessage(context + text))
-        run = await self._invoke(messages, timeout_s)
+        run = await self._invoke(messages, self._deadline(timeout_s))
         answer = redact(run.final.strip(), self._secrets)
         if not answer:
             raise ProviderError("invalid", "analyst returned an empty answer")
@@ -247,9 +285,9 @@ def _parse_report(text: str) -> tuple[ModelReport | None, str]:
         return None, f"{'.'.join(str(part) for part in first['loc'])}: {first['msg']}"
 
 
-def _ground(finding: Finding, corpus: str, secrets: Sequence[str]) -> GroundedFinding:
+def _ground(finding: Finding, values: set[str], secrets: Sequence[str]) -> GroundedFinding:
     evidence = [redact(item, secrets) for item in finding.evidence]
-    grounded = bool(finding.evidence) and all(item.strip() and item in corpus for item in finding.evidence)
+    grounded = bool(finding.evidence) and all(item in values for item in finding.evidence)
     return GroundedFinding(
         title=redact(finding.title, secrets),
         detail=redact(finding.detail, secrets),

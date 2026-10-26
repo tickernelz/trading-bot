@@ -113,6 +113,44 @@ async def test_evidence_not_found_in_tool_output_is_flagged(data_dir):
     assert [item.grounded for item in report.suggestions] == [False]
 
 
+@pytest.mark.parametrize(
+    ("evidence", "expected"),
+    [
+        (["dec_a"], True),
+        (["1"], True),
+        (["win_rate"], True),
+        (["-10.0"], True),
+        (["-10"], True),
+        (["26"], False),
+        (["22"], False),
+        (["2026"], False),
+        (["BTC"], False),
+        (["dec_"], False),
+        (["dec_a", "dec_nope"], False),
+        ([" dec_a"], False),
+        ([""], False),
+        ([], False),
+    ],
+)
+async def test_grounded_means_an_exact_value_the_tools_returned(data_dir, evidence, expected):
+    payload = {"summary": "s", "anomalies": [{"title": "t", "detail": "d", "evidence": evidence}], "suggestions": []}
+    script = [
+        tool_call("get_voter_log", {"day": DAY}, "c1"),
+        tool_call("get_trade_history", {}, "c2"),
+        tool_call("get_metrics", {}, "c3"),
+        final(payload),
+    ]
+    report = await runner(RecorderModel(script=script, calls=[]), data_dir).daily_report(DAY)
+    assert report.anomalies[0].grounded is expected
+
+
+async def test_a_value_only_in_a_note_or_an_error_is_not_evidence(data_dir):
+    payload = {"summary": "s", "anomalies": [{"title": "t", "detail": "d", "evidence": ["day"]}], "suggestions": []}
+    script = [tool_call("get_voter_log", {"day": "yesterday"}, "c1"), final(payload)]
+    report = await runner(RecorderModel(script=script, calls=[]), data_dir).daily_report(DAY)
+    assert report.anomalies[0].grounded is False
+
+
 async def test_evidence_is_not_grounded_when_the_tool_was_never_called(data_dir):
     report = await runner(RecorderModel(script=[final(GOOD)], calls=[]), data_dir).daily_report(DAY)
     assert [item.grounded for item in report.anomalies + report.suggestions] == [False, False]
@@ -223,6 +261,36 @@ async def test_ask_cannot_use_write_tools_or_read_secrets(data_dir):
     assert snapshot(data_dir) == before
 
 
+async def test_a_run_cannot_spend_more_than_the_tool_budget(data_dir):
+    from langchain_core.messages import ToolMessage
+
+    from tb_swarm.agents import MAX_TOOL_CALLS, TOOL_CALLS
+
+    script = [tool_call("get_metrics", {}, f"c{n}") for n in range(MAX_TOOL_CALLS + 4)] + [final("answer from data")]
+    TOOL_CALLS.set([0])
+    result = await build_analyst(RecorderModel(script=script, calls=[]), data_dir).ainvoke(
+        {"messages": [("user", "loop forever?")]}
+    )
+    statuses = [m.status for m in result["messages"] if isinstance(m, ToolMessage)]
+    assert statuses == ["success"] * MAX_TOOL_CALLS + ["error"] * 4
+    last_error = [m for m in result["messages"] if isinstance(m, ToolMessage)][-1]
+    assert "tool budget" in last_error.content
+    assert result["messages"][-1].content == "answer from data"
+
+
+async def test_the_tool_budget_is_per_run_not_per_runner(data_dir):
+    from tb_swarm.agents import MAX_TOOL_CALLS
+
+    analyst = runner(RecorderModel(script=[], calls=[]), data_dir)
+    for _ in range(3):
+        analyst._agent = build_analyst(
+            RecorderModel(script=[tool_call("get_metrics", {}, f"c{n}") for n in range(MAX_TOOL_CALLS)], calls=[]),
+            data_dir,
+        )
+        answer = await analyst.ask("again")
+        assert answer.answer == "done"
+
+
 async def test_ask_answer_is_redacted(data_dir):
     answer = await runner(RecorderModel(script=[final(f"the key is {KEY}")], calls=[]), data_dir).ask("key?")
     assert KEY not in answer.answer
@@ -265,6 +333,34 @@ async def test_per_call_timeout_overrides_the_runner_default(data_dir):
     with pytest.raises(ProviderError) as caught:
         await runner(Slow(script=[], calls=[]), data_dir, timeout_s=60).daily_report(DAY, timeout_s=0.05)
     assert caught.value.kind == "timeout"
+
+
+async def test_the_deadline_covers_the_repair_retry_and_the_queue(data_dir):
+    class Slow(RecorderModel):
+        def _generate(self, *args, **kwargs):
+            time.sleep(0.25)
+            return super()._generate(*args, **kwargs)
+
+    model = Slow(script=[final("not json"), final(GOOD)], calls=[])
+    started = time.monotonic()
+    with pytest.raises(ProviderError) as caught:
+        await runner(model, data_dir, timeout_s=60).daily_report(DAY, timeout_s=0.4)
+    assert caught.value.kind == "timeout" and time.monotonic() - started < 1.0
+
+
+async def test_waiting_for_a_free_slot_counts_against_the_deadline(data_dir):
+    import asyncio
+
+    class Slow(RecorderModel):
+        def _generate(self, *args, **kwargs):
+            time.sleep(0.4)
+            return super()._generate(*args, **kwargs)
+
+    analyst = runner(Slow(script=[], calls=[]), data_dir, timeout_s=60)
+    started = time.monotonic()
+    results = await asyncio.gather(*(analyst.ask("hello", timeout_s=0.3) for _ in range(5)), return_exceptions=True)
+    assert any(isinstance(item, ProviderError) and item.kind == "timeout" for item in results)
+    assert time.monotonic() - started < 1.5
 
 
 def sample_report(day, summary="s"):

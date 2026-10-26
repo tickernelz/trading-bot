@@ -1,6 +1,7 @@
 import json
 from collections import deque
 from collections.abc import Awaitable, Callable, Iterable
+from contextvars import ContextVar
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -20,6 +21,9 @@ VOTER_LOG_FILE = "voter_decisions.jsonl"
 
 MAX_TOOL_CHARS = 20_000
 MAX_ROWS = 200
+RENDER_BUDGET = 10_000
+MAX_TOOL_CALLS = 8
+TOOL_CALLS: ContextVar[list[int] | None] = ContextVar("analyst_tool_calls", default=None)
 
 DEFAULT_TIMEZONE = "Asia/Jakarta"
 
@@ -74,6 +78,36 @@ class ToolAllowlist(AgentMiddleware):
         if request.tool_call["name"] not in self._allowed:
             return self._refusal(request)
         return await handler(request)
+
+
+class ToolBudget(AgentMiddleware):
+    """Refuses further tool calls once one agent run has used its budget, so a question cannot loop on reads."""
+
+    def __init__(self, limit: int = MAX_TOOL_CALLS) -> None:
+        super().__init__()
+        self._limit = limit
+
+    def _spent(self) -> bool:
+        counter = TOOL_CALLS.get()
+        if counter is None:
+            return False
+        counter[0] += 1
+        return counter[0] > self._limit
+
+    def _refusal(self, request: Any) -> ToolMessage:
+        call = request.tool_call
+        return ToolMessage(
+            content=f"tool budget of {self._limit} calls is used up: answer now from the data already returned",
+            tool_call_id=call["id"],
+            name=call["name"],
+            status="error",
+        )
+
+    def wrap_tool_call(self, request: Any, handler: Callable[[Any], Any]) -> Any:
+        return self._refusal(request) if self._spent() else handler(request)
+
+    async def awrap_tool_call(self, request: Any, handler: Callable[[Any], Awaitable[Any]]) -> Any:
+        return self._refusal(request) if self._spent() else await handler(request)
 
 
 def _clip(text: str) -> str:
@@ -136,17 +170,64 @@ def _tail(
     return list(rows), total
 
 
-def _render(rows: list[dict[str, Any]], total: int, zone: ZoneInfo) -> str:
+def _dump(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+
+
+def _render(rows: list[dict[str, Any]], total: int, zone: ZoneInfo, limit: int) -> str:
     lines = []
     for row in rows:
         moment = _moment(row)
         shown = row if moment is None else {**row, "ts_local": moment.astimezone(zone).isoformat(timespec="seconds")}
-        lines.append(json.dumps(shown, ensure_ascii=False))
-    if total > len(rows):
-        lines.append(
-            f"[showing the newest {len(rows)} of {total} matching rows; narrow the filter, limit max {MAX_ROWS}]"
-        )
-    return _clip("\n".join(lines))
+        lines.append(_dump(shown))
+    kept: list[str] = []
+    used = 0
+    for line in reversed(lines):
+        if kept and used + len(line) + 1 > RENDER_BUDGET:
+            break
+        kept.append(line)
+        used += len(line) + 1
+    kept.reverse()
+    if len(kept) < total:
+        reason = f"limit {min(limit, MAX_ROWS)}, at most {RENDER_BUDGET} characters"
+        kept.insert(0, f"[showing the newest {len(kept)} of {total} matching rows ({reason}); narrow day or pair]")
+    return "\n".join(kept)
+
+
+def _metrics_view(data: Any, name: str, day: str) -> str:
+    if not isinstance(data, dict):
+        return _clip(_dump(data))
+    if name and name not in data:
+        return f"no metric named {name!r}"
+    swarm = data.get("swarm_by_day")
+    rest = {key: value for key, value in data.items() if key != "swarm_by_day" and (not name or key == name)}
+    if name and name != "swarm_by_day":
+        return _clip(_dump(rest))
+    if not isinstance(swarm, dict):
+        return _clip(_dump(rest))
+    out: dict[str, Any] = dict(rest)
+    if day:
+        if day not in swarm:
+            out["swarm_by_day"] = {}
+            out["note"] = f"no swarm data for {day}; days available: {sorted(swarm)}"
+            return _clip(_dump(out))
+        out["swarm_by_day"] = {day: swarm[day]}
+        return _clip(_dump(out))
+    budget = MAX_TOOL_CHARS - len(_dump(rest)) - 400
+    chosen: dict[str, Any] = {}
+    used = 0
+    for key in sorted(swarm, reverse=True):
+        size = len(_dump(swarm[key])) + len(key) + 6
+        if chosen and used + size > budget:
+            break
+        chosen[key] = swarm[key]
+        used += size
+    out["swarm_by_day"] = chosen
+    omitted = sorted(set(swarm) - set(chosen))
+    if omitted:
+        out["swarm_by_day_omitted_days"] = omitted
+        out["note"] = "newest days first; pass day=YYYY-MM-DD to read an omitted day"
+    return _clip(_dump(out))
 
 
 def read_only_tools(data_dir: str | Path, timezone: str = DEFAULT_TIMEZONE) -> list[BaseTool]:
@@ -155,17 +236,14 @@ def read_only_tools(data_dir: str | Path, timezone: str = DEFAULT_TIMEZONE) -> l
     zone = ZoneInfo(timezone)
 
     @tool
-    def get_metrics(name: str = "") -> str:
-        """Return the bot metrics as JSON, with daily swarm totals; pass a metric name to return only that entry."""
+    def get_metrics(name: str = "", day: str = "") -> str:
+        """Return the bot metrics as JSON with daily swarm totals, newest day first; filter by name or day."""
+        if _bad_day(day):
+            return "day must be YYYY-MM-DD"
         path = root / METRICS_FILE
         if not path.is_file():
             return "no metrics recorded"
-        data = json.loads(path.read_text(encoding="utf-8"))
-        if name:
-            if not isinstance(data, dict) or name not in data:
-                return f"no metric named {name!r}"
-            data = {name: data[name]}
-        return _clip(json.dumps(data, ensure_ascii=False))
+        return _metrics_view(json.loads(path.read_text(encoding="utf-8")), name, day)
 
     @tool
     def get_trade_history(limit: int = 50, day: str = "", pair: str = "") -> str:
@@ -174,7 +252,7 @@ def read_only_tools(data_dir: str | Path, timezone: str = DEFAULT_TIMEZONE) -> l
             return "day must be YYYY-MM-DD"
         rows, total = _tail(root / TRADES_FILE, limit, _row_filter(day, pair, zone))
         empty = "no trades match the filter" if day or pair else "no trades recorded"
-        return _render(rows, total, zone) or empty
+        return _render(rows, total, zone, limit) or empty
 
     @tool
     def get_voter_log(limit: int = 20, decision_id: str = "", day: str = "", pair: str = "") -> str:
@@ -188,7 +266,7 @@ def read_only_tools(data_dir: str | Path, timezone: str = DEFAULT_TIMEZONE) -> l
             lambda row: (not decision_id or row.get("decision_id") == decision_id) and (by_day is None or by_day(row)),
         )
         empty = "no voter decisions match the filter" if decision_id or day or pair else "no voter decisions recorded"
-        return _render(rows, total, zone) or empty
+        return _render(rows, total, zone, limit) or empty
 
     return [get_metrics, get_trade_history, get_voter_log]
 
@@ -198,7 +276,7 @@ def build_analyst(model: BaseChatModel | str, data_dir: str | Path, timezone: st
         model=model,
         tools=read_only_tools(data_dir, timezone),
         system_prompt=ANALYST_PROMPT,
-        middleware=[ToolAllowlist(ANALYST_TOOL_NAMES)],
+        middleware=[ToolAllowlist(ANALYST_TOOL_NAMES), ToolBudget()],
     )
 
 
