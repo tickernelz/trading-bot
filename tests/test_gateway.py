@@ -26,14 +26,41 @@ FILLED_MS = NOW_MS - 5_000
 class FakeFreqtrade:
     def __init__(self) -> None:
         self.down = False
-        self.closed_loss = -25_000.0
+        self.closed = [
+            {
+                "trade_id": 7,
+                "pair": "BTC/IDR",
+                "is_open": False,
+                "close_timestamp": NOW_MS - 60_000,
+                "close_profit_abs": -25_000.0,
+            }
+        ]
         self.paths: list[str] = []
+        self.logs = [
+            [
+                "2026-10-26 00:17:53",
+                1792973873000.0,
+                "uvicorn.error",
+                "INFO",
+                '127.0.0.1:41506 - "WebSocket /api/v1/message/ws?token=eyJhbGciOi.secret" [accepted]',
+            ]
+        ]
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         if self.down:
             raise httpx.ConnectError("refused", request=request)
         path = request.url.path.removeprefix("/api/v1")
         self.paths.append(path)
+        if path == "/trades":
+            assert request.url.params["order_by_id"] == "true"
+            limit, offset = int(request.url.params["limit"]), int(request.url.params["offset"])
+            page = sorted(self.closed, key=lambda trade: trade["trade_id"])[offset : offset + min(limit, 500)]
+            return httpx.Response(
+                200,
+                json={"trades": page, "trades_count": len(page), "offset": offset, "total_trades": len(self.closed)},
+            )
+        if path == "/logs":
+            return httpx.Response(200, json={"log_count": len(self.logs), "logs": self.logs})
         routes = {
             "/version": {"version": "2026.9"},
             "/show_config": {
@@ -53,17 +80,6 @@ class FakeFreqtrade:
                     "is_open": True,
                 }
             ],
-            "/trades": {
-                "trades": [
-                    {
-                        "trade_id": 7,
-                        "pair": "BTC/IDR",
-                        "is_open": False,
-                        "close_timestamp": NOW_MS - 60_000,
-                        "close_profit_abs": self.closed_loss,
-                    }
-                ]
-            },
             "/trade/7": {
                 "trade_id": 7,
                 "orders": [
@@ -375,3 +391,87 @@ def test_hub_routes_candles_only_to_clients_of_that_pair():
     btc_events, eth_count = asyncio.run(scenario())
     assert btc_events == ["gw.candles", "gw.error"]
     assert eth_count == 1
+
+
+def test_risk_and_history_page_past_freqtrades_500_trade_limit(setup):
+    _, fake, client, _ = setup
+    fake.closed = [
+        {
+            "trade_id": index,
+            "pair": "SOL/IDR",
+            "is_open": False,
+            "close_timestamp": NOW_MS - 10 * 86_400_000,
+            "close_profit_abs": 10.0,
+        }
+        for index in range(1, 1201)
+    ]
+    fake.closed.append(
+        {
+            "trade_id": 1201,
+            "pair": "BTC/IDR",
+            "is_open": False,
+            "close_timestamp": NOW_MS - 60_000,
+            "close_profit_abs": -25_000.0,
+        }
+    )
+    token = _token(client)
+    risk = _get(client, "/gw/v1/risk", token).json()
+    assert risk["breaches"] == ["daily_loss"]
+    assert risk["daily_pnl"] == -27_000.0
+    newest = _get(client, "/gw/v1/trades?limit=3", token).json()
+    assert [trade["trade_id"] for trade in newest] == [1201, 1200, 1199]
+    assert _get(client, "/gw/v1/trades?limit=1&pair=ETH/IDR", token).json()[0]["trade_id"] == 9
+
+
+def test_short_trade_page_fails_closed(setup):
+    gateway, fake, client, _ = setup
+    fake.closed = [
+        {"trade_id": index, "pair": "SOL/IDR", "is_open": False, "close_timestamp": NOW_MS, "close_profit_abs": 0.0}
+        for index in range(1, 600)
+    ]
+    real = fake.__call__
+
+    class Shrinking(FakeFreqtrade):
+        def __call__(self, request):
+            response = real(request)
+            if request.url.path.endswith("/trades") and request.url.params["offset"] != "0":
+                body = response.json()
+                body["trades"] = body["trades"][:10]
+                return httpx.Response(200, json=body)
+            return response
+
+    upstream = gateway.upstreams["A"]
+    upstream.client = httpx.AsyncClient(
+        base_url=upstream.bot.api_url + "/api/v1", transport=httpx.MockTransport(Shrinking())
+    )
+    response = _get(client, "/gw/v1/risk", _token(client))
+    assert response.status_code == 502
+    assert response.json()["error"]["code"] == "upstream_error"
+
+
+def test_logs_never_carry_websocket_tokens(setup):
+    _, _, client, _ = setup
+    [line] = _get(client, "/gw/v1/logs?limit=5", _token(client)).json()["logs"]
+    assert line[4] == '127.0.0.1:41506 - "WebSocket /api/v1/message/ws?token=<redacted>" [accepted]'
+
+
+def test_feed_survives_binary_frames_and_bad_limits(setup):
+    _, _, client, _ = setup
+    token = _token(client)
+    with client.websocket_connect(f"/gw/v1/events?token={token}") as socket:
+        assert socket.receive_json()["type"] == "gw.hello"
+        socket.send_bytes(b"\x00\x01")
+        socket.send_json({"type": "subscribe", "topics": ["status"], "candles": [{"pair": "BTC/IDR", "limit": "abc"}]})
+        socket.send_json({"type": "ping"})
+        assert socket.receive_json()["type"] == "pong"
+
+
+def test_cache_drops_expired_entries(setup):
+    gateway = setup[0]
+
+    async def calls():
+        for limit in range(1, 6):
+            await gateway.ft(gateway.primary(), "/logs", ttl=0, limit=limit)
+
+    asyncio.run(calls())
+    assert len(gateway.cache) == 1

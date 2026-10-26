@@ -15,7 +15,7 @@ SECRETS = {
     "FT_API_USERNAME": "bot",
     "FT_API_PASSWORD": "pw-example",
     "FT_API_JWT_SECRET": "jwt-example",
-    "FT_API_WS_TOKEN": "ws-example",
+    "SHADOW_TOKEN": "s" * 32,
 }
 
 
@@ -97,7 +97,6 @@ def test_serving_commands_pass_api_secrets_through_env(monkeypatch, tmp_path, ex
     launch.main([command])
     [(_, argv, env)] = exec_calls
     assert argv[1] == command
-    assert env["FREQTRADE__API_SERVER__WS_TOKEN"] == "ws-example"
     assert ("--strategy" in argv) is (command in launch.STRATEGY_COMMANDS)
 
 
@@ -118,3 +117,26 @@ def test_valid_config_execs_freqtrade_with_strategy(monkeypatch, tmp_path, exec_
     assert rendered["db_url"] == f"sqlite:///{tmp_path / 'user_data' / 'tradesv3.dryrun.sqlite'}"
     assert rendered["trading_bot"]["shadow_url"] == "http://127.0.0.1:8091"
     assert rendered["trading_bot"]["bot_id"] == "A"
+
+
+def test_swarm_bot_refuses_to_start_without_shadow_token(monkeypatch, tmp_path, exec_calls, capsys):
+    for name, value in SECRETS.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.delenv("SHADOW_TOKEN")
+    monkeypatch.setenv("TRADING_BOT_CONFIG", str(EXAMPLE))
+    monkeypatch.setenv("TRADING_BOT_USERDIR", str(tmp_path / "user_data"))
+    assert launch.main(["trade"]) == 2
+    assert exec_calls == []
+    assert "SHADOW_TOKEN" in capsys.readouterr().err
+
+
+def test_rules_only_bot_starts_without_shadow_token(monkeypatch, tmp_path, example_raw, write_config, exec_calls):
+    example_raw["swarm"]["enabled"] = False
+    del example_raw["shadow"]
+    for name, value in SECRETS.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.delenv("SHADOW_TOKEN")
+    monkeypatch.setenv("TRADING_BOT_CONFIG", str(write_config(example_raw)))
+    monkeypatch.setenv("TRADING_BOT_USERDIR", str(tmp_path / "user_data"))
+    launch.main(["trade"])
+    assert len(exec_calls) == 1

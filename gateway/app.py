@@ -26,6 +26,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from engine.decisions import DecisionStore
 from engine.heartbeat import read_heartbeat
 from engine.launch import TRADABLE_BALANCE_RATIO
+from engine.logredact import redact
 from engine.risk import day_start
 from engine.settings import ConfigError, Settings, load_settings
 from gateway import VERSION
@@ -50,6 +51,7 @@ from gateway.views import (
 logger = logging.getLogger("trading_bot.gateway")
 
 CACHE_TTL_S = 2.0
+TRADE_PAGE = 500
 CANDLE_SECONDS = 3600
 HEARTBEAT_EVENT_S = 60
 SECRET_KEYS = ("api_key",)
@@ -137,15 +139,33 @@ class Gateway:
     async def ft(self, bot: BotRef, path: str, ttl: float = CACHE_TTL_S, **params: Any) -> Any:
         key = (bot.id, path + json.dumps(params, sort_keys=True))
         cached = self.cache.get(key)
-        if cached and time.monotonic() - cached[0] < ttl:
+        if cached and cached[0] > time.monotonic():
             return cached[1]
         value = await self.upstreams[bot.id].get(path, **params)
-        self.cache[key] = (time.monotonic(), value)
+        now = time.monotonic()
+        self.cache = {item: entry for item, entry in self.cache.items() if entry[0] > now}
+        self.cache[key] = (now + ttl, value)
         return value
 
+    async def closed_trades(self, bot: BotRef) -> list[dict[str, Any]]:
+        """Every closed trade, paged from Freqtrade; fails closed when the pages do not add up to the total."""
+        rows: dict[int, dict[str, Any]] = {}
+        total = 0
+        while True:
+            page = await self.ft(bot, "/trades", limit=TRADE_PAGE, offset=len(rows), order_by_id=True)
+            total = page.get("total_trades", 0)
+            batch = page.get("trades", [])
+            for trade in batch:
+                rows[trade["trade_id"]] = trade
+            if len(rows) >= total or len(batch) < TRADE_PAGE:
+                break
+        if len(rows) != total:
+            raise ApiError(502, "upstream_error", f"Freqtrade returned {len(rows)} of {total} closed trades", 2000)
+        return list(rows.values())
+
     async def closed_and_open(self, bot: BotRef) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-        history, status = await asyncio.gather(self.ft(bot, "/trades", limit=500), self.ft(bot, "/status"))
-        return history.get("trades", []), status
+        closed, status = await asyncio.gather(self.closed_trades(bot), self.ft(bot, "/status"))
+        return closed, status
 
     async def risk(self, bot: BotRef) -> dict[str, Any]:
         settings = self.engine_settings(bot)
@@ -645,8 +665,8 @@ def create_app(gateway: Gateway) -> FastAPI:
     async def trades(
         bot: str | None = None, limit: int = Query(100, ge=1, le=500), pair: str | None = None
     ) -> list[dict[str, Any]]:
-        history = await gateway.ft(gateway.bot(bot), "/trades", limit=500)
-        rows = [trade for trade in history.get("trades", []) if pair is None or trade.get("pair") == pair]
+        closed, opened = await gateway.closed_and_open(gateway.bot(bot))
+        rows = [trade for trade in [*opened, *closed] if pair is None or trade.get("pair") == pair]
         rows.sort(key=lambda trade: trade.get("trade_id", 0), reverse=True)
         return rows[:limit]
 
@@ -722,7 +742,13 @@ def create_app(gateway: Gateway) -> FastAPI:
 
     @app.get("/gw/v1/logs", dependencies=[Depends(reader)])
     async def logs(bot: str | None = None, limit: int = Query(50, ge=1, le=500)) -> dict[str, Any]:
-        return await gateway.ft(gateway.bot(bot), "/logs", limit=limit)
+        data = await gateway.ft(gateway.bot(bot), "/logs", limit=limit)
+        return {
+            **data,
+            "logs": [
+                [redact(field) if isinstance(field, str) else field for field in line] for line in data.get("logs", [])
+            ],
+        }
 
     @app.get("/gw/v1/sysinfo", dependencies=[Depends(reader)])
     async def sysinfo(bot: str | None = None) -> dict[str, Any]:
@@ -785,8 +811,11 @@ def create_app(gateway: Gateway) -> FastAPI:
         try:
             await hello(client)
             while True:
+                frame = await socket.receive()
+                if frame["type"] == "websocket.disconnect":
+                    break
                 try:
-                    message = json.loads(await socket.receive_text())
+                    message = json.loads(frame.get("text") or "")
                 except ValueError:
                     continue
                 if isinstance(message, dict):
@@ -838,8 +867,13 @@ def create_app(gateway: Gateway) -> FastAPI:
             client.topics = {topic for topic in message.get("topics") or [] if isinstance(topic, str)}
             client.candles = {}
             for item in message.get("candles") or []:
-                if isinstance(item, dict) and isinstance(item.get("pair"), str):
-                    client.candles[item["pair"]] = max(1, min(1500, int(item.get("limit") or 300)))
+                if not isinstance(item, dict) or not isinstance(item.get("pair"), str):
+                    continue
+                try:
+                    limit = int(item.get("limit") or 300)
+                except (TypeError, ValueError):
+                    continue
+                client.candles[item["pair"]] = max(1, min(1500, limit))
             if "gw.candles" in client.topics:
                 timeframe = gateway.engine_settings(gateway.primary()).exchange.timeframe
                 for pair, limit in client.candles.items():

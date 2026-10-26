@@ -62,6 +62,7 @@ def freqtrade_config(settings: Settings, serve_api: bool = True) -> dict[str, An
         "trading_bot": {
             "bot_id": settings.bot_id,
             "shadow_url": settings.shadow.url if settings.swarm.enabled and settings.shadow else None,
+            "shadow_token_env": settings.shadow.token_env if settings.shadow else None,
             "initial_capital": settings.capital.initial_idr,
             "compounding": settings.capital.compounding,
             "risk": settings.risk.model_dump(),
@@ -86,9 +87,11 @@ def secret_env(settings: Settings, environ: dict[str, str]) -> dict[str, str]:
         "FREQTRADE__API_SERVER__USERNAME": settings.api.username_env,
         "FREQTRADE__API_SERVER__PASSWORD": settings.api.password_env,
         "FREQTRADE__API_SERVER__JWT_SECRET_KEY": settings.api.jwt_secret_env,
-        "FREQTRADE__API_SERVER__WS_TOKEN": settings.api.ws_token_env,
     }
-    missing = [source for source in names.values() if not environ.get(source)]
+    required = list(names.values())
+    if settings.swarm.enabled and settings.shadow is not None:
+        required.append(settings.shadow.token_env)
+    missing = [source for source in required if not environ.get(source)]
     if missing:
         raise MissingSecret(f"set environment variables: {', '.join(missing)}")
     return {target: environ[source] for target, source in names.items()}

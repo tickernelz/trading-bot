@@ -18,18 +18,23 @@ mount=/opt/trading-bot/run
 
 container_args() {
   case $1 in
-    bot-a | bot-b)
+    bot-a)
       echo "--memory 1g --memory-swap 1g --env-file $run_dir/secrets/ft.env"
       echo "-e TRADING_BOT_CONFIG=$mount/config/$1.yaml -e TRADING_BOT_USERDIR=$mount/$1"
       echo "${IMAGE:?set IMAGE} trade"
       ;;
+    bot-b)
+      echo "--memory 1g --memory-swap 1g --env-file $run_dir/secrets/ft.env --env-file $run_dir/secrets/shadow.env"
+      echo "-e TRADING_BOT_CONFIG=$mount/config/$1.yaml -e TRADING_BOT_USERDIR=$mount/$1"
+      echo "${IMAGE:?set IMAGE} trade"
+      ;;
     shadow-b)
-      echo "--memory 512m --memory-swap 512m --env-file $run_dir/secrets/swarm.env"
+      echo "--memory 512m --memory-swap 512m --env-file $run_dir/secrets/swarm.env --env-file $run_dir/secrets/shadow.env"
       echo "-e TRADING_BOT_CONFIG=$mount/config/bot-b.yaml -e TRADING_BOT_USERDIR=$mount/bot-b"
       echo "--entrypoint python ${IMAGE:?set IMAGE} -m engine.shadow"
       ;;
     gateway)
-      echo "--memory 512m --memory-swap 512m --env-file $run_dir/secrets/ft.env --env-file $run_dir/secrets/gateway.env"
+      echo "--memory 512m --memory-swap 512m --env-file $run_dir/secrets/gateway.env"
       echo "-e GATEWAY_CONFIG=$mount/config/gateway.yaml"
       echo "--entrypoint python ${IMAGE:?set IMAGE} -m gateway"
       ;;

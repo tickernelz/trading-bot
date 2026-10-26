@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import secrets
+import sqlite3
 import sys
 from contextlib import asynccontextmanager
 from dataclasses import asdict
@@ -13,14 +15,16 @@ from typing import Annotated, Any
 
 import uvicorn
 import yaml
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
 from tb_swarm.config import parse_config
 from tb_swarm.models import ChoiceQuestion, DecisionRequest
 from tb_swarm.runner import DecisionOutcome, SwarmRunner
 
 from engine.decisions import DecisionStore
+from engine.logredact import install as install_log_redaction
 from engine.settings import ConfigError, Settings, load_settings
+from engine.shadow_client import TOKEN_HEADER
 
 logger = logging.getLogger("trading_bot.shadow")
 
@@ -155,7 +159,7 @@ class ShadowService:
         await self.runner.aclose()
 
 
-def create_app(service: ShadowService) -> FastAPI:
+def create_app(service: ShadowService, token: str) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_: FastAPI):
         interrupted = service.store.interrupt_pending("shadow_restart")
@@ -166,11 +170,16 @@ def create_app(service: ShadowService) -> FastAPI:
 
     app = FastAPI(lifespan=lifespan, openapi_url=None, docs_url=None, redoc_url=None)
 
-    @app.post("/candidates", status_code=202)
+    async def caller(request: Request) -> None:
+        offered = request.headers.get(TOKEN_HEADER, "")
+        if not secrets.compare_digest(offered.encode(), token.encode()):
+            raise HTTPException(401, "unauthorized")
+
+    @app.post("/candidates", status_code=202, dependencies=[Depends(caller)])
     async def candidates(candidate: Candidate) -> dict[str, str]:
         try:
             service.submit(candidate)
-        except Exception as exc:
+        except sqlite3.IntegrityError as exc:
             raise HTTPException(409, "decision already recorded") from exc
         return {"decision_id": candidate.decision_id}
 
@@ -189,6 +198,7 @@ def create_app(service: ShadowService) -> FastAPI:
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
     logging.getLogger("httpx").setLevel(logging.WARNING)
+    install_log_redaction()
     config_file = os.environ.get("TRADING_BOT_CONFIG", "config/config.yaml")
     userdir = Path(os.environ.get("TRADING_BOT_USERDIR", "user_data"))
     try:
@@ -199,10 +209,15 @@ def main() -> int:
     if not settings.swarm.enabled or settings.shadow is None:
         print("trading-bot shadow: refusing to start: swarm is disabled in this config", file=sys.stderr)
         return 2
+    token = os.environ.get(settings.shadow.token_env, "")
+    if len(token) < 32:
+        message = f"{settings.shadow.token_env} needs at least 32 characters"
+        print(f"trading-bot shadow: refusing to start: {message}", file=sys.stderr)
+        return 2
     raw = yaml.safe_load(Path(config_file).read_text(encoding="utf-8"))
     store = DecisionStore(userdir / settings.shadow.database)
     service = ShadowService(settings, raw, store, dict(os.environ))
-    uvicorn.run(create_app(service), host=settings.shadow.listen, port=settings.shadow.port, log_level="warning")
+    uvicorn.run(create_app(service, token), host=settings.shadow.listen, port=settings.shadow.port, log_level="warning")
     return 0
 
 

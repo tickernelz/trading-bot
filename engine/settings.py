@@ -127,7 +127,6 @@ class Api(Strict):
     username_env: EnvName = "FT_API_USERNAME"
     password_env: EnvName = "FT_API_PASSWORD"
     jwt_secret_env: EnvName = "FT_API_JWT_SECRET"
-    ws_token_env: EnvName = "FT_API_WS_TOKEN"
     force_entry: bool = False
 
 
@@ -135,6 +134,7 @@ class Shadow(Strict):
     listen: Literal["127.0.0.1", "::1"] = "127.0.0.1"
     port: Annotated[int, Field(ge=1024, le=65535)] = 8091
     database: Annotated[str, Field(pattern=r"^[A-Za-z0-9_.-]+\.sqlite$")] = "swarm_decisions.sqlite"
+    token_env: EnvName = "SHADOW_TOKEN"
 
     @property
     def url(self) -> str:

@@ -22,6 +22,12 @@ providers:
     api_key_env: NUTARALINE_API_KEY
     api_key: null
     models: [deepseek-v4.1-flash-1017]
+  - id: experientiallabs
+    type: openai-completions
+    base_url: https://api.experientiallabs.ai/v1
+    api_key_env: EXPERIENTIALLABS_API_KEY
+    api_key: null
+    models: [deepseek-v4.1-flash-1017]
 swarm:
   enabled: true
   mode: shadow
@@ -39,7 +45,7 @@ swarm:
       enabled: true
     - id: v2
       adapter: llm_structured
-      provider: nutaraline
+      provider: experientiallabs
       model: deepseek-v4.1-flash-1017
       variation: option_order
       timeout_s: 30
@@ -55,7 +61,7 @@ swarm:
       enabled: true
     - id: v4
       adapter: llm_structured
-      provider: nutaraline
+      provider: experientiallabs
       model: deepseek-v4.1-flash-1017
       variation: option_order
       timeout_s: 30
@@ -71,7 +77,7 @@ swarm:
       enabled: true
     - id: v6
       adapter: llm_structured
-      provider: nutaraline
+      provider: experientiallabs
       model: deepseek-v4.1-flash-1017
       variation: option_order
       timeout_s: 30
@@ -104,9 +110,9 @@ api:
   username_env: FT_API_USERNAME
   password_env: FT_API_PASSWORD
   jwt_secret_env: FT_API_JWT_SECRET
-  ws_token_env: FT_API_WS_TOKEN
   force_entry: false
 shadow:
   listen: 127.0.0.1
   port: 8091
   database: swarm_decisions.sqlite
+  token_env: SHADOW_TOKEN
