@@ -601,7 +601,7 @@ def create_app(gateway: Gateway) -> FastAPI:
     async def config_error(_: Request, exc: ConfigError) -> JSONResponse:
         return error_response(503, "upstream_error", str(exc).splitlines()[0][:300])
 
-    def reader(request: Request) -> str:
+    async def reader(request: Request) -> str:
         token = gateway.token_of(request)
         if not token or gateway.ledger.session_scope(token) is None:
             raise ApiError(401, "unauthorized", "sign in again")

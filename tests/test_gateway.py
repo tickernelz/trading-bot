@@ -200,6 +200,21 @@ def test_read_endpoints_need_a_live_session(setup):
     assert _get(client, "/gw/v1/risk", token).status_code == 401
 
 
+def test_concurrent_authenticated_requests_share_the_ledger_safely(setup):
+    gateway, _, client, _ = setup
+    token = _token(client)
+    app = client.app
+
+    async def burst():
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://gw") as http:
+            headers = {"Authorization": f"Bearer {token}"}
+            responses = await asyncio.gather(*(http.get("/gw/v1/audit?limit=5", headers=headers) for _ in range(300)))
+        return [response.status_code for response in responses]
+
+    assert set(asyncio.run(burst())) == {200}
+
+
 def test_risk_combines_todays_closed_loss_and_open_pnl(setup):
     _, _, client, _ = setup
     risk = _get(client, "/gw/v1/risk", _token(client)).json()
