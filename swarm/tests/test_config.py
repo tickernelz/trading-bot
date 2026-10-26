@@ -26,15 +26,18 @@ def raw(voters=None, providers=None, **swarm):
 
 def test_repository_example_config_parses():
     config = load_config(EXAMPLE)
-    assert len(config.swarm.voters) == 7
+    enabled = [v for v in config.swarm.voters if v.enabled]
+    assert len(enabled) == 7
     assert config.swarm.min_voters_answered == 5
-    assert config.providers["nutaraline"].type == "openai-completions"
-    assert {v.model for v in config.swarm.voters} == {"deepseek-v4.1-flash-1017"}
+    assert len({v.provider for v in enabled}) == 7
+    assert len({v.model for v in enabled}) == 7
+    assert {v.adapter for v in config.swarm.voters if not v.enabled} == {"systemone", "openai_decisions"}
+    assert all(spec.resolve_base_url({}) for spec in config.providers.values())
 
 
-def test_example_config_base_url_is_unresolved_and_fails_build_loudly():
+def test_unresolved_base_url_fails_build_loudly():
     config = load_config(EXAMPLE)
-    spec = config.providers["nutaraline"]
+    spec = config.providers["nutaraline"].model_copy(update={"base_url": "from_import"})
     assert spec.resolve_base_url({}) is None
     with pytest.raises(ConfigError):
         build_provider(config.swarm.voters[0], spec, {})
@@ -96,20 +99,22 @@ def test_providers_accept_mapping_form():
     assert config.providers["p"].id == "p"
 
 
-async def test_three_adapters_answer_the_same_question_end_to_end(stub):
+async def test_four_adapters_answer_the_same_question_end_to_end(stub):
     config = parse_config(
         {
             "providers": [
                 {"id": "llm", "type": "openai-completions", "base_url": stub.base_url + "/v1", "api_key_env": "K"},
                 {"id": "s1", "type": "systemone", "base_url": stub.base_url, "api_key_env": "K"},
                 {"id": "or", "type": "openrouter-decisions", "base_url": stub.base_url, "api_key_env": "K"},
+                {"id": "od", "type": "openai-decisions", "base_url": stub.base_url, "api_key_env": "K"},
             ],
             "swarm": {
-                "min_voters_answered": 3,
+                "min_voters_answered": 4,
                 "voters": [
                     voter("llm", provider="llm", model="deepseek-test"),
                     voter("s1", adapter="systemone", provider="s1", model="jev-latest"),
                     voter("or", adapter="openrouter_decisions", provider="or", model="typesafe/jev-1.13"),
+                    voter("od", adapter="openai_decisions", provider="od", model="gpt-6-luna-decisions"),
                 ],
             },
         }
@@ -124,11 +129,12 @@ async def test_three_adapters_answer_the_same_question_end_to_end(stub):
         },
     )
     outcome = await runner.decide(request)
-    assert outcome.proceed and outcome.answered == 3
-    assert {r.voter_id: r.status for r in outcome.voters} == {"llm": "ok", "s1": "ok", "or": "ok"}
+    assert outcome.proceed and outcome.answered == 4
+    assert {r.voter_id: r.status for r in outcome.voters} == {"llm": "ok", "s1": "ok", "or": "ok", "od": "ok"}
     assert {req.path for req in stub.state.requests} == {
         "/v1/chat/completions",
         "/v1/systemone",
+        "/v1/decisions",
         "/api/alpha/decisions",
     }
     await runner.aclose()

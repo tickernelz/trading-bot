@@ -15,6 +15,8 @@ def test_example_config_is_valid():
     assert settings.risk.on_breach == "stop_new_entries"
     assert settings.compute.max_cost_idr_per_day is False
     assert settings.data.social is False
+    assert {"systemone", "openai-decisions"} <= {provider.type for provider in settings.providers}
+    assert len({voter.provider for voter in settings.swarm.voters if voter.enabled}) == 7
 
 
 def _mutations():
