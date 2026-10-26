@@ -118,7 +118,7 @@ Rekam data uji gateway dari lari yang sedang jalan (butuh `secrets/ft.env` dan `
 
 Unit systemd user transien (`Restart=always`) bertahan saat sesi terminal atau server lain di-restart; restart dihitung dari `starts.jsonl`. Log: `journalctl --user -u trading-bot-stack-bot-a`.
 
-Dampak ke mesin dibatasi: tiap kontainer membawa `--cpus` (bot 1.0; layanan bayangan, analis, dan gateway 0.5) dan `--memory`; unit PWA berjalan di host tanpa kontainer dengan `Nice=10` dan `CPUQuota=50%`. `stack.sh start pwa` menjalankan `npm ci --include=dev` bila `pwa/node_modules` belum ada, `npm run build`, lalu `npm run preview` melayani `http://127.0.0.1:4173` dan meneruskan `/gw` ke `GATEWAY_URL`.
+Dampak ke mesin dibatasi: tiap kontainer membawa `--cpus` (bot 1.0; layanan bayangan, analis, dan gateway 0.5) dan `--memory`; unit PWA berjalan di host tanpa kontainer dengan `Nice=10`, `CPUQuota=50%`, dan `MemoryMax=512M`. `stack.sh start pwa` menjalankan `npm ci --include=dev` bila `pwa/node_modules` belum ada atau `package-lock.json` lebih baru darinya, `npm run build`, lalu `npm run preview` melayani `http://127.0.0.1:4173` dan meneruskan `/gw` ke `GATEWAY_URL`.
 
 ## Tahap 2b: konfigurasi, provider, key, voter
 

@@ -79,13 +79,13 @@ container_args() {
 start_pwa() {
   local node_bin
   node_bin=$(dirname "$(command -v npm)")
-  if [ ! -d "$pwa_dir/node_modules" ]; then
+  if [ ! -d "$pwa_dir/node_modules" ] || [ "$pwa_dir/package-lock.json" -nt "$pwa_dir/node_modules/.package-lock.json" ]; then
     npm --prefix "$pwa_dir" ci --include=dev
   fi
   npm --prefix "$pwa_dir" run build
   systemd-run --user --collect --unit "$1" \
     -p Restart=always -p RestartSec=15 -p TimeoutStopSec=30 \
-    -p Nice=10 -p "CPUQuota=$(cpu_cap pwa)" -p "WorkingDirectory=$pwa_dir" \
+    -p Nice=10 -p "CPUQuota=$(cpu_cap pwa)" -p MemoryMax=512M -p "WorkingDirectory=$pwa_dir" \
     -p "Environment=PATH=$node_bin:/usr/local/bin:/usr/bin" \
     --setenv=GATEWAY_URL="$gateway_url" \
     npm run preview

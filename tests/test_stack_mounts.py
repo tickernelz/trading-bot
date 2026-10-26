@@ -105,6 +105,7 @@ def test_the_pwa_is_a_host_unit_bounded_by_nice_and_cpu_quota(tmp_path):
     tokens = shlex.split(unit)
     assert "Nice=10" in tokens
     assert "CPUQuota=50%" in tokens
+    assert "MemoryMax=512M" in tokens
     assert any(token.startswith("WorkingDirectory=") and token.endswith("/pwa") for token in tokens)
     assert any(token.startswith("Environment=PATH=") for token in tokens)
     assert unit.endswith("GATEWAY_URL=http://127.0.0.1:8090 npm run preview")
