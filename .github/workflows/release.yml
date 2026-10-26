@@ -112,12 +112,15 @@ jobs:
           uv run --python 3.13 --no-project scripts/smoke.py --timeout 300 --engine-wait 150 -- "$exe" 2>&1 | tee smoke.log
           grep -q "^RESULT:" smoke.log
       - uses: actions/upload-artifact@v7
-        if: always()
         with:
           name: bundle-${{ matrix.target }}
-          path: |
-            build/${{ matrix.target }}/out/*
-            smoke.log
+          path: build/${{ matrix.target }}/out/*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: smoke-${{ matrix.target }}
+          path: smoke.log
           if-no-files-found: warn
       - uses: actions/upload-artifact@v7
         if: always() && matrix.from_source != ''
@@ -138,6 +141,10 @@ jobs:
           pattern: bundle-*
           path: artifacts
           merge-multiple: true
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: smoke-*
+          path: smoke
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
@@ -146,6 +153,7 @@ jobs:
           shopt -s nullglob
           cd artifacts
           ls -l
+          results=$(for d in ../smoke/smoke-*; do echo "- ${d##*/smoke-}: $(grep '^RESULT:' "$d/smoke.log" | head -n 1)"; done)
           cat trading-bot-*.sha256 > SHA256SUMS
           sha256sum -c SHA256SUMS
           flags=()
@@ -157,6 +165,9 @@ jobs:
             echo
             echo "Targets built and smoke tested in this release:"
             for f in trading-bot-*.sha256; do echo "- ${f%.sha256}"; done
+            echo
+            echo "Smoke test of each unpacked archive on its native runner:"
+            echo "$results"
           } > notes.md
           files=(trading-bot-*.tar.gz trading-bot-*.zip SHA256SUMS)
           gh release create "${GITHUB_REF_NAME}" "${flags[@]}" --title "${GITHUB_REF_NAME}" --notes-file notes.md --verify-tag "${files[@]}"
