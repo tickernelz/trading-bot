@@ -1,19 +1,31 @@
 <script lang="ts">
+  import type { Component } from "svelte";
   import Nav from "./components/Nav.svelte";
   import StaleBanner from "./components/StaleBanner.svelte";
   import TopBar from "./components/TopBar.svelte";
   import { gateway } from "./lib/gateway.svelte";
-  import { route } from "./lib/route.svelte";
+  import { route, SCREENS, type Screen } from "./lib/route.svelte";
   import Aksi from "./screens/Aksi.svelte";
   import Grafik from "./screens/Grafik.svelte";
+  import Lainnya from "./screens/Lainnya.svelte";
   import Login from "./screens/Login.svelte";
   import Ringkas from "./screens/Ringkas.svelte";
-  import Sistem from "./screens/Sistem.svelte";
-  import Swarm from "./screens/Swarm.svelte";
   import { t } from "./lib/i18n";
-  import { SCREENS } from "./lib/route.svelte";
 
+  const EAGER: Partial<Record<Screen, Component>> = { ringkas: Ringkas, grafik: Grafik, aksi: Aksi, lainnya: Lainnya };
+  const LAZY: Partial<Record<Screen, () => Promise<{ default: Component }>>> = {
+    swarm: () => import("./screens/Swarm.svelte"),
+    sistem: () => import("./screens/Sistem.svelte"),
+    kontrol: () => import("./screens/Kontrol.svelte"),
+    konfigurasi: () => import("./screens/Konfigurasi.svelte"),
+    provider: () => import("./screens/Provider.svelte"),
+    riwayat: () => import("./screens/Riwayat.svelte"),
+    ab: () => import("./screens/AvsB.svelte"),
+    audit: () => import("./screens/Audit.svelte"),
+  };
   const title = $derived(SCREENS.find((s) => s.id === route.screen)?.label ?? "");
+  const eager = $derived(EAGER[route.screen] ?? null);
+  const lazy = $derived(LAZY[route.screen]?.() ?? null);
 
   $effect(() => {
     document.title = title + " · Bot Trading";
@@ -26,23 +38,29 @@
   <div class="shell">
     <aside class="rail">
       <p class="brand">Bot Trading</p>
-      <Nav current={route.screen} labelled={t("nav.side")} />
+      <Nav current={route.screen} variant="rail" />
     </aside>
     <div class="body">
       <TopBar />
       <StaleBanner />
       <main id="isi">
         <h1 class="sr-only">{title}</h1>
-        {#if route.screen === "ringkas"}
-          <Ringkas />
-        {:else if route.screen === "grafik"}
-          <Grafik />
-        {:else if route.screen === "aksi"}
-          <Aksi />
-        {:else if route.screen === "swarm"}
-          <Swarm />
-        {:else}
-          <Sistem />
+        {#if eager}
+          {@const Screen = eager}
+          <Screen />
+        {:else if lazy}
+          {#await lazy}
+            <div class="loading" aria-busy="true" aria-label={t("app.loading_screen")}>
+              <span class="skeleton" style="width: 40%"></span>
+              <span class="skeleton" style="width: 85%"></span>
+              <span class="skeleton" style="width: 70%"></span>
+            </div>
+          {:then module}
+            {@const Screen = module.default}
+            <Screen />
+          {:catch}
+            <p class="note warn-text">{t("app.screen_failed")}</p>
+          {/await}
         {/if}
       </main>
     </div>
@@ -77,6 +95,11 @@
   .tabs :global(a[aria-current="page"]) {
     box-shadow: inset 0 2px 0 var(--ink);
   }
+  .loading {
+    display: grid;
+    gap: var(--space-3);
+    padding: var(--space-5) var(--space-4);
+  }
   @media (min-width: 960px) {
     .shell {
       display: grid;
@@ -100,8 +123,7 @@
       border-bottom: 1px solid var(--rule);
     }
     .rail :global(nav) {
-      flex-direction: column;
-      padding: var(--space-2) 0;
+      padding: 0 0 var(--space-4);
     }
     .rail :global(a) {
       justify-content: flex-start;

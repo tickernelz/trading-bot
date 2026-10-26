@@ -3,6 +3,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import webpush, { type PushSubscription } from "web-push";
 import { WebSocket, WebSocketServer } from "ws";
 import { buildCandles, buildDecision, buildNews, buildSentiment, COLUMNS, HOUR, iso, isoMs, PAIRS, rng, type Row, START_CAPITAL, STAKE_RATIO } from "./data";
+import { createStage2, type MockTrade, type Session } from "./stage2";
 
 type Scenario = "aman" | "ditahan" | "berhenti";
 
@@ -12,7 +13,9 @@ const random = rng(Number(process.env.MOCK_GATEWAY_SEED ?? 7));
 const vapid = webpush.generateVAPIDKeys();
 webpush.setVapidDetails("mailto:contoh@localhost", vapid.publicKey, vapid.privateKey);
 
-const tokens = new Set<string>();
+const tokens = new Map<string, Session>();
+let remote = process.env.MOCK_REMOTE === "1";
+const scopeFor = (isRemote: boolean): Session["scope"] => (isRemote ? "read" : "control");
 const subscriptions = new Map<string, PushSubscription>();
 const buffer: { type: string; seq: number; ts: string; data: unknown }[] = [];
 const clients = new Map<WebSocket, { candles: Set<string>; topics: Set<string> }>();
@@ -33,18 +36,6 @@ const hourNow = () => Math.floor(Date.now() / HOUR) * HOUR;
 let lastHour = hourNow() - HOUR;
 const candles = new Map<string, Row[]>(PAIRS.map((p) => [p.pair, buildCandles(p, lastHour, 300)]));
 const prices = new Map<string, number>(PAIRS.map((p) => [p.pair, candles.get(p.pair)!.at(-1)![4]]));
-
-interface MockTrade {
-  trade_id: number;
-  pair: string;
-  open_ms: number;
-  open_rate: number;
-  stake_amount: number;
-  enter_tag: string;
-  close_ms?: number;
-  close_rate?: number;
-  exit_reason?: string;
-}
 
 const FEE = 0.002;
 const trades: MockTrade[] = [];
@@ -195,8 +186,8 @@ function send(ws: WebSocket, msg: object) {
   if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
 }
 
-function emit(type: string, data: unknown) {
-  const event = { type, seq: ++seq, ts: isoMs(Date.now()), data };
+function emit(type: string, data: unknown, bot?: string) {
+  const event = { type, seq: ++seq, ts: isoMs(Date.now()), data, ...(bot ? { bot } : {}) };
   buffer.push(event);
   if (buffer.length > 200) buffer.shift();
   for (const [ws] of clients) if (wants(ws, type)) send(ws, event);
@@ -204,7 +195,7 @@ function emit(type: string, data: unknown) {
 }
 
 function hello(ws: WebSocket) {
-  send(ws, { type: "gw.hello", seq, ts: isoMs(Date.now()), data: { gateway_version: "0.1.0-contoh", freqtrade_version: "2026.9", dry_run: true, whitelist: PAIRS.map((p) => p.pair), sequence_resume_window: 200, sample_data: true } });
+  send(ws, { type: "gw.hello", seq, ts: isoMs(Date.now()), data: { gateway_version: "0.1.0-contoh", freqtrade_version: "2026.9", dry_run: true, whitelist: PAIRS.map((p) => p.pair), sequence_resume_window: 200, sample_data: true, bots: stage2.bots } });
 }
 
 const PUSH_SAMPLES: Record<string, { title: string; body: string; url: string }> = {
@@ -251,6 +242,23 @@ async function body(req: IncomingMessage): Promise<Record<string, unknown>> {
   return text ? (JSON.parse(text) as Record<string, unknown>) : {};
 }
 
+const stage2 = createStage2({
+  trades,
+  prices,
+  candles,
+  decisions,
+  fee: FEE,
+  startCapital: START_CAPITAL,
+  started,
+  emit,
+  tradeJson,
+  profitOf,
+  overview,
+  riskSnapshot,
+  equitySeries,
+  upstreamFailure: (path) => failing.get(path),
+});
+
 const server = createServer(async (req, res) => {
   if (Date.now() < droppedUntil && !req.url?.startsWith("/gw/v1/dev/")) {
     req.socket.destroy();
@@ -258,16 +266,19 @@ const server = createServer(async (req, res) => {
   }
   const url = new URL(req.url ?? "/", "http://localhost");
   const path = url.pathname;
+  let cached: Promise<Record<string, unknown>> | null = null;
+  const readBody = () => (cached ??= body(req));
   try {
     if (req.method === "POST" && path === "/gw/v1/session") {
-      const b = await body(req);
+      const b = await readBody();
       if (b.password !== PASSWORD) return fail(res, 401, "unauthorized", "Kata sandi salah");
       const token = randomBytes(24).toString("hex");
-      tokens.add(token);
-      return json(res, 200, { token, expires_at: iso(Date.now() + 30 * 24 * HOUR) });
+      const session: Session = { scope: scopeFor(remote), expires_at: iso(Date.now() + 30 * 24 * HOUR) };
+      tokens.set(token, session);
+      return json(res, 200, { token, expires_at: session.expires_at, scope: session.scope });
     }
     if (path.startsWith("/gw/v1/dev/")) {
-      const b = req.method === "POST" ? await body(req) : {};
+      const b = req.method === "POST" ? await readBody() : {};
       if (path === "/gw/v1/dev/scenario") {
         scenario = (b.name as Scenario) ?? "aman";
         emit("status", { status: scenario === "berhenti" ? "stopped" : "running" });
@@ -280,6 +291,11 @@ const server = createServer(async (req, res) => {
         return json(res, 200, { dropped_until: iso(droppedUntil) });
       }
       if (path === "/gw/v1/dev/push") return json(res, 200, await push(String(b.kind)));
+      if (path === "/gw/v1/dev/remote") {
+        remote = Boolean(b.remote);
+        for (const session of tokens.values()) session.scope = scopeFor(remote);
+        return json(res, 200, { remote });
+      }
       if (path === "/gw/v1/dev/upstream") {
         upstreamDownUntil = Date.now() + Number(b.seconds ?? 30) * 1000;
         emit("gw.error", { code: "upstream_unavailable", message: "Freqtrade websocket closed", retry_ms: 5000 });
@@ -294,12 +310,19 @@ const server = createServer(async (req, res) => {
       return fail(res, 404, "not_found", "unknown dev route");
     }
     const auth = req.headers.authorization?.replace(/^Bearer /, "");
-    if (!auth || !tokens.has(auth)) return fail(res, 401, "unauthorized", "Token tidak sah");
-    const forced = failing.get(path);
+    const session = auth ? tokens.get(auth) : undefined;
+    if (!auth || !session) return fail(res, 401, "unauthorized", "Token tidak sah");
+    const forced = req.method === "GET" ? failing.get(path) : undefined;
     if (forced) return fail(res, forced, forced === 404 ? "not_found" : "upstream_error", "Gagal dipaksa oleh rute dev");
     if (upstreamDown() && ["/gw/v1/health", "/gw/v1/overview", "/gw/v1/risk"].includes(path)) {
       return fail(res, 503, "upstream_unavailable", "Freqtrade API did not answer within 5s");
     }
+    if (path === "/gw/v1/session" && req.method === "DELETE") {
+      tokens.delete(auth);
+      return json(res, 200, { revoked: true });
+    }
+    const reply = await stage2.route(req, url, session, readBody);
+    if (reply) return json(res, reply.status, reply.body);
     if (req.method === "GET") {
       switch (path) {
         case "/gw/v1/health":
@@ -371,7 +394,7 @@ const server = createServer(async (req, res) => {
       }
     }
     if (path === "/gw/v1/push/subscriptions") {
-      const b = await body(req);
+      const b = await readBody();
       const sub = b.subscription as PushSubscription | undefined;
       if (req.method === "POST" && sub?.endpoint) {
         subscriptions.set(sub.endpoint, sub);
@@ -485,7 +508,7 @@ function script() {
     const d = buildDecision(random, pair, lastHour, Date.now(), phase === 2 && random() < 0.3);
     decisions.unshift(d);
     decisions.splice(500);
-    emit("gw.decision", d);
+    emit("gw.decision", stage2.decorate(d), "B");
     return;
   }
   if (phase === 1) {

@@ -775,3 +775,34 @@ Satu bot dry-run Indodax (`trading-bot/engine` dengan `api.force_entry: true` ha
 - Klasifikasi perubahan konfigurasi (`risky_changes`) belum terhubung ke endpoint; menunggu `PATCH /gw/v1/settings` (ZHA-3775).
 - Kontrol dari PWA jarak jauh sengaja tidak ada (hanya loopback); bila nanti kill switch harus bisa dari ponsel lewat tunnel, itu keputusan keamanan baru.
 - Deteksi tunnel bergantung pada header forward. Cloudflare Tunnel menambah `CF-Connecting-IP` dan `X-Forwarded-For` menurut dokumentasinya, tetapi belum diuji dengan tunnel sungguhan. Tunnel yang tidak menambah header (misalnya `ssh -L`) terlihat sebagai lokal. uvicorn juga menulis ulang alamat klien dari `X-Forwarded-For` bila koneksi datang dari 127.0.0.1 (uji hidup: baris audit mencatat IP dari header itu), jadi aturan lokal tertolak dua kali untuk request semacam itu.
+
+## 15. PWA tahap 2 (ZHA-3777)
+
+Layar tahap 2 (Kontrol, Konfigurasi, Provider dan key, Swarm per keputusan, Riwayat, A vs B, Audit) memakai kontrak gateway yang sudah dibangun di cabang tugasnya, apa adanya, dan hanya menulis rancangan untuk endpoint yang belum dimiliki cabang mana pun. Saat ditulis (2026-10-26) gateway tahap 1 (ZHA-3764) dan 2a (ZHA-3774, bagian 14) sudah di `main`, sedangkan 2b dan 2c belum. Cabang 2b memakai nomor 14 untuk bagiannya sendiri dan `main` memakai nomor 12 dua kali (N2 dan gateway tahap 1), jadi rujukan di bawah memakai nama tugas, bukan nomor.
+
+### 15.1 Kontrak yang dipakai apa adanya
+
+- Kontrol dan audit: ZHA-3774 (bagian 2, 3, 6, dan 14 di dokumen ini, `main` a63e1e3). Lingkup sesi dari `scope` login (`control` hanya dari loopback langsung, selain itu `read`); `Idempotency-Key` UUID v4 baru per tekan; `409 confirmation_required` menampilkan langkah 2 dari `error.confirmation`; langkah 2 mengulang permintaan yang sama dengan kunci yang sama dan body `{"confirm": "<id>"}`, termasuk pada `DELETE`; `confirmation_expired` dan `confirmation_invalid` kembali ke langkah 1. Kill switch "Hentikan entry baru" memanggil `stop-entry`; menurut bagian 14.1 `stop-entry`, `pause`, dan `stop` sama-sama dicatat gateway dan dipasang ulang setelah bot restart, hanya `resume` yang menghapusnya.
+- Konfigurasi, provider, key, voter, peran, impor: ZHA-3775 (`feat/stage-2b-config`, bagian "Gateway tahap 2b" di cabang itu). PWA mengirim `PATCH /gw/v1/settings?bot=` dengan `changes` bersarang yang hanya memuat kunci yang berubah, tanpa `mode`, `bot_id`, `api`, `shadow`, `providers`, `swarm.voters`; voter lewat `PUT` dan `DELETE /gw/v1/voters/{id}`; analis lewat `PUT /gw/v1/roles`; provider lewat `PUT` dan `DELETE /gw/v1/providers/{id}`; key lewat `PUT` dan `DELETE /gw/v1/providers/{id}/key`; impor lewat `GET` dan `POST /gw/v1/providers/import`; catatan perubahan dari `GET /gw/v1/settings/changes`. Dua langkah mengikuti `raising_keys` 2b (empat batas risiko dan `capital.initial_idr` naik). Galat skema `400 invalid_request` membawa `loc: pesan` di `message`; PWA memetakan `loc` ke kolom yang sama namanya dan menampilkan sisanya di atas formulir. `restart_required: true` ditampilkan sebagai "berlaku setelah bot di-restart".
+- Registri provider dan voter per bot (`?bot=`): PWA memakai pemilih Bot di layar Konfigurasi dan Provider, dan mengingatkan bahwa dua bot diubah dua kali.
+
+### 15.2 Yang sengaja tidak ada di PWA
+
+- Mengaktifkan atau menonaktifkan provider dari jarak jauh. Plan 4.5 butir 4 menyebutnya, tetapi 2b membatasi sesi `read` ke baca dan uji koneksi, dan skema belum punya `providers[].enabled`. Keputusan ada di ZHA-3796; sampai itu, layar Provider jarak jauh hanya status dan Uji koneksi.
+- Catatan alasan per perubahan konfigurasi: 2b tidak menerima field itu; catatan perubahan adalah siapa, kapan, kunci, nilai lama dan baru dari `/gw/v1/settings/changes`.
+
+### 15.3 Rancangan untuk endpoint yang belum dimiliki cabang mana pun
+
+Isi `rancangan`, menunggu ZHA-3776 (swarm per keputusan, riwayat, A vs B). Dipakai PWA dan gateway tiruan; tugas gateway menangkap ulang bentuknya.
+
+- `GET /gw/v1/decisions` menambah `status=ok|skip` dan `bot=A|B` di samping `pair`, `before` (waktu `candle`, bagian N2 ZHA-3781), dan `limit`. Setiap baris dan event `gw.decision` menambah `outcome`:
+
+```json
+{"state": "settled", "basis": "price", "horizon_h": 4, "price_at": 1463932000, "price_after": 1471200000, "return_pct": 0.5, "return_after_fees_pct": 0.1, "trade_id": null, "is_open": null, "profit_abs": null, "profit_pct": null, "settles_at": "2026-10-25T21:00:00Z"}
+```
+
+  `basis: "trade"`: bot benar-benar masuk; `trade_id`, `is_open`, `profit_abs`, `profit_pct` dari trade itu. `basis: "price"`: entry dilewati; penutupan kandel `horizon_h` jam sesudahnya dibanding harga saat keputusan, sebelum dan sesudah biaya dua sisi; pengandaian kasar, bukan trade. `state`: `pending` (horizon belum lewat atau trade masih terbuka), `insufficient_data` (kandel sesudah horizon tidak ada), `settled`. PWA tidak memberi angka untuk dua yang pertama dan tidak menjumlahkannya.
+- `GET /gw/v1/trades?limit=50&offset=0&state=closed&bot=A`: `offset` sesudah urutan `trade_id` turun, `state=closed` hanya trade tertutup.
+- Harian, mingguan, bulanan per bot: bagian 5.7 dengan `bot`. Per alasan exit dan durasi: 5.8. Per pair, tag entry, alasan exit: 5.9.
+- `GET /gw/v1/equity` menambah `window=total` (sejak start dry-run, satu titik per jam). `GET /gw/v1/profit?window=total&bot=B` meneruskan `max_drawdown` (rasio) dan `max_drawdown_abs` dari `/profit` Freqtrade.
+- `GET /gw/v1/overview?bot=` menambah `state` (`running`, `paused`, `stopped`) dari `/show_config` bot itu, supaya layar Kontrol membaca keadaan Bot B. Tanpa itu PWA memakai `/gw/v1/health` untuk bot pertama dan menulis "keadaan tidak terbaca" untuk bot lain.

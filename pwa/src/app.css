@@ -4,7 +4,7 @@
   --ink: oklch(0.19 0.012 255);
   --ink2: oklch(0.42 0.015 255);
   --rule: oklch(0.86 0.008 255);
-  --rule-strong: oklch(0.7 0.01 255);
+  --rule-strong: oklch(0.6 0.01 255);
   --gain: oklch(0.4 0.15 258);
   --loss: oklch(0.5 0.19 38.6);
   --sig: oklch(0.673 0.217 38.6);
@@ -289,6 +289,152 @@ a {
 
 .stale-value {
   color: var(--ink2);
+}
+
+.btn.kill {
+  background: var(--sig);
+  color: var(--onsig);
+}
+
+.btn.quiet {
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  background: transparent;
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--rule-strong);
+  font-weight: 500;
+}
+
+.btn.quiet:hover {
+  opacity: 1;
+  box-shadow: inset 0 0 0 1px var(--ink2);
+}
+
+.btn.quiet:active {
+  background: var(--panel);
+}
+
+.btn.quiet:disabled,
+.btn.secondary:disabled,
+.btn.kill:disabled {
+  background: var(--panel);
+  color: var(--ink2);
+  box-shadow: inset 0 0 0 1px var(--rule);
+  opacity: 1;
+}
+
+.btn[aria-busy="true"] {
+  cursor: progress;
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+  padding: var(--space-2) var(--space-4);
+}
+
+.field > label,
+.field > .label {
+  font-size: var(--step-0);
+  font-weight: 600;
+}
+
+.field .hint {
+  font-size: var(--step--1);
+  color: var(--ink2);
+}
+
+.field .err {
+  font-size: var(--step--1);
+  color: var(--loss);
+  font-weight: 600;
+}
+
+.input {
+  min-height: 44px;
+  width: 100%;
+  max-width: 22rem;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  box-shadow: inset 0 0 0 1px var(--rule-strong);
+  transition: box-shadow var(--t) var(--ease);
+}
+
+.input::placeholder {
+  color: var(--ink2);
+  opacity: 1;
+}
+
+textarea.input {
+  max-width: 40rem;
+  min-height: 88px;
+  padding: var(--space-2) var(--space-3);
+  resize: vertical;
+}
+
+.input:hover {
+  box-shadow: inset 0 0 0 1px var(--ink2);
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.input:disabled {
+  background: var(--panel);
+  color: var(--ink2);
+  cursor: not-allowed;
+}
+
+.input[aria-invalid="true"] {
+  box-shadow: inset 0 0 0 2px var(--loss);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  font-size: var(--step-0);
+  cursor: pointer;
+}
+
+.check input {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--ink);
+  cursor: inherit;
+}
+
+.check:has(input:disabled) {
+  color: var(--ink2);
+  cursor: not-allowed;
+}
+
+.inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4) var(--space-3);
+}
+
+.done-text {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.skel-rows {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
 }
 
 @media (prefers-reduced-motion: reduce) {

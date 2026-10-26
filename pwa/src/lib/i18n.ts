@@ -1,4 +1,3 @@
-import { en } from "./locales/en";
 import { id, type Messages } from "./locales/id";
 
 export type Lang = "id" | "en";
@@ -7,7 +6,6 @@ export type Params = Record<string, string | number>;
 
 export const LANGS: readonly Lang[] = ["id", "en"];
 export const LANG_KEY = "tb.lang";
-export const DICTS: Record<Lang, Messages> = { id, en };
 
 export function pickLang(stored: string | null | undefined): Lang {
   return stored === "en" ? "en" : "id";
@@ -22,6 +20,7 @@ function storedLang(): string | null {
 }
 
 export const lang: Lang = pickLang(storedLang());
+const active: Messages = lang === "en" ? (await import("./locales/en")).en : id;
 export const locale = lang === "en" ? "en-GB" : "id-ID";
 
 export function translate(dict: Messages, key: Key, params?: Params): string {
@@ -31,7 +30,7 @@ export function translate(dict: Messages, key: Key, params?: Params): string {
 }
 
 export function t(key: Key, params?: Params): string {
-  return translate(DICTS[lang], key, params);
+  return translate(active, key, params);
 }
 
 export function setLang(next: Lang): void {
